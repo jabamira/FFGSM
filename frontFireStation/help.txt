@@ -1,0 +1,513 @@
+1. в файле settings.py посмотри (если че поменяй имя и пароль юзера и имя бд)
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'fuel_db',        # имя твоей БД
+        'USER': 'fuel_user',      # пользователь PostgreSQL
+        'PASSWORD': 'fuel_password',  # пароль
+        'HOST': 'localhost',      # или IP сервера БД
+        'PORT': '5432',           # стандартный порт PostgreSQL
+    }
+}
+2. python -m venv venv в папке serverFireStation
+3. pip install django
+pip install djangorestframework
+pip install psycopg2-binary
+pip install PyJWT
+4. venv\Scripts\activate
+5. cd fire_station_project
+6. python manage.py makemigrations
+7. python manage.py migrate
+8. python manage.py createsuperuser(для захода в админку http://127.0.0.1:8000/admin/)
+9. python manage.py runserve
+
+
+
+Предположим, что все эндпоинты доступны по базовому URL:
+
+text
+
+/api/
+0. Общие правила
+Формат запросов/ответов: JSON.
+
+Даты: "YYYY-MM-DD" (например "2024-08-15").
+
+Время: "HH:MM[:SS]" (например "08:10:00").
+
+Decimal‑поля приходят как строки "54.956" — на фронте можно приводить к числам.
+
+Почти все эндпоинты требуют JWT:
+
+http
+
+Authorization: Bearer <JWT_ACCESS_TOKEN>
+Без токена большинство запросов вернёт:
+
+JSON
+
+{"detail": "Authentication credentials were not provided."}
+1. JWT‑аутентификация
+1.1. Логин (общий для web и mobile)
+POST /api/auth/login/
+
+Тело:
+
+JSON
+
+{
+  "login": "ivanov",
+  "password": "123",
+  "client": "web"       // "web" или "mobile"
+}
+login / password — поля модели User (одни и те же для сайта и мобилки).
+client:
+"web" — браузер;
+"mobile" — мобильное приложение.
+Ответ (200):
+
+JSON
+
+{
+  "access": "<JWT_ACCESS_TOKEN>",
+  "user": {
+    "id": 10,
+    "login": "ivanov",
+    "role": 2,
+    "name": "Иван",
+    "surname": "Иванов",
+    "last_name": "Иванович"
+  }
+}
+Что делать на фронте:
+
+Сохранить access (в store/secure storage).
+
+Во всех дальнейших запросах к API добавлять:
+
+http
+
+Authorization: Bearer <JWT_ACCESS_TOKEN>
+Токен содержит:
+
+JSON
+
+{
+  "sub": 10,           // id пользователя
+  "login": "ivanov",
+  "role": 2,           // id Role
+  "client": "web",     // или "mobile"
+  "iat": 1720000000,
+  "exp": 1720001800
+}
+При истечении exp сервер вернёт 401 → надо повторно залогиниться.
+
+2. Подписи (ролевая модель)
+2.1. Роли и пользователи
+Роли
+GET /api/roles/
+
+Пример элемента:
+
+JSON
+
+{
+  "id": 2,
+  "name": "Механик",
+  "can_book_from_mobile": true
+}
+Пользователи
+GET /api/users/
+
+JSON
+
+{
+  "id": 10,
+  "name": "Иван",
+  "surname": "Иванов",
+  "last_name": "Иванович",
+  "login": "ivanov",
+  "phone": "+79001234567",
+  "rank": 1,
+  "role": 2,
+  "driver_license": 5
+}
+2.2. Подстановки ролей (кто может расписаться за кого)
+RoleSubstitution
+GET /api/role-substitutions/
+
+JSON
+
+{
+  "id": 1,
+  "main_role": 2,        // ЧЬЯ подпись требуется по документу (например, "Механик")
+  "substitute_role": 3   // КТО может подписать вместо неё (например, "Начальник части")
+}
+Логика:
+
+Пользователь с ролью substitute_role может подписать слот, в котором требуется main_role.
+
+2.3. Какие роли ОБЯЗАНЫ подписать любой Waybill
+RequiredRole
+GET /api/required-roles/
+
+JSON
+
+{
+  "id": 2,           // идентификатор RequiredRole (совпадает с id Role)
+  "role": 2,         // id Role
+  "role_name": "Механик",
+  "order": 20        // порядок отображения в документе
+}
+Список required-roles — «слоты подписи», которые нужно закрыть по каждому путевому листу.
+
+3. Waybill и подписи
+3.1. Путевой лист (общая шапка)
+Ресурс: /api/waybills/ — CRUD.
+
+Пример:
+
+JSON
+
+{
+  "id": 100,
+  "number": 123,                 // если поле есть
+  "date": "2024-08-01",
+  "from_date": "2024-08-01",
+  "for_date": "2024-08-31"
+}
+3.2. Статус подписей по Waybill
+GET /api/waybills/{id}/signing_status/
+
+Ответ:
+
+JSON
+
+[
+  {
+    "required_role_id": 1,
+    "role_name": "Водитель",
+    "signed": true,
+    "signed_by": "petrov",
+    "signed_at": "2024-08-10T12:34:56Z"
+  },
+  {
+    "required_role_id": 2,
+    "role_name": "Механик",
+    "signed": false,
+    "signed_by": null,
+    "signed_at": null
+  }
+]
+Использование:
+
+выводить список обязательных ролей;
+показывать, кто и когда подписал.
+3.3. Поставить подпись
+POST /api/waybills/{id}/sign/
+
+Тело:
+
+JSON
+
+{
+  "required_role": 2   // id RequiredRole (слот, который хотим подписать)
+}
+Заголовок:
+
+http
+
+Authorization: Bearer <JWT_ACCESS_TOKEN>
+Поведение:
+
+бэкенд берёт request.user из токена;
+проверяет:
+если user.role == required_role.role → ОК;
+иначе ищет RoleSubstitution(main_role=required_role.role, substitute_role=user.role) → если есть, тоже ОК;
+иначе → 400 с сообщением об ошибке.
+Ответ (201):
+
+JSON
+
+{
+  "id": 15,
+  "waybill": 100,
+  "required_role": 2,
+  "role": "Механик",
+  "user": 10,
+  "user_name": "ivanov",
+  "signed_at": "2024-08-10T12:34:56Z"
+}
+Типичные ошибки:
+
+400 — «нет права подписать слот» или слот уже кем‑то подписан;
+403 — если нет токена;
+404 — неверный required_role.
+4. Машины
+4.1. Базовая машина
+/api/cars/ — CRUD.
+
+JSON
+
+{
+  "id": 3,
+  "number": "A001YY54",
+  "brand": "КАМАЗ",
+  "model": "43118"
+}
+4.2. Легковой автомобиль
+/api/passenger-cars/ — CRUD.
+
+JSON
+
+{
+  "id": 5,
+  "odometer": "43256.00",
+  "fuel": "40.000",
+
+  "winter_area": "0.120",
+  "winter_city": "0.100",
+  "summer_area": "0.110",
+  "summer_city": "0.090",
+
+  "car": 3
+}
+4.3. Пожарный автомобиль
+/api/fire-trucks/ — CRUD.
+
+JSON
+
+{
+  "id": 7,
+  "odometer": "10670.00",
+  "type": "АЦ-3,2-40",
+  "fuel": "150.000",
+
+  "winter_km": "0.657",
+  "winter_without_pump": "0.150",
+  "winter_with_pump": "0.250",
+
+  "summer_km": "0.657",
+  "summer_without_pump": "0.150",
+  "summer_with_pump": "0.250",
+
+  "car": 4
+}
+5. Путевой лист ЛЕГКОВОГО автомобиля
+5.1. Шапка PassengerCarWaybill
+/api/passenger-car-waybills/ — CRUD.
+
+JSON
+
+{
+  "id": 20,
+  "waybill": 100,        // id Waybill
+  "passenger_car": 5     // id PassengerCar
+}
+5.2. Строки PassengerCarWaybillRecord
+/api/passenger-car-records/ — CRUD.
+
+Важно: фронт заполняет только часть полей — остальное считает сервер.
+
+5.2.1. Что фронт должен отправлять (create/update)
+JSON
+
+{
+  "passenger_car_waybill": 20,
+
+  "date": "2024-08-15",
+  "driver": 10,                      // id User (водитель)
+
+  "odometer_after": "43093.00",      // одометр ПОСЛЕ поездки, км
+
+  "distance_city_km": "92.00",       // пробег по городу, км
+  "distance_area_km": "0.00",        // пробег по области, км
+
+  "fuel_refueled": "20.000",         // заправка, л
+
+  "season": "summer"                 // "summer" или "winter"
+}
+НЕ отправлять (read‑only, считает бэк):
+
+fuel_before_departure
+odometer_before
+norm_city, norm_area
+distance_total_km
+fuel_used_city, fuel_used_area, fuel_used_total
+fuel_on_return
+5.2.2. Что вернёт сервер
+JSON
+
+{
+  "id": 301,
+  "passenger_car_waybill": 20,
+  "date": "2024-08-15",
+  "driver": 10,
+
+  "odometer_after": "43093.00",
+  "distance_city_km": "92.00",
+  "distance_area_km": "0.00",
+  "fuel_refueled": "20.000",
+  "season": "summer",
+
+  "fuel_before_departure": "54.956", // автоматически: из предыдущей записи или из PassengerCar.fuel
+  "odometer_before": "43001.00",     // автоматически: из предыдущей записи или из PassengerCar.odometer
+
+  "norm_city": "0.090",
+  "norm_area": "0.110",
+
+  "distance_total_km": "92.00",
+  "fuel_used_city": "8.280",
+  "fuel_used_area": "0.000",
+  "fuel_used_total": "8.280",
+  "fuel_on_return": "66.676"
+}
+Также:
+
+при сохранении обновляется PassengerCar.odometer (максимальный odometer_after);
+PassengerCar.fuel становится fuel_on_return последней записи.
+6. Путевой лист ПОЖАРНОГО автомобиля
+6.1. Шапка FireTruckWaybill
+/api/fire-truck-waybills/ — CRUD.
+
+JSON
+
+{
+  "id": 30,
+  "waybill": 101,   // id Waybill
+  "fire_truck": 7   // id FireTruck
+}
+6.2. Строки FireTruckWaybillRecord
+/api/fire-truck-records/ — CRUD.
+
+Фронт указывает минимальные данные: конечный одометр, заправку, времена работы и сезон.
+
+6.2.1. Что фронт должен отправлять
+JSON
+
+{
+  "fire_truck_waybill": 30,
+
+  "date": "2024-08-15",
+  "place_of_work": "ТП Н Сотниковка 12 асс",
+  "departure_time": "08:10:00",
+  "return_time": "09:00:00",
+
+  "odometer_after": "10679.00",    // одометр ПОСЛЕ рейса
+
+  "fuel_refueled": "40.000",       // заправка, л
+
+  "fire_time_with_pump": 0,
+  "fire_time_without_pump": 15,
+  "training_time_with_pump": 0,
+  "training_time_without_pump": 0,
+  "shift_change_time_with_pump": 0,
+  "shift_change_time_without_pump": 5,
+  "other_time_with_pump": 0,
+  "other_time_without_pump": 0,
+
+  "season": "summer"
+}
+НЕ отправлять:
+
+fuel_before_departure
+odometer_before
+norm_km, norm_with_pump, norm_without_pump
+distance_km
+fuel_used_by_distance, fuel_used_with_pump,
+fuel_used_without_pump, fuel_used_total
+fuel_on_return
+6.2.2. Что вернёт сервер
+JSON
+
+{
+  "id": 401,
+  "fire_truck_waybill": 30,
+
+  "date": "2024-08-15",
+  "place_of_work": "ТП Н Сотниковка 12 асс",
+  "departure_time": "08:10:00",
+  "return_time": "09:00:00",
+
+  "odometer_after": "10679.00",
+  "fuel_refueled": "40.000",
+  "fire_time_with_pump": 0,
+  "fire_time_without_pump": 15,
+  "training_time_with_pump": 0,
+  "training_time_without_pump": 0,
+  "shift_change_time_with_pump": 0,
+  "shift_change_time_without_pump": 5,
+  "other_time_with_pump": 0,
+  "other_time_without_pump": 0,
+  "season": "summer",
+
+  "fuel_before_departure": "132.384",  // авто: из FireTruck.fuel или предыдущей записи
+  "odometer_before": "10670.00",       // авто: из FireTruck.odometer или предыдущей записи
+
+  "norm_km": "0.657",
+  "norm_with_pump": "0.250",
+  "norm_without_pump": "0.150",
+
+  "distance_km": "9.00",
+  "fuel_used_by_distance": "5.913",
+  "fuel_used_with_pump": "0.000",
+  "fuel_used_without_pump": "3.000",
+  "fuel_used_total": "8.913",
+  "fuel_on_return": "163.471"
+}
+Также при сохранении:
+
+FireTruck.odometer обновляется до max(старое, odometer_after);
+FireTruck.fuel = fuel_on_return.
+7. Взять машину через мобильное приложение
+Только для пользователей:
+
+с JWT, где client = "mobile";
+чья роль имеет can_book_from_mobile = true.
+Роут:
+POST /api/cars/{id}/book-mobile/
+
+Тело (минимум):
+
+JSON
+
+{
+  "from_date": "2024-08-12",
+  "for_date": "2024-08-12"
+}
+Заголовок:
+
+http
+
+Authorization: Bearer <JWT_из_login_с_client="mobile">
+Ответ (пример, зависит от реализации на бэке):
+
+JSON
+
+{
+  "message": "Машина успешно забронирована через мобильное приложение",
+  "car_id": 3,
+  "car_number": "A001YY54",
+  "user": "ivanov",
+  "from_date": "2024-08-12",
+  "for_date": "2024-08-12"
+}
+Ошибки:
+
+403 — если:
+токен веб‑клиента (client="web"),
+или у роли can_book_from_mobile = false;
+400 — если не переданы обязательные поля.
+8. Удаление
+Любой DELETE /api/<resource>/{id}/:
+
+делает soft delete (ставит deleted_at),
+в обычных списках (GET /api/<resource>/) такие записи больше не возвращаются.
+Восстановление нужно делать отдельными ручками/скриптом
+
+
+
+
+
+
+
