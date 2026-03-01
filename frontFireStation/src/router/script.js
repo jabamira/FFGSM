@@ -15,7 +15,23 @@ const routes = [
     component: UIComponentsPage,
     meta: { requiresAuth: true },
   },
-  { path: "/server-error", component: ServerError }, // catch all and send back to auth (could be 404 page)
+  {
+    path: "/server-error",
+    component: ServerError,
+    // if we somehow land here but the server is healthy, bounce to auth/root
+    beforeEnter: async (to, from) => {
+      const auth = useAuthStore();
+      const ok = await auth.checkConnection();
+      if (ok) {
+        // clear the flag so navigation guard won't redirect us back
+        auth.clearServerError();
+        // navigate to root which will redirect to /auth and then to /fuel-report if logged in
+        return "/";
+      }
+      // otherwise stay on error page
+      return true;
+    },
+  }, // catch all and send back to auth (could be 404 page)
   { path: "/:catchAll(.*)", redirect: "/" },
 ];
 
@@ -27,6 +43,14 @@ const router = createRouter({
 // global navigation guard (non-blocking for subsequent checks)
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
+  if (to.path !== "/server-error") {
+    await auth.checkConnection();
+    // only redirect if the store believes the server is actually down.
+    if (auth.serverError) {
+      return "/server-error";
+    }
+  }
 
   // if server previously failed, go straight to error page (unless we are already there)
   if (auth.serverError && to.path !== "/server-error") {

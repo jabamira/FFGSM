@@ -36,11 +36,16 @@ watch(
 );
 
 // verify with server to catch password change or invalidation
-// fire in background, don't block UI
-auth.checkConnection().then((ok) => {
-  if (!ok) {
-    router.push("/server-error");
-  }
-});
+// only perform this check when we actually have a token (otherwise
+// checkConnection() will return false immediately and the promise
+// handler below would erroneously send us to the server-error page
+// even though nothing was wrong with the backend).
+if (auth.isAuthenticated) {
+  auth.checkConnection().then((ok) => {
+    if (!ok && auth.serverError) {
+      router.push("/server-error");
+    }
+  });
+}
 
 app.mount("#app");

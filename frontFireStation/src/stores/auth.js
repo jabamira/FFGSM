@@ -143,22 +143,25 @@ export const useAuthStore = defineStore("auth", {
       }
       // mark that we've attempted verification even if early-return
       this.checkedOnce = true;
-      if (!this.access) {
-        this.logout();
-        return false;
+
+      // build headers only if we have a token; otherwise we'll still
+      // hit the endpoint without Authorization so we can detect whether the
+      // server is reachable even for anonymous users.
+      let headerVal;
+      if (this.access) {
+        headerVal = `Bearer ${this.access}`;
+        axios.defaults.headers.common["Authorization"] = headerVal;
+        console.debug(
+          "[AUTH] verify header explicit",
+          headerVal,
+          "access state",
+          this.access,
+        );
       }
-      // ensure header is definitely set locally and then pass it explicitly
-      const headerVal = `Bearer ${this.access}`;
-      axios.defaults.headers.common["Authorization"] = headerVal;
-      console.debug(
-        "[AUTH] verify header explicit",
-        headerVal,
-        "access state",
-        this.access,
-      );
+
       try {
         const res = await axios.get(`/auth/me/`, {
-          headers: { Authorization: headerVal },
+          headers: headerVal ? { Authorization: headerVal } : {},
           timeout: 5000, // fail quickly if server is unreachable
         });
         if (res.data && res.data.id) {
@@ -170,16 +173,25 @@ export const useAuthStore = defineStore("auth", {
         if (!err.response) {
           // no response => network/server down
           this.serverError = true;
+          // stop the periodic health polls so they don't fire while
+          // we're already handling the outage elsewhere (error screen,
+          // retry button). the mutation watcher in main.js already
+          // drives navigation.
+          this.stopHealthPolling();
           return false; // consume error
         }
         // treat server-side 5xx as 'down' as well
         if (err.response.status >= 500) {
           this.serverError = true;
+          this.stopHealthPolling();
           return false;
         }
         if (err.response.status === 401 || err.response.status === 403) {
-          // token invalid, missing, or password changed
-          this.logout();
+          // unauthorized; server is reachable but token is invalid / absent
+          if (this.access) {
+            // only clear credentials if we actually had one
+            this.logout();
+          }
           return false;
         }
       }
@@ -188,6 +200,11 @@ export const useAuthStore = defineStore("auth", {
 
     clearServerError() {
       this.serverError = false;
+      // resume health polling if we still have a token; this is usually
+      // called by retryVerify when the error page detects recovery.
+      if (this.access) {
+        this.startHealthPolling();
+      }
     },
 
     async retryVerify() {
@@ -195,7 +212,14 @@ export const useAuthStore = defineStore("auth", {
       // also reset timestamp so next call actually pings
       this.lastVerifyTime = 0;
       this.checkedOnce = false;
-      return await this.verify();
+      const ok = await this.verify();
+      // if verify succeeded and we still have an access token, ensure the
+      // background polling is running; clearServerError already started it
+      // but we guard just in case verify set it again.
+      if (ok && this.access && !this.healthIntervalId) {
+        this.startHealthPolling();
+      }
+      return ok;
     },
 
     // periodically poll /auth/me so we can detect downtime even when idle

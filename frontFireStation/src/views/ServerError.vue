@@ -29,9 +29,13 @@ async function onRetry() {
   if (loading.value) return false;
   loading.value = true;
   message.value = '';
-  const ok = await auth.retryVerify();
-  if (ok) {
-    router.push("/");
+
+  // retryVerify resets serverError and then calls verify; we don't care
+  // about the returned boolean so much as whether the serverError flag
+  // remains false (meaning backend is reachable).
+  await auth.retryVerify();
+  if (!auth.serverError) {
+    router.push("/auth");
     return true;
   } else {
     // keep error page, show message, allow try again after timeout
