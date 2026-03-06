@@ -3,6 +3,13 @@ import Auth from "../views/Auth.vue";
 import FuelReport from "../views/FuelReport.vue";
 import UIComponentsPage from "../views/UIComponentsPage.vue";
 import ServerError from "../views/ServerError.vue";
+import Drivers from "../views/Drivers.vue";
+import FireTrucksList from "../views/FireTrucksList.vue";
+import FireTrucksWayBills from "../views/FireTrucksWayBills.vue";
+import FireTrucksNorms from "../views/FireTrucksNorms.vue";
+import LightVehiclesList from "../views/LightVehiclesList.vue";
+import LightVehiclesWayBills from "../views/LightVehiclesWayBills.vue";
+import LightVehiclesNorms from "../views/LightVehiclesNorms.vue";
 import { useAuthStore } from "../stores/auth"; // used in navigation guard
 
 const routes = [
@@ -10,6 +17,37 @@ const routes = [
   { path: "/", redirect: "/auth" },
   { path: "/auth", component: Auth },
   { path: "/fuel-report", component: FuelReport, meta: { requiresAuth: true } },
+  { path: "/drivers", component: Drivers, meta: { requiresAuth: true } },
+  {
+    path: "/fire-trucks-list",
+    component: FireTrucksList,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/fire-trucks-waybills",
+    component: FireTrucksWayBills,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/fire-trucks-norms",
+    component: FireTrucksNorms,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/light-vehicles-list",
+    component: LightVehiclesList,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/light-vehicles-waybills",
+    component: LightVehiclesWayBills,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/light-vehicles-norms",
+    component: LightVehiclesNorms,
+    meta: { requiresAuth: true },
+  },
   {
     path: "/ui-elements",
     component: UIComponentsPage,

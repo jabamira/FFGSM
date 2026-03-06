@@ -1,6 +1,8 @@
 <template>
-  <div class="p-6 max-w-6xl mx-auto">
-    <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Отчёт по ГСМ — заполнение механиком</h2>
+  <div>
+    <NavigationMenu />
+    <div class="p-6 max-w-6xl mx-auto">
+      <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Отчёт по ГСМ — заполнение механиком</h2>
 
     <p class="text-sm mb-4" :style="{ color: palette.medium }">Заполните поля ниже. Вводимые поля — редактируемые, вычисляемые — выделены цветом.</p>
 
@@ -64,12 +66,14 @@
         </template>
       </DataTable>
     </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { reactive, ref } from 'vue';
 import { TextInput, SelectInput, Button, DataTable, palette } from '../components/ui/importUi';
+import NavigationMenu from '../components/NavigationMenu.vue';
 
 const defaults = {
   summer: { norm_city: 0.09, norm_area: 0.11 },

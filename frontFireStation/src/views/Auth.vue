@@ -88,13 +88,23 @@ const passwordInputStyle = computed(() => ({
 
 async function submit() {
   error.value = '';
+
   if (!login.value || !password.value) {
     error.value = 'Введите логин и пароль';
     return;
   }
+  
+
+  const loginClean = login.value.trim();
+  const passwordClean = password.value.trim();
+
+   if (/\s/.test(passwordClean)) {
+    error.value = 'Пароль не должен содержать пробелы';
+    return;
+  }
 
   try {
-    const ok = await auth.login(login.value, password.value);
+    const ok = await auth.login(loginClean, passwordClean);
     if (ok) {
       router.push('/fuel-report');
     } else {
