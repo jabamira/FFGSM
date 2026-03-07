@@ -4,13 +4,14 @@
       <h1 class="text-lg font-bold" :style="{ color: palette.dark }">Управление ГСМ</h1>
       <div class="flex items-center gap-2">
         <router-link 
+          v-if="auth.user && auth.permissions && auth.permissions.view_users"
           to="/drivers" 
           :class="['px-3 py-1.5 rounded transition', isActive('/drivers') ? 'font-semibold' : 'hover:bg-gray-100']"
           :style="isActive('/drivers') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
         >
           Водители
         </router-link>
-        <div class="relative group">
+        <div v-if="auth.user && auth.permissions && auth.permissions.view_fire_trucks" class="relative group">
           <button
             :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isFireTruckActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isFireTruckActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
@@ -22,6 +23,7 @@
           </button>
           <div class="hidden group-hover:block absolute left-0 top-full mt-0 w-48 bg-white rounded shadow-lg z-50 border" :style="{ borderColor: palette.light }">
             <router-link 
+              v-if="auth.permissions && auth.permissions.view_fire_trucks"
               to="/fire-trucks-list" 
               class="block px-4 py-2 hover:bg-gray-50 first:rounded-t-md"
               :style="{ color: palette.dark }"
@@ -29,6 +31,7 @@
               Список пожарных автомобилей
             </router-link>
             <router-link 
+              v-if="auth.permissions && auth.permissions.view_fire_truck_waybills"
               to="/fire-trucks-waybills" 
               class="block px-4 py-2 hover:bg-gray-50"
               :style="{ color: palette.dark }"
@@ -36,6 +39,7 @@
               Путевые листы
             </router-link>
             <router-link 
+              v-if="auth.permissions && auth.permissions.view_fire_truck_norms"
               to="/fire-trucks-norms" 
               class="block px-4 py-2 hover:bg-gray-50 last:rounded-b-md"
               :style="{ color: palette.dark }"
@@ -44,7 +48,7 @@
             </router-link>
           </div>
         </div>
-        <div class="relative group">
+        <div v-if="auth.user && auth.permissions && auth.permissions.view_passenger_cars" class="relative group">
           <button
             :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isLightVehicleActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isLightVehicleActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
@@ -56,6 +60,7 @@
           </button>
           <div class="hidden group-hover:block absolute left-0 top-full mt-0 w-48 bg-white rounded shadow-lg z-50 border" :style="{ borderColor: palette.light }">
             <router-link 
+              v-if="auth.permissions && auth.permissions.view_passenger_cars"
               to="/light-vehicles-list" 
               class="block px-4 py-2 hover:bg-gray-50 first:rounded-t-md"
               :style="{ color: palette.dark }"
@@ -63,6 +68,7 @@
               Список легковых автомобилей
             </router-link>
             <router-link 
+              v-if="auth.permissions && auth.permissions.view_passenger_cars_waybills"
               to="/light-vehicles-waybills" 
               class="block px-4 py-2 hover:bg-gray-50"
               :style="{ color: palette.dark }"
@@ -70,7 +76,8 @@
               Путевые листы
             </router-link>
             <router-link 
-              to="/light-vehicles-norms" 
+              v-if="auth.permissions && auth.permissions.view_passenger_cars_norms"
+              to="/light-vehicles-norms"
               class="block px-4 py-2 hover:bg-gray-50 last:rounded-b-md"
               :style="{ color: palette.dark }"
             >
@@ -79,6 +86,7 @@
           </div>
         </div>
         <router-link 
+          v-if="auth.user && auth.permissions && auth.permissions.view_fire_truck_reports"
           to="/fuel-report" 
           :class="['px-3 py-1.5 rounded transition', isActive('/fuel-report') ? 'font-semibold' : 'hover:bg-gray-100']"
           :style="isActive('/fuel-report') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
@@ -94,6 +102,8 @@
         />
       </div>
     </div>
+
+   
   </nav>
 </template>
 
@@ -101,10 +111,13 @@
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { palette, Button } from './ui/importUi';
+import { onMounted } from 'vue';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+
+console.debug("[NavigationMenu] Auth store:", auth); // Debug the auth object
 
 const isActive = (path) => {
   return route.path === path;
@@ -123,6 +136,17 @@ const logout = () => {
   auth.setUser(null);
   router.push('/auth');
 };
+
+// Fetch permissions on component mount
+onMounted(async () => {
+  if (!auth.permissions || Object.keys(auth.permissions).length === 0) {
+    try {
+      await auth.fetchPermissions();
+    } catch (error) {
+      console.error("[NavigationMenu] Error fetching permissions:", error);
+    }
+  }
+});
 </script>
 
 <style scoped>

@@ -32,6 +32,11 @@ const columns = [
 ];
 
 const fetchDrivers = async () => {
+  if (!auth.permissions.view_users) {
+    console.warn('Нет разрешения на просмотр пользователей.');
+    return;
+  }
+
   try {
     const response = await axios.get('users/?role=3', {
       headers: { Authorization: `Bearer ${auth.token}` }
@@ -57,5 +62,12 @@ const viewDriverDetails = (driver) => {
   console.log('Просмотр деталей водителя:', driver);
 };
 
-onMounted(fetchDrivers);
+onMounted(() => {
+  console.debug("[DEBUG] Permissions loaded from store:", auth.permissions);
+  if (auth.permissions.view_users) {
+    fetchDrivers();
+  } else {
+    console.warn("[DEBUG] User does not have permission to view users.");
+  }
+});
 </script>
