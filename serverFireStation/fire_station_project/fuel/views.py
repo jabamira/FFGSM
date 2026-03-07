@@ -49,6 +49,12 @@ class UserViewSet(SoftDeleteModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def get_queryset(self):
+        role_id = self.request.query_params.get('role')
+        if role_id:
+            return self.queryset.filter(role_id=role_id, deleted_at__isnull=True)
+        return self.queryset.filter(deleted_at__isnull=True)
+
 # --- Легковые ---
 
 class PassengerCarViewSet(SoftDeleteModelViewSet):

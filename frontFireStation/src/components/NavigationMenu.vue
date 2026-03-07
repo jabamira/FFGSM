@@ -1,22 +1,18 @@
 <template>
   <nav class="bg-white shadow-md border-b" :style="{ borderColor: palette.light }">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center gap-6">
-      <h1 class="text-xl font-bold" :style="{ color: palette.dark }">Управление ГСМ</h1>
-      
+    <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-4">
+      <h1 class="text-lg font-bold" :style="{ color: palette.dark }">Управление ГСМ</h1>
       <div class="flex items-center gap-2">
-        <!-- Водители -->
         <router-link 
           to="/drivers" 
-          :class="['px-4 py-2 rounded transition', isActive('/drivers') ? 'font-semibold' : 'hover:bg-gray-100']"
+          :class="['px-3 py-1.5 rounded transition', isActive('/drivers') ? 'font-semibold' : 'hover:bg-gray-100']"
           :style="isActive('/drivers') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
         >
           Водители
         </router-link>
-
-        <!-- Пожарные автомобили с dropdown -->
         <div class="relative group">
           <button
-            :class="['px-4 py-2 rounded transition flex items-center gap-2', isFireTruckActive() ? 'font-semibold' : 'hover:bg-gray-100']"
+            :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isFireTruckActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isFireTruckActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
           >
             Пожарные автомобили
@@ -24,8 +20,6 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
             </svg>
           </button>
-          
-          <!-- Dropdown Menu -->
           <div class="hidden group-hover:block absolute left-0 top-full mt-0 w-48 bg-white rounded shadow-lg z-50 border" :style="{ borderColor: palette.light }">
             <router-link 
               to="/fire-trucks-list" 
@@ -50,11 +44,9 @@
             </router-link>
           </div>
         </div>
-
-        <!-- Легковые автомобили с dropdown -->
         <div class="relative group">
           <button
-            :class="['px-4 py-2 rounded transition flex items-center gap-2', isLightVehicleActive() ? 'font-semibold' : 'hover:bg-gray-100']"
+            :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isLightVehicleActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isLightVehicleActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
           >
             Легковые автомобили
@@ -62,8 +54,6 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
             </svg>
           </button>
-          
-          <!-- Dropdown Menu -->
           <div class="hidden group-hover:block absolute left-0 top-full mt-0 w-48 bg-white rounded shadow-lg z-50 border" :style="{ borderColor: palette.light }">
             <router-link 
               to="/light-vehicles-list" 
@@ -88,18 +78,14 @@
             </router-link>
           </div>
         </div>
-
-        <!-- Отчёт по ГСМ -->
         <router-link 
           to="/fuel-report" 
-          :class="['px-4 py-2 rounded transition', isActive('/fuel-report') ? 'font-semibold' : 'hover:bg-gray-100']"
+          :class="['px-3 py-1.5 rounded transition', isActive('/fuel-report') ? 'font-semibold' : 'hover:bg-gray-100']"
           :style="isActive('/fuel-report') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
         >
           Отчёт по ГСМ
         </router-link>
       </div>
-
-      <!-- Logout button -->
       <div class="ml-auto">
         <Button 
           @click="logout" 

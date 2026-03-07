@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
     <div class="p-6 max-w-6xl mx-auto">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Путевые листы легковых автомобилей</h2>

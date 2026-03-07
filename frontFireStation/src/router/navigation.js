@@ -21,6 +21,7 @@ export function useNavigation() {
   const NavigateLightVehiclesWayBills = () =>
     router.push("/light-vehicles-waybills");
   const NavigateLightVehiclesNorms = () => router.push("/light-vehicles-norms");
+  const NavigatePassengerCars = () => router.push("/passenger-cars");
 
   return {
     NavigateAuth,
@@ -36,5 +37,6 @@ export function useNavigation() {
     NavigateLightVehiclesList,
     NavigateLightVehiclesWayBills,
     NavigateLightVehiclesNorms,
+    NavigatePassengerCars,
   };
 }
