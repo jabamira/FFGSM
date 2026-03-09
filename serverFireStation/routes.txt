@@ -3,30 +3,30 @@
 text
 
 /api/
-Во всех примерах Authorization подразумевает, что JWT уже получен через /auth/login/.
-
-1. Аутентификация и JWT
-1.1. Логин
-POST /auth/login/
-
-Запрос:
+JWT передаётся в заголовке:
 
 http
 
-POST /api/auth/login/
-Content-Type: application/json
+Authorization: Bearer <JWT>
+1. Аутентификация
+1.1. Логин
+POST /auth/login/
 
-{
-  "login": "driver1",
-  "password": "12345",
-  "client": "mobile"
-}
-Успешный ответ 200:
+Тело:
 
 JSON
 
 {
-  "access": "eyJ0eXAiOiJKV1QiLCJh...<JWT>...",
+  "login": "driver1",
+  "password": "12345",
+  "client": "web"   // "web" или "mobile"
+}
+Ответ:
+
+JSON
+
+{
+  "access": "<JWT>",
   "user": {
     "id": 5,
     "login": "driver1",
@@ -36,24 +36,27 @@ JSON
     "last_name": "Иванович"
   }
 }
-Ошибка (неверный логин/пароль) 401:
+В токене в payload есть:
 
 JSON
 
 {
-  "detail": "Неверный логин или пароль"
+  "sub": 5,
+  "login": "driver1",
+  "role": 3,
+  "client": "mobile",      // то, что было в login.client
+  "pwd_fp": "<отпечаток_пароля>",
+  "iat": ...,
+  "exp": ...
 }
-1.2. Текущий пользователь (/auth/me)
+Если пароль пользователя изменится, все старые токены станут невалидными.
+
+1.2. Текущий пользователь
 GET /auth/me/
 
-Запрос:
+Требует Authorization: Bearer <JWT>.
 
-http
-
-GET /api/auth/me/
-Authorization: Bearer eyJ0eXAiOiJKV1QiLCJh...<JWT>...
-Accept: application/json
-Ответ 200:
+Ответ:
 
 JSON
 
@@ -68,334 +71,76 @@ JSON
   "role": 3,
   "deleted_at": null
 }
-Пример 401 при невалидном токене:
+2. Модель прав
+2.1. Роли
+/roles/ — CRUD ролей (name).
+
+2.2. Permission (права роли)
+/permissions/ — CRUD прав для роли.
+
+Основные флаги, важные для фронта:
+
+view_passenger_cars_waybills — просмотр путевых легковых.
+
+can_create_passenger_cars_waybills — создание шапки путевого (легковой).
+
+can_update_passenger_cars_waybills, can_delete_passenger_cars_waybills.
+
+can_download_passenger_cars_waybills — выгрузка отчёта Excel (легковой).
+
+can_create_passenger_cars_waybills_record — создание записей (record) с WEB (легковой).
+
+can_update_passenger_cars_waybills_record, can_delete_passenger_cars_waybills_record.
+
+Аналогичные флаги для пожарных:
+view_fire_truck_waybills, can_create_fire_truck_waybills,
+can_download_fire_truck_waybills,
+can_create_fire_truck_waybills_record и т.д.
+
+can_use_mobile_booking — право создавать записи с мобильного приложения.
+
+Правило:
+
+Запрос с client="web" → для создания записей проверяется can_create_*_waybills_record.
+Запрос с client="mobile" → для создания записей проверяется can_use_mobile_booking.
+Если оба флага у роли = True → пользователь может создавать записи и с веба, и с мобилки.
+
+3. Легковой автомобиль
+3.1. Машины
+/passenger-cars/ — CRUD.
+
+3.2. Нормы расхода
+/passenger-car-norms/ — CRUD.
+
+Доп. роут:
+
+GET /passenger-car-norms/for-date/?car=<id>&season=<summer|winter>&date=YYYY-MM-DD
+
+→ возвращает запись нормы для машины и сезона, действующую на дату документа (последнюю по date <= указанной).
+
+3.3. Снимки одометра/топлива
+/passenger-car-odometer-fuel/ — CRUD.
+
+GET /passenger-car-odometer-fuel/last/?car=<id> → последний снимок по машине.
+
+Используется на бэке для:
+
+определения odometer_before / fuel_before_departure перед новой записью;
+создания нового снимка после записи (odometer_after / fuel_on_return).
+3.4. Путевой — шапка
+Ресурс: /passenger-car-waybills/
+
+Доступ по правам:
+
+list, retrieve → view_passenger_cars_waybills.
+create → can_create_passenger_cars_waybills.
+update, partial_update → can_update_passenger_cars_waybills.
+destroy → can_delete_passenger_cars_waybills.
+Пример создания:
 
 JSON
-
-{
-  "detail": "Пароль был изменён. Авторизуйтесь снова."
-}
-или
-
-JSON
-
-{
-  "detail": "Токен истёк"
-}
-2. Роли, права, пользователи
-2.1. Роли /roles/
-GET /roles/
-
-http
-
-GET /api/roles/
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-[
-  {
-    "id": 1,
-    "name": "Администратор",
-    "deleted_at": null
-  },
-  {
-    "id": 2,
-    "name": "Механик",
-    "deleted_at": null
-  },
-  {
-    "id": 3,
-    "name": "Водитель",
-    "deleted_at": null
-  }
-]
-POST /roles/
-
-http
-
-POST /api/roles/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "name": "Инженер"
-}
-Ответ 201:
-
-JSON
-
-{
-  "id": 4,
-  "name": "Инженер",
-  "deleted_at": null
-}
-2.2. Права роли /permissions/
-GET /permissions/
-
-http
-
-GET /api/permissions/
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-[
-  {
-    "id": 1,
-    "role": 1,
-    "can_use_mobile_booking": true,
-    "can_create_users": true,
-    "can_delete_users": true,
-    "can_update_users": true,
-    "view_users": true,
-    "can_create_fire_trucks": true,
-    "...": false,
-    "view_passenger_cars_reports": true,
-    "deleted_at": null
-  },
-  {
-    "id": 2,
-    "role": 2,
-    "can_use_mobile_booking": true,
-    "...": true,
-    "deleted_at": null
-  }
-]
-POST /permissions/
-
-http
-
-POST /api/permissions/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "role": 3,
-  "can_use_mobile_booking": true,
-  "view_passenger_cars_waybills": true,
-  "can_create_passenger_cars_waybills_record": true
-}
-Ответ:
-
-JSON
-
-{
-  "id": 3,
-  "role": 3,
-  "can_use_mobile_booking": true,
-  "can_create_users": false,
-  "can_delete_users": false,
-  "can_update_users": false,
-  "view_users": false,
-  "can_create_fire_trucks": false,
-  "...": false,
-  "view_passenger_cars_waybills": true,
-  "can_create_passenger_cars_waybills_record": true,
-  "...": false,
-  "deleted_at": null
-}
-2.3. Пользователи /users/
-GET /users/
-
-http
-
-GET /api/users/
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-[
-  {
-    "id": 1,
-    "name": "Админ",
-    "surname": "Админов",
-    "last_name": "Админович",
-    "login": "admin",
-    "phone": "+70000000000",
-    "driver_license": null,
-    "role": 1,
-    "deleted_at": null
-  },
-  {
-    "id": 5,
-    "name": "Иван",
-    "surname": "Иванов",
-    "last_name": "Иванович",
-    "login": "driver1",
-    "phone": "+79001234567",
-    "driver_license": "1234567890",
-    "role": 3,
-    "deleted_at": null
-  }
-]
-POST /users/
-
-http
-
-POST /api/users/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "name": "Иван",
-  "surname": "Иванов",
-  "last_name": "Иванович",
-  "login": "driver2",
-  "password": "654321",
-  "phone": "+79007654321",
-  "driver_license": "9876543210",
-  "role": 3
-}
-Ответ 201:
-
-JSON
-
-{
-  "id": 6,
-  "name": "Иван",
-  "surname": "Иванов",
-  "last_name": "Иванович",
-  "login": "driver2",
-  "phone": "+79007654321",
-  "driver_license": "9876543210",
-  "role": 3,
-  "deleted_at": null
-}
-3. Легковые автомобили
-3.1. Машина /passenger-cars/
-POST /passenger-cars/
-
-http
-
-POST /api/passenger-cars/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "number": "A001AA54",
-  "brand": "Toyota",
-  "model": "Camry"
-}
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "number": "A001AA54",
-  "brand": "Toyota",
-  "model": "Camry",
-  "deleted_at": null
-}
-GET /passenger-cars/ → список всех машин.
-
-3.2. Нормы /passenger-car-norms/
-POST /passenger-car-norms/
-
-http
-
-POST /api/passenger-car-norms/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "car": 1,
-  "season": "summer",
-  "city_norm": "0.090",
-  "area_norm": "0.110",
-  "date": "2024-09-01"
-}
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "car": 1,
-  "season": "summer",
-  "city_norm": "0.090",
-  "area_norm": "0.110",
-  "date": "2024-09-01",
-  "deleted_at": null
-}
-GET /passenger-car-norms/for-date/?car=1&season=summer&date=2024-09-15
-
-http
-
-GET /api/passenger-car-norms/for-date/?car=1&season=summer&date=2024-09-15
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "car": 1,
-  "season": "summer",
-  "city_norm": "0.090",
-  "area_norm": "0.110",
-  "date": "2024-09-01",
-  "deleted_at": null
-}
-3.3. Снимки одометра/топлива /passenger-car-odometer-fuel/
-POST /passenger-car-odometer-fuel/
-
-http
-
-POST /api/passenger-car-odometer-fuel/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "car": 1,
-  "odometer": 100000,
-  "fuel": "40.000",
-  "date": "2024-09-01",
-  "waybill": null
-}
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "car": 1,
-  "odometer": 100000,
-  "fuel": "40.000",
-  "date": "2024-09-01",
-  "waybill": null,
-  "deleted_at": null
-}
-GET /passenger-car-odometer-fuel/last/?car=1
-
-http
-
-GET /api/passenger-car-odometer-fuel/last/?car=1
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-{
-  "id": 3,
-  "car": 1,
-  "odometer": 100350,
-  "fuel": "35.500",
-  "date": "2024-09-15",
-  "waybill": 5,
-  "deleted_at": null
-}
-3.4. Путевой /passenger-car-waybills/
-POST /passenger-car-waybills/
-
-http
 
 POST /api/passenger-car-waybills/
-Content-Type: application/json
 Authorization: Bearer <JWT>
 
 {
@@ -405,7 +150,7 @@ Authorization: Bearer <JWT>
   "norm_season": "summer",
   "fuel_type": "petrol"
 }
-Ответ:
+Ответ (агрегаты считает сервер):
 
 JSON
 
@@ -425,13 +170,22 @@ JSON
   "overrun": "0.000",
   "deleted_at": null
 }
-3.5. Строки путевого /passenger-car-records/
-POST /passenger-car-records/
+3.5. Путевой — строки (записи)
+Ресурс: /passenger-car-records/
 
-http
+Права:
+
+list, retrieve → view_passenger_cars_waybills.
+create → зависит от client в JWT:
+client="web" → нужно can_create_passenger_cars_waybills_record.
+client="mobile" → нужно can_use_mobile_booking.
+update, partial_update → can_update_passenger_cars_waybills_record.
+destroy → can_delete_passenger_cars_waybills_record.
+Пример создания записи (водитель или механик, в зависимости от прав):
+
+JSON
 
 POST /api/passenger-car-records/
-Content-Type: application/json
 Authorization: Bearer <JWT>
 
 {
@@ -442,9 +196,9 @@ Authorization: Bearer <JWT>
   "distance_city_km": 50,
   "distance_area_km": 0,
   "fuel_refueled": "10.000",
-  "fuel_used": "8.000"
+  "fuel_used": "8.000"     // факт, по желанию
 }
-Ответ 201:
+Ответ (пример):
 
 JSON
 
@@ -464,15 +218,19 @@ JSON
   "distance_total_km": 50,
   "odometer_after": 100050,
 
-  "fuel_used_city": "4.500",
-  "fuel_used_area": "0.000",
-  "fuel_used_normal": "4.500",
+  "fuel_used_city": "4.500",   // по норме
+  "fuel_used_area": "0.000",   // по норме
+  "fuel_used_normal": "4.500", // по норме (сумма)
   "fuel_on_return": "42.000",
 
   "deleted_at": null
 }
 3.6. Отчёт Excel по легковому
-GET /passenger-car-waybills/export-excel/?car=1&from=2024-09-01&to=2024-09-30
+GET /passenger-car-waybills/export-excel/?car=<id>&from=YYYY-MM-DD&to=YYYY-MM-DD
+
+Право: can_download_passenger_cars_waybills.
+
+Пример:
 
 http
 
@@ -481,185 +239,51 @@ Authorization: Bearer <JWT>
 Ответ:
 
 200 OK
-
-Заголовок:
-
-http
-
 Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename*=UTF-8''%D0%9F%D1%83%D1%82%D0%B5%D0%B2%D1%8B%D0%B5%20...
-Тело — бинарный .xlsx файл по шаблону passenger_car.xlsx с заполненными строками и итогами.
+Content-Disposition: attachment; filename*=UTF-8''%...
+Тело — файл .xlsx по шаблону passenger_car.xlsx с:
+строками по всем записям;
+строкой «ИТОГО»;
+раскраской (жёлтый/зелёный/красный) и подсчётами.
+4. Пожарный автомобиль
+4.1. Машины
+/fire-trucks/ — CRUD.
 
-4. Пожарные автомобили
-4.1. Машины /fire-trucks/
-POST /fire-trucks/
+4.2. Нормы
+/fire-truck-norms/ — CRUD.
 
-http
+GET /fire-truck-norms/for-date/?car=<id>&season=<winter|summer>&date=YYYY-MM-DD — последняя норма на дату.
 
-POST /api/fire-trucks/
-Content-Type: application/json
-Authorization: Bearer <JWT>
+4.3. Снимки одометра/топлива
+/fire-truck-odometer-fuel/ — CRUD.
 
-{
-  "number": "A101AA54",
-  "brand": "КАМАЗ",
-  "model": "43118",
-  "type": "АЦ-3,2-40"
-}
-Ответ:
+GET /fire-truck-odometer-fuel/last/?car=<id> — последний снимок по машине.
 
-JSON
+4.4. Путевой ПА — шапка
+/fire-truck-waybills/
 
-{
-  "id": 2,
-  "number": "A101AA54",
-  "brand": "КАМАЗ",
-  "model": "43118",
-  "type": "АЦ-3,2-40",
-  "deleted_at": null
-}
-4.2. Нормы /fire-truck-norms/
-POST /fire-truck-norms/
+Права:
 
-http
+list, retrieve → view_fire_truck_waybills.
+create → can_create_fire_truck_waybills.
+update, partial_update → can_update_fire_truck_waybills.
+destroy → can_delete_fire_truck_waybills.
+4.5. Путевой ПА — строки
+/fire-truck-records/
 
-POST /api/fire-truck-norms/
-Content-Type: application/json
-Authorization: Bearer <JWT>
+Права:
 
-{
-  "car": 2,
-  "season": "winter",
-  "with_pump_norm": "0.250",
-  "without_pump_norm": "0.150",
-  "km_norm": "0.657",
-  "date": "2024-09-01"
-}
-Ответ:
+list, retrieve → view_fire_truck_waybills.
+create:
+client="web" → can_create_fire_truck_waybills_record.
+client="mobile" → can_use_mobile_booking.
+update, partial_update → can_update_fire_truck_waybills_record.
+destroy → can_delete_fire_truck_waybills_record.
+Пример создания:
 
 JSON
-
-{
-  "id": 1,
-  "car": 2,
-  "season": "winter",
-  "with_pump_norm": "0.250",
-  "without_pump_norm": "0.150",
-  "km_norm": "0.657",
-  "date": "2024-09-01",
-  "deleted_at": null
-}
-GET /fire-truck-norms/for-date/?car=2&season=winter&date=2024-12-15
-
-http
-
-GET /api/fire-truck-norms/for-date/?car=2&season=winter&date=2024-12-15
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "car": 2,
-  "season": "winter",
-  "with_pump_norm": "0.250",
-  "without_pump_norm": "0.150",
-  "km_norm": "0.657",
-  "date": "2024-09-01",
-  "deleted_at": null
-}
-4.3. Снимки одометра/топлива /fire-truck-odometer-fuel/
-POST /fire-truck-odometer-fuel/
-
-http
-
-POST /api/fire-truck-odometer-fuel/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "car": 2,
-  "odometer": 20000,
-  "fuel": "150.000",
-  "date": "2024-09-01",
-  "waybill": null
-}
-Ответ:
-
-JSON
-
-{
-  "id": 1,
-  "car": 2,
-  "odometer": 20000,
-  "fuel": "150.000",
-  "date": "2024-09-01",
-  "waybill": null,
-  "deleted_at": null
-}
-GET /fire-truck-odometer-fuel/last/?car=2
-
-http
-
-GET /api/fire-truck-odometer-fuel/last/?car=2
-Authorization: Bearer <JWT>
-Ответ:
-
-JSON
-
-{
-  "id": 5,
-  "car": 2,
-  "odometer": 20090,
-  "fuel": "145.000",
-  "date": "2024-09-15",
-  "waybill": 8,
-  "deleted_at": null
-}
-4.4. Путевой ПА — шапка /fire-truck-waybills/
-POST /fire-truck-waybills/
-
-http
-
-POST /api/fire-truck-waybills/
-Content-Type: application/json
-Authorization: Bearer <JWT>
-
-{
-  "car": 2,
-  "driver": 5,
-  "date": "2024-09-15",
-  "norm_season": "winter",
-  "fuel_type": "diesel"
-}
-Ответ (пример):
-
-JSON
-
-{
-  "id": 8,
-  "car": 2,
-  "driver": 5,
-  "date": "2024-09-15",
-  "norm_season": "winter",
-  "fuel_type": "diesel",
-  "upon_issuance": "150.000",
-  "total_spent": "0.000",
-  "total_received": "0.000",
-  "required_by_norm": "0.000",
-  "availability_upon_delivery": "150.000",
-  "savings": "0.000",
-  "overrun": "0.000",
-  "deleted_at": null
-}
-4.5. Путевой ПА — записи /fire-truck-records/
-POST /fire-truck-records/
-
-http
 
 POST /api/fire-truck-records/
-Content-Type: application/json
 Authorization: Bearer <JWT>
 
 {
@@ -674,50 +298,31 @@ Authorization: Bearer <JWT>
   "fuel_refueled": "20.000",
   "fuel_used": "25.000"
 }
-Ответ:
-
-JSON
-
-{
-  "id": 12,
-  "fire_truck_waybill": 8,
-  "target": "Выезд на пожар",
-  "driving_route": "ул. Ленина, 10",
-  "departure_time": "14:00:00",
-  "arrival_time": "15:30:00",
-  "odometer_after": 20090,
-  "time_with_pump": 30,
-  "time_without_pump": 15,
-  "fuel_refueled": "20.000",
-  "fuel_used": "25.000",
-
-  "fuel_before_departure": "150.000",
-  "odometer_before": 20000,
-  "distance_km": 90,
-
-  "fuel_used_by_distance": "59.130",
-  "fuel_used_with_pump": "7.500",
-  "fuel_used_without_pump": "2.250",
-  "fuel_used_normal": "68.880",
-  "fuel_on_return": "145.000",
-
-  "deleted_at": null
-}
 4.6. Отчёт Excel по ПА
-GET /fire-truck-waybills/export-excel/?car=2&from=2024-09-01&to=2024-09-30
+GET /fire-truck-waybills/export-excel/?car=<id>&from=YYYY-MM-DD&to=YYYY-MM-DD
 
-http
+Право: can_download_fire_truck_waybills.
 
-GET /api/fire-truck-waybills/export-excel/?car=2&from=2024-09-01&to=2024-09-30
-Authorization: Bearer <JWT>
-Ответ:
+Ответ — .xlsx по шаблону fire_truck.xlsx (как у легкового: строки + итоги, цвета, экономия/перерасход).
 
-200 OK
+5. Кратко по сценариям использования
+Водитель через мобильное
+Логин с client="mobile".
+В Permission роли водителя:
+can_use_mobile_booking = True,
+view_*_waybills = True (для чтения),
+can_create_*_waybills_record можно не ставить (если создавать записи ТОЛЬКО с мобилки).
+Тогда:
 
-Заголовки:
+GET /api/passenger-car-waybills/ — если есть view_passenger_cars_waybills.
+POST /api/passenger-car-records/ → разрешено, потому что client="mobile" и can_use_mobile_booking=True.
+Механик через веб
+Логин с client="web".
+В Permission механика:
+can_create_passenger_cars_waybills = True,
+can_create_passenger_cars_waybills_record = True,
+can_use_mobile_booking может быть False.
+Тогда:
 
-http
-
-Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-Content-Disposition: attachment; filename*=UTF-8''%D0%AD%D0%BA%D1%81%D0%BF%D0%BB%D1%83%D0%B0%D1%82%D0%B0%D1%86%D0%B8%D0%BE%D0%BD...
-Тело — бинарный .xlsx по шаблону fire_truck.xlsx с данными и итогами.
+может создавать шапки и записи через веб;
+не может создавать записи с мобилки (если can_use_mobile_booking=False).

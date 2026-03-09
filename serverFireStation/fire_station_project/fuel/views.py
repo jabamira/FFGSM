@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from django.utils.dateparse import parse_date
 from django.http import HttpResponse
+from rest_framework.permissions import IsAuthenticated
 from io import BytesIO
 from django.conf import settings
 from openpyxl import Workbook, load_workbook
@@ -25,6 +26,28 @@ from .serializers import (
     FireTruckSerializer, NormsFireTruckSerializer,
     FireTruckWaybillSerializer, FireTruckWaybillRecordSerializer,
     OdometerFuelFireTruckSerializer,
+)
+
+from .permissions import (
+    CanViewPassengerCarWaybills,
+    CanCreatePassengerCarWaybills,
+    CanUpdatePassengerCarWaybills,
+    CanDeletePassengerCarWaybills,
+    CanDownloadPassengerCarWaybills,
+    CanCreatePassengerCarWaybillRecord,
+    CanUpdatePassengerCarWaybillRecord,
+    CanDeletePassengerCarWaybillRecord,
+
+    CanViewFireTruckWaybills,
+    CanCreateFireTruckWaybills,
+    CanUpdateFireTruckWaybills,
+    CanDeleteFireTruckWaybills,
+    CanDownloadFireTruckWaybills,
+    CanCreateFireTruckWaybillRecord,
+    CanUpdateFireTruckWaybillRecord,
+    CanDeleteFireTruckWaybillRecord,
+
+    CanBookCarFromMobile,   # если будешь использовать экшены только для мобилки
 )
 
 class SoftDeleteModelViewSet(viewsets.ModelViewSet):
@@ -142,6 +165,20 @@ class OdometerFuelPassengerCarViewSet(SoftDeleteModelViewSet):
 class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
     queryset = PassengerCarWaybill.objects.all()
     serializer_class = PassengerCarWaybillSerializer
+
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewPassengerCarWaybills()]
+        elif self.action == 'create':
+            return base + [CanCreatePassengerCarWaybills()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdatePassengerCarWaybills()]
+        elif self.action == 'destroy':
+            return base + [CanDeletePassengerCarWaybills()]
+        elif self.action == 'export_excel':
+            return base + [CanDownloadPassengerCarWaybills()]
+        return base
 
     @action(detail=False, methods=['get'], url_path='export-excel')
     def export_excel(self, request):
@@ -352,6 +389,22 @@ class PassengerCarWaybillRecordViewSet(SoftDeleteModelViewSet):
     queryset = PassengerCarWaybillRecord.objects.select_related('passenger_car_waybill')
     serializer_class = PassengerCarWaybillRecordSerializer
 
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            # просмотр записей доступен тем, у кого есть право просмотра путевых
+            return base + [CanViewPassengerCarWaybills()]
+        elif self.action == 'create':
+            # создание записи:
+            #  - client="web"   -> проверится Permission.can_create_passenger_cars_waybills_record
+            #  - client="mobile"-> Permission.can_use_mobile_booking
+            return base + [CanCreatePassengerCarWaybillRecord()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdatePassengerCarWaybillRecord()]
+        elif self.action == 'destroy':
+            return base + [CanDeletePassengerCarWaybillRecord()]
+        return base
+
 # --- Пожарные ---
 
 class FireTruckViewSet(SoftDeleteModelViewSet):
@@ -438,6 +491,20 @@ class OdometerFuelFireTruckViewSet(SoftDeleteModelViewSet):
 class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
     queryset = FireTruckWaybill.objects.all()
     serializer_class = FireTruckWaybillSerializer
+
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewFireTruckWaybills()]
+        elif self.action == 'create':
+            return base + [CanCreateFireTruckWaybills()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateFireTruckWaybills()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteFireTruckWaybills()]
+        elif self.action == 'export_excel':
+            return base + [CanDownloadFireTruckWaybills()]
+        return base
 
     @action(detail=False, methods=['get'], url_path='export-excel')
     def export_excel(self, request):
@@ -676,3 +743,18 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
 class FireTruckWaybillRecordViewSet(SoftDeleteModelViewSet):
     queryset = FireTruckWaybillRecord.objects.select_related('fire_truck_waybill')
     serializer_class = FireTruckWaybillRecordSerializer
+
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewFireTruckWaybills()]
+        elif self.action == 'create':
+            # создание записи:
+            #  - client="web"   -> can_create_fire_truck_waybills_record
+            #  - client="mobile"-> can_use_mobile_booking
+            return base + [CanCreateFireTruckWaybillRecord()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateFireTruckWaybillRecord()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteFireTruckWaybillRecord()]
+        return base

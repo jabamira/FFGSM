@@ -79,7 +79,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'fire_station',        # имя твоей БД
         'USER': 'postgres',      # пользователь PostgreSQL
-         'PASSWORD': '0632',   # пароль
+        'PASSWORD': 'admin',   # пароль
         'HOST': 'localhost',      # или IP сервера БД
         'PORT': '5432',           # стандартный порт PostgreSQL
     }
