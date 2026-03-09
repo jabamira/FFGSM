@@ -84,6 +84,16 @@ class Permission(SoftDeleteModel):
     view_users = models.BooleanField(default=False)
     view_drivers = models.BooleanField(default=False)
 
+    can_create_roles = models.BooleanField(default=False)
+    can_delete_roles = models.BooleanField(default=False)
+    can_update_roles = models.BooleanField(default=False)
+    can_view_roles = models.BooleanField(default=False)
+
+    can_create_permissions = models.BooleanField(default=False)
+    can_delete_permissisons = models.BooleanField(default=False)
+    can_update_permissisons = models.BooleanField(default=False)
+    can_view_permissisons = models.BooleanField(default=False)
+
     can_create_fire_trucks = models.BooleanField(default=False)
     can_delete_fire_trucks = models.BooleanField(default=False)
     can_update_fire_trucks = models.BooleanField(default=False)

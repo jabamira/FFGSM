@@ -32,6 +32,9 @@ from .permissions import (
     # пользователи
     CanViewUsers, CanCreateUsers, CanUpdateUsers, CanDeleteUsers,
 
+    CanViewRoles, CanCreateRoles, CanUpdateRoles, CanDeleteRoles,
+    CanViewPermissions, CanCreatePermissions, CanUpdatePermissions, CanDeletePermissions,
+
     # легковые машины
     CanViewPassengerCars, CanCreatePassengerCars,
     CanUpdatePassengerCars, CanDeletePassengerCars,
@@ -81,9 +84,52 @@ class RoleViewSet(SoftDeleteModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
 
+    def get_permissions(self):
+        """
+        Права на управление ролями:
+        - list/retrieve: can_view_roles
+        - create: can_create_roles
+        - update/partial_update: can_update_roles
+        - destroy: can_delete_roles
+        """
+        base = [IsAuthenticated()]
+
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewRoles()]
+        elif self.action == 'create':
+            return base + [CanCreateRoles()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateRoles()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteRoles()]
+
+        # по умолчанию — только просмотр
+        return base + [CanViewRoles()]
+
 class PermissionViewSet(SoftDeleteModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
+
+    def get_permissions(self):
+        """
+        Права на управление объектами Permission (правами ролей):
+        - list/retrieve: can_view_permissisons
+        - create: can_create_permissions
+        - update/partial_update: can_update_permissisons
+        - destroy: can_delete_permissisons
+        """
+        base = [IsAuthenticated()]
+
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewPermissions()]
+        elif self.action == 'create':
+            return base + [CanCreatePermissions()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdatePermissions()]
+        elif self.action == 'destroy':
+            return base + [CanDeletePermissions()]
+
+        return base + [CanViewPermissions()]
 
 class UserViewSet(SoftDeleteModelViewSet):
     queryset = User.objects.all()

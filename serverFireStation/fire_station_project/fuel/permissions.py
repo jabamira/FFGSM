@@ -30,6 +30,42 @@ class RolePermission(BasePermission):
             return True
         return bool(getattr(perm_obj, self.perm_attr, False))
 
+# ---- РОЛИ -------------------------------------------------------------
+
+class CanViewRoles(RolePermission):
+    perm_attr = 'can_view_roles'
+
+
+class CanCreateRoles(RolePermission):
+    perm_attr = 'can_create_roles'
+
+
+class CanUpdateRoles(RolePermission):
+    perm_attr = 'can_update_roles'
+
+
+class CanDeleteRoles(RolePermission):
+    perm_attr = 'can_delete_roles'
+
+
+# ---- ПРАВА (Permission) -----------------------------------------------
+
+class CanViewPermissions(RolePermission):
+    # обращаем внимание: имя поля в модели can_view_permissisons (с двумя s)
+    perm_attr = 'can_view_permissisons'
+
+
+class CanCreatePermissions(RolePermission):
+    perm_attr = 'can_create_permissions'
+
+
+class CanUpdatePermissions(RolePermission):
+    perm_attr = 'can_update_permissisons'
+
+
+class CanDeletePermissions(RolePermission):
+    perm_attr = 'can_delete_permissisons'
+
 
 # ================== ЛЕГКОВЫЕ ПУТЕВЫЕ (ШАПКА) ==================
 

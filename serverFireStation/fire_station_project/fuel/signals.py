@@ -17,6 +17,17 @@ DEFAULT_ROLES = [
             "can_delete_users": True,
             "can_update_users": True,
             "view_users": True,
+            "view_drivers": True,
+
+            "can_create_roles": True,
+            "can_delete_roles": True,
+            "can_update_roles": True,
+            "can_view_roles": True,
+
+            "can_create_permissions": True,
+            "can_delete_permissisons": True,
+            "can_update_permissisons": True,
+            "can_view_permissisons": True,
 
             "can_create_fire_trucks": True,
             "can_delete_fire_trucks": True,
@@ -74,6 +85,17 @@ DEFAULT_ROLES = [
             "can_delete_users": False,
             "can_update_users": False,
             "view_users": True,
+            "view_drivers": True,
+
+            "can_create_roles": False,
+            "can_delete_roles": False,
+            "can_update_roles": False,
+            "can_view_roles": False,
+
+            "can_create_permissions": False,
+            "can_delete_permissisons": False,
+            "can_update_permissisons": False,
+            "can_view_permissisons": False,
 
             "can_create_fire_trucks": True,
             "can_delete_fire_trucks": False,
@@ -131,6 +153,17 @@ DEFAULT_ROLES = [
             "can_delete_users": False,
             "can_update_users": False,
             "view_users": False,
+            "view_drivers": False,
+
+            "can_create_roles": False,
+            "can_delete_roles": False,
+            "can_update_roles": False,
+            "can_view_roles": False,
+
+            "can_create_permissions": False,
+            "can_delete_permissisons": False,
+            "can_update_permissisons": False,
+            "can_view_permissisons": False,
 
             "can_create_fire_trucks": False,
             "can_delete_fire_trucks": False,
