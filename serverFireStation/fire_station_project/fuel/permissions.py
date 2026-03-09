@@ -50,7 +50,7 @@ class CanDeletePassengerCarWaybills(RolePermission):
 
 
 class CanDownloadPassengerCarWaybills(RolePermission):
-    perm_attr = 'can_download_passenger_cars_waybills'
+    perm_attr = 'can_download_passenger_cars_reports'
 
 
 # ================== ЛЕГКОВЫЕ ПУТЕВЫЕ (СТРОКИ) =================
@@ -109,7 +109,7 @@ class CanDeleteFireTruckWaybills(RolePermission):
 
 
 class CanDownloadFireTruckWaybills(RolePermission):
-    perm_attr = 'can_download_fire_truck_waybills'
+    perm_attr = 'can_download_fire_truck_reports'
 
 
 # ================== ПОЖАРНЫЕ ПУТЕВЫЕ (СТРОКИ) ==================
@@ -141,6 +141,100 @@ class CanUpdateFireTruckWaybillRecord(RolePermission):
 
 class CanDeleteFireTruckWaybillRecord(RolePermission):
     perm_attr = 'can_delete_fire_truck_waybills_record'
+
+
+
+
+# --- УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ----------------------------------------------
+
+class CanViewUsers(RolePermission):
+    perm_attr = 'view_users'
+
+
+class CanCreateUsers(RolePermission):
+    perm_attr = 'can_create_users'
+
+
+class CanUpdateUsers(RolePermission):
+    perm_attr = 'can_update_users'
+
+
+class CanDeleteUsers(RolePermission):
+    perm_attr = 'can_delete_users'
+
+
+# ---- НОРМЫ ЛЕГКОВЫЕ --------------------------------------------------------
+
+class CanViewPassengerCarNorms(RolePermission):
+    perm_attr = 'view_passenger_cars_norms'
+
+
+class CanCreatePassengerCarNorms(RolePermission):
+    perm_attr = 'can_create_passenger_cars_norms'
+
+
+class CanUpdatePassengerCarNorms(RolePermission):
+    perm_attr = 'can_update_passenger_cars_norms'
+
+
+class CanDeletePassengerCarNorms(RolePermission):
+    perm_attr = 'can_delete_passenger_cars_norms'
+
+
+# ---- МАШИНЫ ЛЕГКОВЫЕ -------------------------------------------------------
+
+class CanViewPassengerCars(RolePermission):
+    perm_attr = 'view_passenger_cars'
+
+
+class CanCreatePassengerCars(RolePermission):
+    perm_attr = 'can_create_passenger_cars'
+
+
+class CanUpdatePassengerCars(RolePermission):
+    perm_attr = 'can_update_passenger_cars'
+
+
+class CanDeletePassengerCars(RolePermission):
+    perm_attr = 'can_delete_passenger_cars'
+
+
+
+# ---- МАШИНЫ ПОЖАРНЫЕ -------------------------------------------------------
+
+class CanViewFireTrucks(RolePermission):
+    perm_attr = 'view_fire_trucks'
+
+
+class CanCreateFireTrucks(RolePermission):
+    perm_attr = 'can_create_fire_trucks'
+
+
+class CanUpdateFireTrucks(RolePermission):
+    perm_attr = 'can_update_fire_trucks'
+
+
+class CanDeleteFireTrucks(RolePermission):
+    perm_attr = 'can_delete_fire_trucks'
+
+
+
+# ---- НОРМЫ ПОЖАРНЫЕ --------------------------------------------------------
+
+class CanViewFireTruckNorms(RolePermission):
+    perm_attr = 'view_fire_truck_norms'
+
+
+class CanCreateFireTruckNorms(RolePermission):
+    perm_attr = 'can_create_fire_truck_norms'
+
+
+class CanUpdateFireTruckNorms(RolePermission):
+    perm_attr = 'can_update_fire_truck_norms'
+
+
+class CanDeleteFireTruckNorms(RolePermission):
+    perm_attr = 'can_delete_fire_truck_norms'
 
 
 # ========= СПЕЦ. ПЕРМИШЕН ДЛЯ МОБ. ЭКШЕНОВ (например /book-mobile) =========

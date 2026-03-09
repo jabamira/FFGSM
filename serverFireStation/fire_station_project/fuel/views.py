@@ -29,25 +29,42 @@ from .serializers import (
 )
 
 from .permissions import (
-    CanViewPassengerCarWaybills,
-    CanCreatePassengerCarWaybills,
-    CanUpdatePassengerCarWaybills,
-    CanDeletePassengerCarWaybills,
+    # пользователи
+    CanViewUsers, CanCreateUsers, CanUpdateUsers, CanDeleteUsers,
+
+    # легковые машины
+    CanViewPassengerCars, CanCreatePassengerCars,
+    CanUpdatePassengerCars, CanDeletePassengerCars,
+
+    # нормы легковые
+    CanViewPassengerCarNorms, CanCreatePassengerCarNorms,
+    CanUpdatePassengerCarNorms, CanDeletePassengerCarNorms,
+
+    # путевые легковых (шапка + записи)
+    CanViewPassengerCarWaybills, CanCreatePassengerCarWaybills,
+    CanUpdatePassengerCarWaybills, CanDeletePassengerCarWaybills,
     CanDownloadPassengerCarWaybills,
     CanCreatePassengerCarWaybillRecord,
     CanUpdatePassengerCarWaybillRecord,
     CanDeletePassengerCarWaybillRecord,
 
-    CanViewFireTruckWaybills,
-    CanCreateFireTruckWaybills,
-    CanUpdateFireTruckWaybills,
-    CanDeleteFireTruckWaybills,
+    # пожарные машины
+    CanViewFireTrucks, CanCreateFireTrucks,
+    CanUpdateFireTrucks, CanDeleteFireTrucks,
+
+    # нормы пожарные
+    CanViewFireTruckNorms, CanCreateFireTruckNorms,
+    CanUpdateFireTruckNorms, CanDeleteFireTruckNorms,
+
+    # путевые пожарные (шапка + записи)
+    CanViewFireTruckWaybills, CanCreateFireTruckWaybills,
+    CanUpdateFireTruckWaybills, CanDeleteFireTruckWaybills,
     CanDownloadFireTruckWaybills,
     CanCreateFireTruckWaybillRecord,
     CanUpdateFireTruckWaybillRecord,
     CanDeleteFireTruckWaybillRecord,
 
-    CanBookCarFromMobile,   # если будешь использовать экшены только для мобилки
+    CanBookCarFromMobile,   # если будешь использовать спец‑экшены
 )
 
 class SoftDeleteModelViewSet(viewsets.ModelViewSet):
@@ -72,6 +89,28 @@ class UserViewSet(SoftDeleteModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
+    def get_permissions(self):
+        """
+        Права на работу с пользователями:
+        - list/retrieve: view_users
+        - create: can_create_users
+        - update/partial_update: can_update_users
+        - destroy: can_delete_users
+        """
+        base = [IsAuthenticated()]  # всегда нужен валидный JWT
+
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewUsers()]
+        elif self.action == 'create':
+            return base + [CanCreateUsers()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateUsers()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteUsers()]
+
+        # на всякий случай для других action'ов
+        return base + [CanViewUsers()]
+
     def get_queryset(self):
         role_id = self.request.query_params.get('role')
         if role_id:
@@ -84,9 +123,36 @@ class PassengerCarViewSet(SoftDeleteModelViewSet):
     queryset = PassengerCar.objects.all()
     serializer_class = PassengerCarSerializer
 
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewPassengerCars()]
+        elif self.action == 'create':
+            return base + [CanCreatePassengerCars()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdatePassengerCars()]
+        elif self.action == 'destroy':
+            return base + [CanDeletePassengerCars()]
+        return base
+
 class NormsPassengerCarsViewSet(SoftDeleteModelViewSet):
     queryset = NormsPassengerCars.objects.all()
     serializer_class = NormsPassengerCarsSerializer
+
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action == 'for_date':
+            # получать норму на дату можно тем, кто имеет право смотреть нормы
+            return base + [CanViewPassengerCarNorms()]
+        elif self.action in ['list', 'retrieve']:
+            return base + [CanViewPassengerCarNorms()]
+        elif self.action == 'create':
+            return base + [CanCreatePassengerCarNorms()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdatePassengerCarNorms()]
+        elif self.action == 'destroy':
+            return base + [CanDeletePassengerCarNorms()]
+        return base
 
     @action(detail=False, methods=['get'], url_path='for-date')
     def for_date(self, request):
@@ -411,9 +477,35 @@ class FireTruckViewSet(SoftDeleteModelViewSet):
     queryset = FireTruck.objects.all()
     serializer_class = FireTruckSerializer
 
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action in ['list', 'retrieve']:
+            return base + [CanViewFireTrucks()]
+        elif self.action == 'create':
+            return base + [CanCreateFireTrucks()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateFireTrucks()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteFireTrucks()]
+        return base
+
 class NormsFireTruckViewSet(SoftDeleteModelViewSet):
     queryset = NormsFireTruck.objects.all()
     serializer_class = NormsFireTruckSerializer
+
+    def get_permissions(self):
+        base = [IsAuthenticated()]
+        if self.action == 'for_date':
+            return base + [CanViewFireTruckNorms()]
+        elif self.action in ['list', 'retrieve']:
+            return base + [CanViewFireTruckNorms()]
+        elif self.action == 'create':
+            return base + [CanCreateFireTruckNorms()]
+        elif self.action in ['update', 'partial_update']:
+            return base + [CanUpdateFireTruckNorms()]
+        elif self.action == 'destroy':
+            return base + [CanDeleteFireTruckNorms()]
+        return base
 
     @action(detail=False, methods=['get'], url_path='for-date')
     def for_date(self, request):
