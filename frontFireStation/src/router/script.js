@@ -4,6 +4,7 @@ import FuelReport from "../views/FuelReport.vue";
 import UIComponentsPage from "../views/UIComponentsPage.vue";
 import ServerError from "../views/ServerError.vue";
 import Drivers from "../views/Drivers.vue";
+import Users from "../views/Users.vue";
 import FireTrucksList from "../views/FireTrucksList.vue";
 import FireTrucksWayBills from "../views/FireTrucksWayBills.vue";
 import FireTrucksNorms from "../views/FireTrucksNorms.vue";
@@ -18,6 +19,7 @@ const routes = [
   { path: "/auth", component: Auth },
   { path: "/fuel-report", component: FuelReport, meta: { requiresAuth: true } },
   { path: "/drivers", component: Drivers, meta: { requiresAuth: true } },
+  { path: "/users", component: Users, meta: { requiresAuth: true } },
   {
     path: "/fire-trucks-list",
     component: FireTrucksList,

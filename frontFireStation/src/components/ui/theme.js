@@ -56,9 +56,9 @@ export const theme = {
 
   modal: {
     overlay:
-      "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center",
+      "fixed inset-0 bg-black bg-opacity-10 flex items-center justify-center z-50",
     content:
-      "bg-white rounded-lg shadow-lg max-w-lg w-full max-h-96 overflow-y-auto",
+      "bg-white rounded-lg shadow-lg max-w-lg w-full max-h-96 overflow-y-auto relative z-50",
   },
 };
 

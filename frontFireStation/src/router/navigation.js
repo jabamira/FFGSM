@@ -11,6 +11,7 @@ export function useNavigation() {
 
   const NavigateHome = () => router.push("/");
   const NavigateUser = () => router.push("/user");
+  const NavigateUsers = () => router.push("/users");
   const NavigatePolls = () => router.push("/polls");
   const NavigateFuelReport = () => router.push("/fuel-report");
   const NavigateDrivers = () => router.push("/drivers");
@@ -28,6 +29,7 @@ export function useNavigation() {
     NavigateAuthSignUp,
     NavigateHome,
     NavigateUser,
+    NavigateUsers,
     NavigatePolls,
     NavigateFuelReport,
     NavigateDrivers,

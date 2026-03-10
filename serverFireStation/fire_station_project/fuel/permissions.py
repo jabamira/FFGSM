@@ -199,6 +199,10 @@ class CanDeleteUsers(RolePermission):
     perm_attr = 'can_delete_users'
 
 
+class CanViewDrivers(RolePermission):
+    perm_attr = 'view_drivers'
+
+
 # ---- НОРМЫ ЛЕГКОВЫЕ --------------------------------------------------------
 
 class CanViewPassengerCarNorms(RolePermission):

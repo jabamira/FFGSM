@@ -6,7 +6,7 @@
         <tr :style="{ backgroundColor: `${palette.primary}15`, borderColor: palette.light, borderBottomWidth: '1px' }">
           <th class="w-12 px-4 py-3 text-left">
             <input
-              v-if="selectable"
+              v-if="selectable && showSelectAll"
               type="checkbox"
               :checked="allSelected"
               @change="toggleSelectAll"
@@ -36,8 +36,9 @@
         <tr
           v-for="(row, idx) in paginatedData"
           :key="idx"
-          class="border-b hover:opacity-75"
+          class="border-b hover:opacity-75 cursor-pointer"
           :style="{ borderColor: palette.light, backgroundColor: idx % 2 === 0 ? 'white' : `${palette.light}10` }"
+          @click="$emit('row-click', row, idx)"
         >
           <td class="w-12 px-4 py-3">
             <input
@@ -45,6 +46,7 @@
               type="checkbox"
               :checked="selectedRows.includes(idx)"
               @change="toggleRow(idx)"
+              @click.stop
               class="w-4 h-4 cursor-pointer"
             />
           </td>
@@ -138,6 +140,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    showSelectAll: {
+      type: Boolean,
+      default: true,
+    },
     paginate: {
       type: Boolean,
       default: true,
@@ -147,7 +153,7 @@ export default {
       default: 10,
     },
   },
-  emits: ['row-selected', 'sort', 'edit-row', 'delete-row', 'view-row'],
+  emits: ['row-selected', 'row-click', 'sort', 'edit-row', 'delete-row', 'view-row'],
   setup(props, { emit }) {
     const currentPage = ref(1);
     const sortKey = ref(null);

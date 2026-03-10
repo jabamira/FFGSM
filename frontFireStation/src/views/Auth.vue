@@ -106,6 +106,10 @@ async function submit() {
   try {
     const ok = await auth.login(loginClean, passwordClean);
     if (ok) {
+      // Убедиться, что все операции полностью завершены перед перенаправлением
+      // это включает загрузку разрешений и проверку соединения
+      await auth.checkConnection();
+      console.log('[Auth] Login successful, permissions loaded, redirecting...');
       router.push('/fuel-report');
     } else {
       error.value = 'Неверный логин или пароль';

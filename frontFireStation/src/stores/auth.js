@@ -13,6 +13,10 @@ export const useAuthStore = defineStore("auth", {
     checkedOnce: false,
     healthIntervalId: null,
     permissions: {},
+    crudPermissions: {
+      canCreate: false,
+      canDelete: false,
+    },
   }),
 
   getters: {
@@ -59,10 +63,15 @@ export const useAuthStore = defineStore("auth", {
         this.setAccess(access);
         this.setUser(user);
 
-        await this.fetchPermissions(); // загрузка permissions
+        // Загрузка разрешений с полным ожиданием
+        await this.fetchPermissions();
+
+        // Убедиться, что флаг checkedOnce установлен перед возвратом
+        this.checkedOnce = true;
 
         this.startHealthPolling();
 
+        console.log("[AUTH STORE] Login successful, permissions loaded");
         return true;
       } catch (err) {
         console.error(
@@ -74,13 +83,14 @@ export const useAuthStore = defineStore("auth", {
     },
 
     async fetchPermissions() {
-      if (!this.user || !this.user.role) {
-        console.error("[AUTH] user or role missing");
+      if (!this.user) {
+        console.error("[AUTH] user missing");
         return;
       }
 
       try {
-        const res = await axios.get(`/permissions/${this.user.role}/`, {
+        // Используем /permissions/current/ для получения разрешений текущего пользователя
+        const res = await axios.get(`/permissions/current/`, {
           headers: {
             Authorization: `Bearer ${this.access}`,
           },
@@ -98,7 +108,38 @@ export const useAuthStore = defineStore("auth", {
       this.setAccess(null);
       this.setUser(null);
       this.permissions = {};
+      this.clearCrudPermissions();
       this.stopHealthPolling();
+    },
+
+    /**
+     * Установить CRUD разрешения для текущей страницы
+     */
+    setCrudPermissions(crudPerms) {
+      this.crudPermissions = {
+        canCreate: crudPerms.canCreate || false,
+        canDelete: crudPerms.canDelete || false,
+      };
+      console.debug("[AUTH] CRUD permissions updated:", this.crudPermissions);
+    },
+
+    /**
+     * Очистить CRUD разрешения
+     */
+    clearCrudPermissions() {
+      this.crudPermissions = {
+        canCreate: false,
+        canDelete: false,
+      };
+    },
+
+    /**
+     * Обновить отдельное CRUD разрешение
+     */
+    updateCrudPermission(permission, value) {
+      if (this.crudPermissions.hasOwnProperty(permission)) {
+        this.crudPermissions[permission] = value;
+      }
     },
 
     loadFromStorage() {

@@ -26,6 +26,8 @@ class PermissionSerializer(serializers.ModelSerializer):
 # --- Пользователь ------------------------------------------------------------
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
     class Meta:
         model = User
         fields = '__all__'
@@ -41,12 +43,15 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
     def update(self, instance, validated_data):
+        # Извлекаем пароль, если он был предоставлен
+        # Если пароль пустой или None, не обновляем его
         password = validated_data.pop('password', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
 
-        if password:
+        # Обновляем пароль только если он не пустой
+        if password and password.strip():
             instance.set_password(password)
 
         instance.save()

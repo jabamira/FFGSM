@@ -4,14 +4,22 @@
       <h1 class="text-lg font-bold" :style="{ color: palette.dark }">Управление ГСМ</h1>
       <div class="flex items-center gap-2">
         <router-link 
-          v-if="auth.user && auth.permissions && auth.permissions.view_users"
+          v-if="auth.user && auth.permissions && auth.permissions.view_drivers"
           to="/drivers" 
           :class="['px-3 py-1.5 rounded transition', isActive('/drivers') ? 'font-semibold' : 'hover:bg-gray-100']"
           :style="isActive('/drivers') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
         >
           Водители
         </router-link>
-        <div v-if="auth.user && auth.permissions && auth.permissions.view_fire_trucks" class="relative group">
+        <router-link 
+          v-if="auth.user && auth.permissions && auth.permissions.view_users"
+          to="/users" 
+          :class="['px-3 py-1.5 rounded transition', isActive('/users') ? 'font-semibold' : 'hover:bg-gray-100']"
+          :style="isActive('/users') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
+        >
+          Пользователи
+        </router-link>
+        <div v-if="auth.user && auth.permissions && canViewFireTrucks()" class="relative group">
           <button
             :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isFireTruckActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isFireTruckActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
@@ -48,7 +56,7 @@
             </router-link>
           </div>
         </div>
-        <div v-if="auth.user && auth.permissions && auth.permissions.view_passenger_cars" class="relative group">
+        <div v-if="auth.user && auth.permissions && canViewPassengerCars()" class="relative group">
           <button
             :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isLightVehicleActive() ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isLightVehicleActive() ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
@@ -129,6 +137,30 @@ const isFireTruckActive = () => {
 
 const isLightVehicleActive = () => {
   return ['/light-vehicles-list', '/light-vehicles-waybills', '/light-vehicles-norms'].includes(route.path);
+};
+
+/**
+ * Проверить, есть ли хотя бы одно разрешение для просмотра пожарных автомобилей
+ */
+const canViewFireTrucks = () => {
+  if (!auth.permissions) return false;
+  return !!(
+    auth.permissions.view_fire_trucks ||
+    auth.permissions.view_fire_truck_waybills ||
+    auth.permissions.view_fire_truck_norms
+  );
+};
+
+/**
+ * Проверить, есть ли хотя бы одно разрешение для просмотра легковых автомобилей
+ */
+const canViewPassengerCars = () => {
+  if (!auth.permissions) return false;
+  return !!(
+    auth.permissions.view_passenger_cars ||
+    auth.permissions.view_passenger_cars_waybills ||
+    auth.permissions.view_passenger_cars_norms
+  );
 };
 
 const logout = () => {

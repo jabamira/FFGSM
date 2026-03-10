@@ -30,7 +30,7 @@ from .serializers import (
 
 from .permissions import (
     # пользователи
-    CanViewUsers, CanCreateUsers, CanUpdateUsers, CanDeleteUsers,
+    CanViewUsers, CanCreateUsers, CanUpdateUsers, CanDeleteUsers, CanViewDrivers,
 
     CanViewRoles, CanCreateRoles, CanUpdateRoles, CanDeleteRoles,
     CanViewPermissions, CanCreatePermissions, CanUpdatePermissions, CanDeletePermissions,
@@ -117,10 +117,14 @@ class PermissionViewSet(SoftDeleteModelViewSet):
         - create: can_create_permissions
         - update/partial_update: can_update_permissisons
         - destroy: can_delete_permissisons
+        - current: только IsAuthenticated (любой авторизованный пользователь)
         """
         base = [IsAuthenticated()]
 
-        if self.action in ['list', 'retrieve']:
+        if self.action == 'current':
+            # Для action 'current' требуется только авторизация
+            return base
+        elif self.action in ['list', 'retrieve']:
             return base + [CanViewPermissions()]
         elif self.action == 'create':
             return base + [CanCreatePermissions()]
@@ -130,6 +134,32 @@ class PermissionViewSet(SoftDeleteModelViewSet):
             return base + [CanDeletePermissions()]
 
         return base + [CanViewPermissions()]
+
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """
+        Получить разрешения текущего авторизованного пользователя.
+        GET /permissions/current/
+        
+        Возвращает разрешения (Permission) для роли текущего пользователя.
+        """
+        user = request.user
+        
+        if not user or not hasattr(user, 'role'):
+            return Response(
+                {'detail': 'User or user role not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            permission = Permission.objects.get(role=user.role, deleted_at__isnull=True)
+            serializer = self.get_serializer(permission)
+            return Response(serializer.data)
+        except Permission.DoesNotExist:
+            return Response(
+                {'detail': 'No permissions found for user role'},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 class UserViewSet(SoftDeleteModelViewSet):
     queryset = User.objects.all()
@@ -142,6 +172,7 @@ class UserViewSet(SoftDeleteModelViewSet):
         - create: can_create_users
         - update/partial_update: can_update_users
         - destroy: can_delete_users
+        - drivers: view_drivers
         """
         base = [IsAuthenticated()]  # всегда нужен валидный JWT
 
@@ -153,6 +184,8 @@ class UserViewSet(SoftDeleteModelViewSet):
             return base + [CanUpdateUsers()]
         elif self.action == 'destroy':
             return base + [CanDeleteUsers()]
+        elif self.action == 'drivers':
+            return base + [CanViewDrivers()]
 
         # на всякий случай для других action'ов
         return base + [CanViewUsers()]
@@ -162,6 +195,16 @@ class UserViewSet(SoftDeleteModelViewSet):
         if role_id:
             return self.queryset.filter(role_id=role_id, deleted_at__isnull=True)
         return self.queryset.filter(deleted_at__isnull=True)
+
+    @action(detail=False, methods=['get'])
+    def drivers(self, request):
+        """
+        Получить список только водителей (пользователей с role_id=3).
+        GET /users/drivers/
+        """
+        drivers = self.queryset.filter(role_id=3, deleted_at__isnull=True)
+        serializer = self.get_serializer(drivers, many=True)
+        return Response(serializer.data)
 
 # --- Легковые ---
 

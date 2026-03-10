@@ -1,10 +1,21 @@
 <template>
   <teleport to="body">
     <transition name="modal">
-      <div v-if="isOpen" :class="theme.modal.overlay" @click.self="closeModal">
-        <div :class="theme.modal.content">
+      <div 
+        v-if="isOpen" 
+        class="fixed inset-0 flex items-center justify-center"
+        :style="{ 
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          zIndex: 50
+        }"
+        @mousedown.self="closeModal"
+      >
+        <div 
+          class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[800px] overflow-y-auto"
+          :style="{ zIndex: 51 }"
+        >
           <!-- Header -->
-          <div class="flex items-center justify-between px-6 py-4 border-b" :style="{ borderColor: palette.light }">
+          <div class="flex items-center justify-between px-12 py-4 border-b" :style="{ borderColor: palette.light }">
             <h2 class="text-lg font-semibold" :style="{ color: palette.dark }">{{ title }}</h2>
             <button
               @click="closeModal"
@@ -16,30 +27,13 @@
           </div>
 
           <!-- Body -->
-          <div class="px-6 py-4 overflow-y-auto">
+          <div class="px-12 py-4 overflow-y-auto">
             <slot />
           </div>
 
           <!-- Footer -->
-          <div v-if="$slots.footer" class="flex items-center justify-end gap-3 px-6 py-4 border-t" :style="{ borderColor: palette.light, backgroundColor: `${palette.light}20` }">
+          <div class="flex items-center justify-end gap-3 px-12 py-4 border-t" :style="{ borderColor: palette.light, backgroundColor: `${palette.light}20` }">
             <slot name="footer" />
-          </div>
-          <div v-else class="flex items-center justify-end gap-3 px-6 py-4 border-t" :style="{ borderColor: palette.light, backgroundColor: `${palette.light}20` }">
-            <button
-              @click="closeModal"
-              class="px-4 py-2 rounded-lg transition"
-              :style="{ color: palette.dark, backgroundColor: `${palette.light}40` }"
-            >
-              Close
-            </button>
-            <button
-              v-if="!hideConfirm"
-              @click="confirmAction"
-              class="px-4 py-2 text-white rounded-lg transition"
-              :style="{ backgroundColor: palette.primary }"
-            >
-              {{ confirmLabel }}
-            </button>
           </div>
         </div>
       </div>
@@ -61,25 +55,15 @@ export default {
       type: String,
       default: 'Modal',
     },
-    confirmLabel: {
-      type: String,
-      default: 'Confirm',
-    },
-    hideConfirm: {
-      type: Boolean,
-      default: false,
-    },
   },
-  emits: ['close', 'confirm'],
+  emits: ['close'],
   setup(props, { emit }) {
     const closeModal = () => emit('close');
-    const confirmAction = () => emit('confirm');
 
     return {
       theme,
       palette,
       closeModal,
-      confirmAction,
     };
   },
 };
