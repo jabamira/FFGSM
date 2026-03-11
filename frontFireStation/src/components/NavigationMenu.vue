@@ -19,6 +19,14 @@
         >
           Пользователи
         </router-link>
+          <router-link 
+            v-if="auth.user && auth.permissions && auth.permissions.can_view_roles"
+            to="/roles" 
+            :class="['px-3 py-1.5 rounded transition', isActive('/roles') ? 'font-semibold' : 'hover:bg-gray-100']"
+            :style="isActive('/roles') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"
+          >
+            Роли
+          </router-link>
         <div v-if="auth.user && auth.permissions && canViewFireTrucks()" class="relative group">
           <button
             :class="['px-3 py-1.5 rounded transition flex items-center gap-2', isFireTruckActive() ? 'font-semibold' : 'hover:bg-gray-100']"

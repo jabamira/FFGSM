@@ -110,6 +110,14 @@ class PermissionViewSet(SoftDeleteModelViewSet):
     queryset = Permission.objects.all()
     serializer_class = PermissionSerializer
 
+    def get_queryset(self):
+        """Фильтруем по role параметру если он передан"""
+        queryset = Permission.objects.filter(deleted_at__isnull=True)
+        role_id = self.request.query_params.get('role')
+        if role_id:
+            queryset = queryset.filter(role_id=role_id)
+        return queryset
+
     def get_permissions(self):
         """
         Права на управление объектами Permission (правами ролей):

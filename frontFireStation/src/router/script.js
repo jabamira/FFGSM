@@ -21,6 +21,11 @@ const routes = [
   { path: "/drivers", component: Drivers, meta: { requiresAuth: true } },
   { path: "/users", component: Users, meta: { requiresAuth: true } },
   {
+    path: "/roles",
+    component: () => import("../views/Roles.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/fire-trucks-list",
     component: FireTrucksList,
     meta: { requiresAuth: true },
