@@ -9,7 +9,7 @@
       <!-- Input с поиском -->
       <input
         :id="id"
-        :value="searchQuery"
+        :value="isOpen ? searchQuery : selectedLabel"
         type="text"
         :placeholder="placeholder || 'Поиск или выбор...'"
         :disabled="disabled"
@@ -141,7 +141,7 @@ const inputStyle = computed(() => {
 const openDropdown = () => {
   if (props.disabled) return;
   isOpen.value = true;
-  searchQuery.value = selectedLabel.value;
+  searchQuery.value = '';
   emit('focus');
 };
 
@@ -155,7 +155,7 @@ const closeDropdownDelay = () => {
 const selectOption = (option) => {
   emit('update:modelValue', option.value);
   isOpen.value = false;
-  searchQuery.value = option.label;
+  searchQuery.value = '';
   clearTimeout(closeTimeout);
 };
 

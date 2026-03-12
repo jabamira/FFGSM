@@ -63,8 +63,12 @@ export const useAuthStore = defineStore("auth", {
         this.setAccess(access);
         this.setUser(user);
 
-        // Загрузка разрешений с полным ожиданием
-        await this.fetchPermissions();
+        // Загрузка разрешений с retry и timeout
+        const permissionsLoaded = await this.fetchPermissionsWithRetry(3, 5000);
+        if (!permissionsLoaded) {
+          console.error("[AUTH STORE] Failed to load permissions after retries");
+          return false;
+        }
 
         // Убедиться, что флаг checkedOnce установлен перед возвратом
         this.checkedOnce = true;
@@ -82,10 +86,41 @@ export const useAuthStore = defineStore("auth", {
       }
     },
 
+    async fetchPermissionsWithRetry(maxRetries = 3, timeout = 5000) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`[AUTH] Attempting to load permissions (attempt ${attempt}/${maxRetries})`);
+          
+          const permissionsLoaded = await Promise.race([
+            this.fetchPermissions(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), timeout)
+            )
+          ]);
+          
+          // Проверяем что permissions реально загружены (не пустой объект)
+          if (this.permissions && Object.keys(this.permissions).length > 0) {
+            console.log("[AUTH] Permissions loaded successfully");
+            return true;
+          }
+          
+        } catch (error) {
+          console.warn(`[AUTH] Attempt ${attempt} failed:`, error.message);
+          if (attempt < maxRetries) {
+            // Небольшая задержка перед retry
+            await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+          }
+        }
+      }
+      
+      console.error("[AUTH] All permission loading attempts failed");
+      return false;
+    },
+
     async fetchPermissions() {
       if (!this.user) {
         console.error("[AUTH] user missing");
-        return;
+        throw new Error("User not set");
       }
 
       try {
@@ -97,10 +132,11 @@ export const useAuthStore = defineStore("auth", {
         });
 
         this.permissions = res.data;
-
         console.debug("[AUTH] permissions loaded", this.permissions);
+        return true;
       } catch (error) {
         console.error("[AUTH] permissions error", error);
+        throw error;
       }
     },
 

@@ -182,7 +182,8 @@ class User(SoftDeleteModel):
     role = models.ForeignKey(
         Role,
         on_delete=models.CASCADE,
-        null=False,
+        null=True,
+        blank=True,
         related_name='users'
     )
 

@@ -152,6 +152,12 @@
         <Button variant="primary" size="md" @click="updateDriver">Сохранить</Button>
       </template>
     </Modal>
+
+    <!-- Permission Denied Modal -->
+    <PermissionDeniedModal ref="permissionDeniedModal" />
+
+    <!-- No Selection Modal -->
+    <NoSelectionModal ref="noSelectionModal" />
   </div>
 </template>
 
@@ -159,17 +165,23 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
+import { useSearch } from '../composables/useSearch';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
+import NoSelectionModal from '../components/NoSelectionModal.vue';
 
 const auth = useAuthStore();
 const drivers = ref([]);
-const searchQuery = ref('');
 const selectedDriverIds = ref([]);
+const permissionDeniedModal = ref(null);
+const noSelectionModal = ref(null);
+const { searchQuery, filtered: filteredDrivers } = useSearch(drivers, ['name', 'surname', 'last_name', 'phone', 'driver_license']);
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const showEditModal = ref(false);
 const editingDriver = ref(null);
+const originalDriver = ref(null);
 
 const columns = [
   { key: 'name', label: 'Имя' },
@@ -207,17 +219,6 @@ const fetchDrivers = async () => {
     console.error('Ошибка при загрузке водителей:', error);
   }
 };
-
-const filteredDrivers = computed(() => {
-  const query = searchQuery.value.toLowerCase();
-  return drivers.value.filter(driver =>
-    driver.name.toLowerCase().includes(query) ||
-    driver.surname.toLowerCase().includes(query) ||
-    driver.last_name.toLowerCase().includes(query) ||
-    driver.phone.includes(query) ||
-    (driver.driver_license && driver.driver_license.includes(query))
-  );
-});
 
 const driversToDelete = computed(() => {
   return filteredDrivers.value.filter(d => selectedDriverIds.value.includes(d.id));
@@ -291,15 +292,21 @@ const addDriver = async () => {
 };
 
 const onRowClick = (driver) => {
-  if (!auth.permissions.can_create_users) {
-    console.warn('Нет разрешения на редактирование водителей.');
+  // Проверка прав доступа
+  const canUpdateUsers = auth.permissions.can_update_users;
+
+  // Если нет прав на обновление пользователей
+  if (!canUpdateUsers) {
+    permissionDeniedModal.value?.openModal('can_update_users');
     return;
   }
+
   openEditModal(driver);
 };
 
 const openEditModal = (driver) => {
-  // Создаём копию водителя, чтобы не менять оригинальные данные при отмене
+  // Сохраняем оригинальные данные водителя
+  originalDriver.value = { ...driver, password: '' };
   editingDriver.value = { ...driver, password: '' };
   showEditModal.value = true;
 };
@@ -307,15 +314,28 @@ const openEditModal = (driver) => {
 const closeEditModal = () => {
   showEditModal.value = false;
   editingDriver.value = null;
+  originalDriver.value = null;
+};
+
+const hasDriverChanged = () => {
+  if (!editingDriver.value || !originalDriver.value) return false;
+  return JSON.stringify(editingDriver.value) !== JSON.stringify(originalDriver.value);
 };
 
 const updateDriver = async () => {
-  if (!auth.permissions.can_create_users) {
+  if (!auth.permissions.can_update_users) {
     console.warn('Нет разрешения на редактирование водителей.');
     return;
   }
 
   if (!editingDriver.value) return;
+
+  // Проверяем, изменились ли данные
+  if (!hasDriverChanged()) {
+    console.log('[Drivers] No changes detected');
+    closeEditModal();
+    return;
+  }
 
   // Валидация полей
   if (!editingDriver.value.name || !editingDriver.value.surname || !editingDriver.value.last_name || 
@@ -356,7 +376,7 @@ const updateDriver = async () => {
 
 const openDeleteModal = () => {
   if (selectedDriverIds.value.length === 0) {
-    console.warn('Не выбраны водители для удаления.');
+    noSelectionModal.value?.openModal();
     return;
   }
   showDeleteModal.value = true;

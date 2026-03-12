@@ -27,19 +27,45 @@ class PermissionSerializer(serializers.ModelSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(required=False, allow_blank=True, write_only=True)
+    role_name = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
         fields = '__all__'
         extra_kwargs = {
             'password': {'write_only': True},
+            'role': {'required': False, 'allow_null': True}
         }
 
+    def get_role_name(self, obj):
+        """Возвращает название роли или '-' если роль не указана"""
+        return obj.role.name if obj.role else '-'
+
     def create(self, validated_data):
-        password = validated_data.pop('password')
+        from .models import Role, Permission
+        
+        password = validated_data.pop('password', None)
+        role = validated_data.pop('role', None)
+        
+        # Если роль не указана, создаём уникальную роль с именем "User_<временная-метка>"
+        if not role:
+            import time
+            unique_role_name = f"User_{int(time.time() * 1000)}"
+            role = Role.objects.create(name=unique_role_name)
+        
+        validated_data['role'] = role
         user = User(**validated_data)
-        user.set_password(password)
+        
+        # Устанавливаем пароль если он был предоставлен
+        if password:
+            user.set_password(password)
+        
         user.save()
+        
+        # Создаём Permission объект для роли если его ещё нет
+        if user.role and not Permission.objects.filter(role=user.role).exists():
+            Permission.objects.create(role=user.role)
+        
         return user
 
     def update(self, instance, validated_data):
