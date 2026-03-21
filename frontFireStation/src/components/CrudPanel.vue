@@ -14,16 +14,17 @@
       <Button 
         v-if="auth.crudPermissions.canCreate"
         @click="$emit('create')" 
-        label="Добавить"
+        :label="createLabel"
         variant="primary"
         size="sm"
       />
       <Button 
         v-if="auth.crudPermissions.canDelete"
         @click="$emit('delete')" 
-        label="Удалить"
+        :label="deleteLabel"
         variant="danger"
         size="sm"
+        :disabled="isDeleteDisabled"
       />
 
       <!-- Pin button в правом углу -->
@@ -53,6 +54,21 @@ import { computed, ref } from 'vue';
 import pinIcon from '../img/free-icon-pin-3297677.png';
 
 const auth = useAuthStore();
+
+defineProps({
+  createLabel: {
+    type: String,
+    default: 'Добавить'
+  },
+  deleteLabel: {
+    type: String,
+    default: 'Удалить'
+  },
+  isDeleteDisabled: {
+    type: Boolean,
+    default: false
+  }
+});
 
 defineEmits(['create', 'delete']);
 

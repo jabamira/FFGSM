@@ -104,6 +104,15 @@
         <Button variant="primary" size="md" @click="confirmDelete">Удалить</Button>
       </template>
     </Modal>
+
+    <!-- CRUD Panel -->
+    <CrudPanel 
+      @create="handleCrudCreate"
+      @delete="handleCrudDelete"
+      createLabel="Добавить роль"
+      :deleteLabel="deleteButtonLabel"
+      :isDeleteDisabled="isDeleteDisabled"
+    />
   </div>
 </template>
 
@@ -118,6 +127,7 @@ import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import UserEditModal from '../components/UserEditModal.vue';
 import RoleEditModal from '../components/RoleEditModal.vue';
+import CrudPanel from '../components/CrudPanel.vue';
 
 const auth = useAuthStore();
 const roles = ref([]);
@@ -129,15 +139,7 @@ const roleEditModal = ref(null);
 const users = ref([]);
 const { searchQuery, filtered: filteredRoles } = useSearch(roles, ['name']);
 const showAddModal = ref(false);
-const showEditModal = ref(false);
 const showDeleteModal = ref(false);
-const editingRole = ref(null);
-const originalRole = ref(null);
-const rolePermissions = ref({});
-const originalRolePermissions = ref({});
-const permissionFields = ref([]);
-const permissionSearchQuery = ref('');
-const selectedPermissionGroup = ref('all');
 const usersWithRoles = ref([]);
 
 const columns = computed(() => {
@@ -154,145 +156,6 @@ const columns = computed(() => {
 
 const newRole = ref({
   name: ''
-});
-
-
-
-const permissionsMap = {
-  'can_use_mobile_booking': 'Может использовать мобильное приложение',
-  'can_create_users': 'Может создавать пользователей',
-  'can_delete_users': 'Может удалять пользователей',
-  'can_update_users': 'Может обновлять пользователей',
-  'view_users': 'Может просматривать пользователей',
-  'view_drivers': 'Может просматривать водителей',
-  'can_create_roles': 'Может создавать роли',
-  'can_delete_roles': 'Может удалять роли',
-  'can_update_roles': 'Может обновлять роли',
-  'can_view_roles': 'Может просматривать роли',
-  'can_create_permissions': 'Может создавать разрешения',
-  'can_delete_permissisons': 'Может удалять разрешения',
-  'can_update_permissisons': 'Может обновлять разрешения',
-  'can_view_permissisons': 'Может просматривать разрешения',
-  'can_create_fire_trucks': 'Может создавать пожарные машины',
-  'can_delete_fire_trucks': 'Может удалять пожарные машины',
-  'can_update_fire_trucks': 'Может обновлять пожарные машины',
-  'view_fire_trucks': 'Может просматривать пожарные машины',
-  'can_create_fire_truck_waybills': 'Может создавать путевые листы пожарных машин',
-  'can_delete_fire_truck_waybills': 'Может удалять путевые листы пожарных машин',
-  'can_update_fire_truck_waybills': 'Может обновлять путевые листы пожарных машин',
-  'can_download_fire_truck_waybills': 'Может скачивать путевые листы пожарных машин',
-  'view_fire_truck_waybills': 'Может просматривать путевые листы пожарных машин',
-  'can_create_fire_truck_waybills_record': 'Может создавать записи путевых листов пожарных машин',
-  'can_delete_fire_truck_waybills_record': 'Может удалять записи путевых листов пожарных машин',
-  'can_update_fire_truck_waybills_record': 'Может обновлять записи путевых листов пожарных машин',
-  'can_create_fire_truck_norms': 'Может создавать нормы пожарных машин',
-  'can_delete_fire_truck_norms': 'Может удалять нормы пожарных машин',
-  'can_update_fire_truck_norms': 'Может обновлять нормы пожарных машин',
-  'view_fire_truck_norms': 'Может просматривать нормы пожарных машин',
-  'can_download_fire_truck_reports': 'Может скачивать отчеты пожарных машин',
-  'view_fire_truck_reports': 'Может просматривать отчеты пожарных машин',
-  'can_create_passenger_cars': 'Может создавать легковые машины',
-  'can_delete_passenger_cars': 'Может удалять легковые машины',
-  'can_update_passenger_cars': 'Может обновлять легковые машины',
-  'view_passenger_cars': 'Может просматривать легковые машины',
-  'can_create_passenger_cars_waybills': 'Может создавать путевые листы легковых машин',
-  'can_delete_passenger_cars_waybills': 'Может удалять путевые листы легковых машин',
-  'can_update_passenger_cars_waybills': 'Может обновлять путевые листы легковых машин',
-  'can_download_passenger_cars_waybills': 'Может скачивать путевые листы легковых машин',
-  'view_passenger_cars_waybills': 'Может просматривать путевые листы легковых машин',
-  'can_create_passenger_cars_waybills_record': 'Может создавать записи путевых листов легковых машин',
-  'can_delete_passenger_cars_waybills_record': 'Может удалять записи путевых листов легковых машин',
-  'can_update_passenger_cars_waybills_record': 'Может обновлять записи путевых листов легковых машин',
-  'can_create_passenger_cars_norms': 'Может создавать нормы легковых машин',
-  'can_delete_passenger_cars_norms': 'Может удалять нормы легковых машин',
-  'can_update_passenger_cars_norms': 'Может обновлять нормы легковых машин',
-  'view_passenger_cars_norms': 'Может просматривать нормы легковых машин',
-  'can_download_passenger_cars_reports': 'Может скачивать отчеты легковых машин',
-  'view_passenger_cars_reports': 'Может просматривать отчеты легковых машин',
-};
-const permissionGroups = {
-  users: {
-    label: 'Пользователи',
-    keys: ['can_create_users', 'can_delete_users', 'can_update_users', 'view_users', 'view_drivers']
-  },
-  roles: {
-    label: 'Роли',
-    keys: ['can_create_roles', 'can_delete_roles', 'can_update_roles', 'can_view_roles']
-  },
-  permissions: {
-    label: 'Разрешения',
-    keys: ['can_create_permissions', 'can_delete_permissisons', 'can_update_permissisons', 'can_view_permissisons']
-  },
-  mobile: {
-    label: 'Мобильное приложение',
-    keys: ['can_use_mobile_booking']
-  },
-  fire_trucks: {
-    label: 'Пожарные машины',
-    keys: ['can_create_fire_trucks', 'can_delete_fire_trucks', 'can_update_fire_trucks', 'view_fire_trucks']
-  },
-  fire_truck_waybills: {
-    label: 'Путевые листы пожарных машин',
-    keys: ['can_create_fire_truck_waybills', 'can_delete_fire_truck_waybills', 'can_update_fire_truck_waybills', 'can_download_fire_truck_waybills', 'view_fire_truck_waybills']
-  },
-  fire_truck_waybill_records: {
-    label: 'Записи путевых листов пожарных машин',
-    keys: ['can_create_fire_truck_waybills_record', 'can_delete_fire_truck_waybills_record', 'can_update_fire_truck_waybills_record']
-  },
-  fire_truck_norms: {
-    label: 'Нормы пожарных машин',
-    keys: ['can_create_fire_truck_norms', 'can_delete_fire_truck_norms', 'can_update_fire_truck_norms', 'view_fire_truck_norms']
-  },
-  fire_truck_reports: {
-    label: 'Отчеты пожарных машин',
-    keys: ['can_download_fire_truck_reports', 'view_fire_truck_reports']
-  },
-  passenger_cars: {
-    label: 'Легковые машины',
-    keys: ['can_create_passenger_cars', 'can_delete_passenger_cars', 'can_update_passenger_cars', 'view_passenger_cars']
-  },
-  passenger_cars_waybills: {
-    label: 'Путевые листы легковых машин',
-    keys: ['can_create_passenger_cars_waybills', 'can_delete_passenger_cars_waybills', 'can_update_passenger_cars_waybills', 'can_download_passenger_cars_waybills', 'view_passenger_cars_waybills']
-  },
-  passenger_cars_waybill_records: {
-    label: 'Записи путевых листов легковых машин',
-    keys: ['can_create_passenger_cars_waybills_record', 'can_delete_passenger_cars_waybills_record', 'can_update_passenger_cars_waybills_record']
-  },
-  passenger_cars_norms: {
-    label: 'Нормы легковых машин',
-    keys: ['can_create_passenger_cars_norms', 'can_delete_passenger_cars_norms', 'can_update_passenger_cars_norms', 'view_passenger_cars_norms']
-  },
-  passenger_cars_reports: {
-    label: 'Отчеты легковых машин',
-    keys: ['can_download_passenger_cars_reports', 'view_passenger_cars_reports']
-  },
-};
-
-const permissionGroupOptions = computed(() => {
-  return [
-    { value: 'all', label: 'Все' },
-    ...Object.entries(permissionGroups).map(([key, group]) => ({
-      value: key,
-      label: group.label
-    }))
-  ];
-});
-
-const filteredPermissionFields = computed(() => {
-  let fields = permissionFields.value;
-  if (selectedPermissionGroup.value !== 'all') {
-    const groupKeys = permissionGroups[selectedPermissionGroup.value]?.keys || [];
-    fields = fields.filter(field => groupKeys.includes(field));
-  }
-  if (permissionSearchQuery.value) {
-    const query = permissionSearchQuery.value.toLowerCase();
-    fields = fields.filter(field => {
-      const label = permissionsMap[field]?.toLowerCase() || '';
-      return label.includes(query);
-    });
-  }
-  return fields;
 });
 
 const fetchRoles = async () => {
@@ -400,159 +263,17 @@ const addRole = async () => {
 
     // 2. Создаём Permission для этой роли (все поля false)
     const permissionPayload = { role: createdRole.id };
-    // Можно добавить сюда дефолтные значения для всех разрешений, если нужно
     const permResp = await axios.post('/permissions/', permissionPayload, { headers: { Authorization: `Bearer ${auth.access}` } });
+    
     // 3. Открываем окно редактирования разрешений для новой роли
-    editingRole.value = createdRole;
-    // Загружаем разрешения для новой роли
-    await loadPermissionsForRole(createdRole.id);
     showAddModal.value = false;
-    showEditModal.value = true;
+    roleEditModal.value?.openModal(createdRole, roles.value);
+    
     // Сброс формы
     newRole.value = { name: '' };
   } catch (error) {
     alert('Ошибка при создании роли или разрешений: ' + (error.response?.data?.detail || error.message));
     console.error('Ошибка при создании роли или разрешений:', error);
-  }
-};
-
-const openEditModal = async (role) => {
-  originalRole.value = { ...role };
-  editingRole.value = { ...role };
-  permissionSearchQuery.value = '';
-  selectedPermissionGroup.value = 'all';
-  await loadPermissionsForRole(role.id);
-  showEditModal.value = true;
-};
-
-const closeEditModal = () => {
-  showEditModal.value = false;
-  editingRole.value = null;
-  originalRole.value = null;
-  rolePermissions.value = {};
-  originalRolePermissions.value = {};
-  permissionSearchQuery.value = '';
-  selectedPermissionGroup.value = 'all';
-};
-
-const hasRoleChanged = () => {
-  if (!editingRole.value || !originalRole.value) return false;
-  // Проверяем изменение названия роли
-  const roleChanged = JSON.stringify(editingRole.value) !== JSON.stringify(originalRole.value);
-  // Проверяем изменение разрешений только если есть право их обновлять
-  let permissionsChanged = false;
-  if (auth.permissions.can_update_permissisons) {
-    permissionsChanged = JSON.stringify(rolePermissions.value) !== JSON.stringify(originalRolePermissions.value);
-  }
-  return roleChanged || permissionsChanged;
-};
-
-const loadPermissionsForRole = async (roleId) => {
-  // Загружаем разрешения только если есть право на их просмотр и обновление
-   if (!auth.permissions.can_view_permissisons || !auth.permissions.can_update_permissisons) {
-    return;
-  }
-  try {
-    const url = `/permissions/?role=${roleId}`;
-    const response = await axios.get(url, { headers: { Authorization: `Bearer ${auth.access}` } });
-    if (response.data && response.data.length > 0) {
-      const permission = response.data[0];
-      rolePermissions.value = { ...permission };
-      originalRolePermissions.value = { ...permission };
-      permissionFields.value = Object.keys(permission).filter(
-        key => typeof permission[key] === 'boolean' && key !== 'deleted_at'
-      );
-    }
-  } catch (error) {
-    console.error('Ошибка при загрузке пермишнов:', error);
-  }
-};
-
-const formatPermissionLabel = (fieldName) => {
-  return permissionsMap[fieldName] || fieldName;
-};
-
-const updateRolePermission = (key, value) => {
-  rolePermissions.value[key] = value;
-};
-
-const updateRole = async () => {
-  if (!auth.permissions.can_update_roles) {
-    console.warn('Нет разрешения на редактирование ролей.');
-    return;
-  }
-  if (!editingRole.value) return;
-
-  // Проверяем, изменилась ли роль
-  if (!hasRoleChanged()) {
-    console.log('[Roles] No changes detected');
-    closeEditModal();
-    return;
-  }
-
-  if (!editingRole.value.name) {
-    alert('Пожалуйста, заполните название роли!');
-    return;
-  }
-  try {
-    const response = await axios.put(`/roles/${editingRole.value.id}/`, editingRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
-    // Обновляем пермишны только если они изменились и есть право на их обновление
-    if (auth.permissions.can_update_permissisons && 
-        JSON.stringify(rolePermissions.value) !== JSON.stringify(originalRolePermissions.value)) {
-      const permResponse = await axios.get(`/permissions/?role=${editingRole.value.id}`, { headers: { Authorization: `Bearer ${auth.access}` } });
-      if (permResponse.data && permResponse.data.length > 0) {
-        const permissionId = permResponse.data[0].id;
-        await axios.put(`/permissions/${permissionId}/`, rolePermissions.value, { headers: { Authorization: `Bearer ${auth.access}` } });
-      }
-    }
-    // Обновляем роль в таблице
-    const roleIndex = roles.value.findIndex(r => r.id === editingRole.value.id);
-    if (roleIndex > -1) {
-      roles.value[roleIndex] = response.data;
-    }
-    closeEditModal();
-  } catch (error) {
-    alert('Ошибка при обновлении роли: ' + (error.response?.data?.detail || error.message));
-  }
-};
-
-const updateRoleAndContinue = async () => {
-  if (!auth.permissions.can_update_roles) {
-    console.warn('Нет разрешения на редактирование ролей.');
-    return;
-  }
-  if (!editingRole.value) return;
-
-  // Проверяем, изменилась ли роль
-  if (!hasRoleChanged()) {
-    console.log('[Roles] No changes detected');
-    return;
-  }
-
-  if (!editingRole.value.name) {
-    alert('Пожалуйста, заполните название роли!');
-    return;
-  }
-  try {
-    const response = await axios.put(`/roles/${editingRole.value.id}/`, editingRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
-    // Обновляем пермишны только если они изменились и есть право на их обновление
-    if (auth.permissions.can_update_permissisons && 
-        JSON.stringify(rolePermissions.value) !== JSON.stringify(originalRolePermissions.value)) {
-      const permResponse = await axios.get(`/permissions/?role=${editingRole.value.id}`, { headers: { Authorization: `Bearer ${auth.access}` } });
-      if (permResponse.data && permResponse.data.length > 0) {
-        const permissionId = permResponse.data[0].id;
-        await axios.put(`/permissions/${permissionId}/`, rolePermissions.value, { headers: { Authorization: `Bearer ${auth.access}` } });
-      }
-    }
-    // Обновляем роль в таблице
-    const roleIndex = roles.value.findIndex(r => r.id === editingRole.value.id);
-    if (roleIndex > -1) {
-      roles.value[roleIndex] = response.data;
-    }
-    // Перезагружаем разрешения для продолжения редактирования
-    await loadPermissionsForRole(editingRole.value.id);
-  } catch (error) {
-    alert('Ошибка при обновлении роли: ' + (error.response?.data?.detail || error.message));
   }
 };
 
@@ -569,7 +290,7 @@ const onRowClick = (role) => {
     return;
   }
 
-  openEditModal(role);
+  roleEditModal.value?.openModal(role, roles.value);
 };
 
 const setupCrudPermissions = () => {
@@ -666,6 +387,15 @@ const confirmDelete = async () => {
   }
 };
 
+const deleteButtonLabel = computed(() => {
+  const count = selectedRoleIds.value.length;
+  if (count === 0) return 'Удалить роль';
+  if (count === 1) return 'Удалить роль';
+  return `Удалить роли (${count})`;
+});
+
+const isDeleteDisabled = computed(() => selectedRoleIds.value.length === 0);
+
 const handleCrudDelete = () => {
   openDeleteModal();
 };
@@ -680,15 +410,10 @@ onMounted(() => {
   }
   // Загружаем пользователей если есть право на просмотр
   fetchUsers();
-  window.addEventListener('crud:create', handleCrudCreate);
-  window.addEventListener('crud:delete', handleCrudDelete);
  });
 
 
 onUnmounted(() => {
   auth.clearCrudPermissions();
-  
-  window.removeEventListener('crud:create', handleCrudCreate);
-  window.removeEventListener('crud:delete', handleCrudDelete);
 }); 
 </script>

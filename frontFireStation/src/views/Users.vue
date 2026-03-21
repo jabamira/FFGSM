@@ -138,6 +138,15 @@
 
     <!-- Role Edit Modal -->
     <RoleEditModal ref="roleEditModal" @role-updated="onRoleUpdated" />
+
+    <!-- CRUD Panel -->
+    <CrudPanel 
+      @create="handleCrudCreate"
+      @delete="handleCrudDelete"
+      createLabel="Добавить пользователя"
+      :deleteLabel="deleteButtonLabel"
+      :isDeleteDisabled="isDeleteDisabled"
+    />
   </div>
 </template>
 
@@ -152,6 +161,7 @@ import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import UserEditModal from '../components/UserEditModal.vue';
 import RoleEditModal from '../components/RoleEditModal.vue';
+import CrudPanel from '../components/CrudPanel.vue';
 
 const auth = useAuthStore();
 const users = ref([]);
@@ -454,6 +464,15 @@ const getRoleNameById = (roleId) => {
   return roles.value.find(r => r.id === roleId)?.name || '-';
 };
 
+const deleteButtonLabel = computed(() => {
+  const count = selectedUserIds.value.length;
+  if (count === 0) return 'Удалить пользователя';
+  if (count === 1) return 'Удалить пользователя';
+  return `Удалить пользователей (${count})`;
+});
+
+const isDeleteDisabled = computed(() => selectedUserIds.value.length === 0);
+
 const openDeleteModal = () => {
   if (selectedUserIds.value.length === 0) {
     noSelectionModal.value?.openModal();
@@ -519,15 +538,9 @@ onMounted(() => {
   } else {
     console.warn("[Users] User does not have permission to view users.");
   }
-
-  window.addEventListener('crud:create', handleCrudCreate);
-  window.addEventListener('crud:delete', handleCrudDelete);
 });
 
 onUnmounted(() => {
   auth.clearCrudPermissions();
-  
-  window.removeEventListener('crud:create', handleCrudCreate);
-  window.removeEventListener('crud:delete', handleCrudDelete);
 });
 </script>

@@ -158,6 +158,15 @@
 
     <!-- No Selection Modal -->
     <NoSelectionModal ref="noSelectionModal" />
+
+    <!-- CRUD Panel -->
+    <CrudPanel 
+      @create="handleCrudCreate"
+      @delete="handleCrudDelete"
+      createLabel="Добавить водителя"
+      :deleteLabel="deleteButtonLabel"
+      :isDeleteDisabled="isDeleteDisabled"
+    />
   </div>
 </template>
 
@@ -170,6 +179,7 @@ import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
+import CrudPanel from '../components/CrudPanel.vue';
 
 const auth = useAuthStore();
 const drivers = ref([]);
@@ -426,6 +436,15 @@ const handleCrudCreate = () => {
   openAddModal();
 };
 
+const deleteButtonLabel = computed(() => {
+  const count = selectedDriverIds.value.length;
+  if (count === 0) return 'Удалить водителя';
+  if (count === 1) return 'Удалить водителя';
+  return `Удалить водителей (${count})`;
+});
+
+const isDeleteDisabled = computed(() => selectedDriverIds.value.length === 0);
+
 // Функция для обработки события delete из CrudPanel
 const handleCrudDelete = () => {
   openDeleteModal();
@@ -440,18 +459,10 @@ onMounted(() => {
   } else {
     console.warn("[Drivers] User does not have permission to view drivers.");
   }
-
-  // Слушаем события от CrudPanel через App.vue
-  window.addEventListener('crud:create', handleCrudCreate);
-  window.addEventListener('crud:delete', handleCrudDelete);
 });
 
 onUnmounted(() => {
   // Очистить CRUD разрешения при выходе со страницы
   auth.clearCrudPermissions();
-  
-  // Удаляем слушатели событий
-  window.removeEventListener('crud:create', handleCrudCreate);
-  window.removeEventListener('crud:delete', handleCrudDelete);
 });
 </script>
