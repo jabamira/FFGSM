@@ -221,9 +221,9 @@ class Season(models.TextChoices):
     SUMMER = 'summer', 'Лето'
 
 class FuelType(models.TextChoices):
-    PETROL = 'petrol', 'Бензин'
-    DIESEL = 'diesel', 'Дизельное топливо'
-
+    PETROL95 = 'petrol95', 'Бензин (АИ-95)'
+    PETROL92 = 'petrol92', 'Бензин (АИ-92)'
+    DIESEL = 'diesel', 'Дизельное топливо'   
 
 # --- Таблицы легкового автомобиля ---
 class PassengerCar(SoftDeleteModel):
@@ -1213,6 +1213,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             self.fire_truck_waybill.recalc_totals()
 
 class OdometerFuelFireTruck(SoftDeleteModel):
+    
     car = models.ForeignKey(
         FireTruck,
         on_delete=models.CASCADE,
@@ -1289,3 +1290,173 @@ class OdometerFuelFireTruck(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.car.number} {self.date}: {self.odometer} км, {self.fuel} л"
+    
+
+
+# --- Таблицы ТО ---
+class MaintenanceType(models.TextChoices):
+    ENGINE_OIL = 'engine_oil', 'Замена моторного масла и фильтра'
+    AIR_FILTER = 'air_filter', 'Замена воздушного фильтра'
+    CABINE_FILTER = 'cabine_filter', 'Замена салонного фильтра'
+    ANTIFREEZE = 'antifreeze', 'Замена антифриза' 
+
+class TechnicalМaintenance(SoftDeleteModel):
+    number = models.CharField(
+        max_length=6,
+        null=False,
+        help_text="номер документа о техническом обслуживании",
+        unique=True,
+    )
+
+    date = models.DateField(
+        null=False,
+        help_text="дата"
+    )
+
+    TYPE_CHOICES = (
+        ('passenger', 'Легковой'),
+        ('fire_truck', 'Пожарный'),
+    )
+
+    car_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+
+    passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
+    fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
+
+    maintenance_type = models.CharField(
+        max_length=30,
+        choices=MaintenanceType.choices,
+        null=False,
+        help_text="вид ТО"
+    )
+
+    spent = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=False,
+        help_text="израсходовано"
+    )
+
+    received = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=False,
+        help_text="получено"
+    )
+
+    def clean(self):
+        super().clean()
+
+        if not self.passenger_car and not self.fire_truck:
+            raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
+        if self.passenger_car and self.fire_truck:
+            raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
+
+        # Доп. логика: если тип = легковой, запрещаем fire_truck
+        if self.car_type == 'passenger' and self.fire_truck:
+            raise ValidationError("Для легкового автомобиля нельзя заполнять поле fire_truck.")
+        if self.car_type == 'fire_truck' and self.passenger_car:
+            raise ValidationError("Для пожарного автомобиля нельзя заполнять passenger_car.")
+    
+    def __str__(self):
+        return f"{self.number} - {self.date} - {self.maintenance_type} - {self.car_type}"
+        
+class NormsOperatingHoursFireTruck(SoftDeleteModel):
+    car = models.ForeignKey(
+        FireTruck,
+        on_delete=models.CASCADE,
+        related_name="norms_operating_hours",
+    )
+
+    km_norm = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        help_text="норма по переводу в моточасы км",
+        validators=[MinValueValidator(Decimal('0.0000'))]
+    )
+
+    with_pump_norm = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        help_text="норма по переводу в моточасы с насосом,",
+        validators=[MinValueValidator(Decimal('0.0000'))]
+    )
+
+    date = models.DateField(
+        default=date.today,
+        null=False,
+        help_text="дата утверждения нормы"
+    )
+
+    def __str__(self):
+        return f"Норма {self.car.number} от {self.date}"
+    
+class NormsOperatingHoursPassengerCar(SoftDeleteModel):
+    car = models.ForeignKey(
+        PassengerCar,
+        on_delete=models.CASCADE,
+        related_name="norms_operating_hours",
+    )
+
+    city_norm = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        null=False,
+        help_text="норма по переводу в моточасы по городу",
+        validators=[MinValueValidator(Decimal('0.0000'))]
+    )
+
+    area_norm = models.DecimalField(
+        max_digits=5,
+        decimal_places=4,
+        null=False,
+        help_text="норма по переводу в моточасы по области",
+        validators=[MinValueValidator(Decimal('0.0000'))]
+    )
+
+    date = models.DateField(
+        default=date.today,
+        null=False,
+        help_text="дата утверждения нормы",
+    )
+
+    def __str__(self):
+        return f"Норма {self.car.number} от {self.date}"
+
+class NormsTechnicalМaintenance(SoftDeleteModel):
+    passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
+    fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
+
+    maintenance_type = models.CharField(
+        max_length=30,
+        choices=MaintenanceType.choices,
+        null=False,
+        help_text="вид ТО"
+    )
+
+    norm = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=False,
+        help_text="норма",
+        validators=[MinValueValidator(Decimal('0.0000'))]
+    )
+
+class LastTechnicalМaintenance(SoftDeleteModel):
+    passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
+    fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
+
+    maintenance_type = models.CharField(
+        max_length=30,
+        choices=MaintenanceType.choices,
+        null=False,
+        help_text="вид ТО"
+    )
+
+    operatig_hours = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=False,
+        help_text="моточасы на момент ТО",
+        validators=[MinValueValidator(Decimal('0.000'))]
+    )
