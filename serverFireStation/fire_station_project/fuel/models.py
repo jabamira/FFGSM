@@ -1344,6 +1344,14 @@ class TechnicalМaintenance(SoftDeleteModel):
         help_text="получено"
     )
 
+    operatig_hours = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=False,
+        help_text="моточасы на момент ТО",
+        validators=[MinValueValidator(Decimal('0.000'))]
+    )
+
     def clean(self):
         super().clean()
 
@@ -1442,21 +1450,51 @@ class NormsTechnicalМaintenance(SoftDeleteModel):
         validators=[MinValueValidator(Decimal('0.0000'))]
     )
 
-class LastTechnicalМaintenance(SoftDeleteModel):
+    date = models.DateField(
+        default=date.today,
+        null=False,
+        help_text="дата"
+    )
+
+# class LastTechnicalМaintenance(SoftDeleteModel):
+#     passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
+#     fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
+
+#     maintenance_type = models.CharField(
+#         max_length=30,
+#         choices=MaintenanceType.choices,
+#         null=False,
+#         help_text="вид ТО"
+#     )
+
+#     operatig_hours = models.DecimalField(
+#         max_digits=12,
+#         decimal_places=3,
+#         null=False,
+#         help_text="моточасы на момент ТО",
+#         validators=[MinValueValidator(Decimal('0.000'))]
+#     )
+
+#     date = models.DateField(
+#         default=date.today,
+#         null=False,
+#         help_text="дата"
+#     )
+
+class OperatingHoursCars(SoftDeleteModel):
     passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
     fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
-
-    maintenance_type = models.CharField(
-        max_length=30,
-        choices=MaintenanceType.choices,
-        null=False,
-        help_text="вид ТО"
-    )
 
     operatig_hours = models.DecimalField(
         max_digits=12,
         decimal_places=3,
         null=False,
-        help_text="моточасы на момент ТО",
+        help_text="моточасы",
         validators=[MinValueValidator(Decimal('0.000'))]
+    )
+
+    date = models.DateField(
+        default=date.today,
+        null=False,
+        help_text="дата"
     )
