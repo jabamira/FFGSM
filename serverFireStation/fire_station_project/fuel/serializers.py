@@ -1,4 +1,3 @@
-# fuel/serializers.py
 from django.core.validators import MaxLengthValidator, MinValueValidator, MaxValueValidator
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
@@ -15,7 +14,6 @@ from .models import (
     NormsOperatingHoursFireTruck,
     TechnicalMaintenance,
     NormsTechnicalMaintenance,
-    MaintenanceNotification,
 )
 
 
@@ -226,9 +224,3 @@ class TechnicalMaintenanceSerializer(FriendlyModelSerializer):
         model = TechnicalMaintenance
         fields = '__all__'
         read_only_fields = ['number', 'operating_hours']
-
-
-class MaintenanceNotificationSerializer(FriendlyModelSerializer):
-    class Meta:
-        model = MaintenanceNotification
-        fields = '__all__'

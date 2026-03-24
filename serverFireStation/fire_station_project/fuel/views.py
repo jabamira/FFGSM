@@ -10,6 +10,7 @@ from openpyxl import Workbook, load_workbook
 from decimal import Decimal
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from urllib.parse import quote
+from datetime import date
 
 from .models import (
     Role, Permission, User,
@@ -23,7 +24,6 @@ from .models import (
     NormsOperatingHoursFireTruck,
     TechnicalMaintenance,
     NormsTechnicalMaintenance,
-    MaintenanceNotification,
 )
 
 from .serializers import (
@@ -40,7 +40,6 @@ from .serializers import (
     NormsOperatingHoursFireTruckSerializer,
     TechnicalMaintenanceSerializer,
     NormsTechnicalMaintenanceSerializer,
-    MaintenanceNotificationSerializer,
 )
 
 from .permissions import (
@@ -58,7 +57,7 @@ from .permissions import (
 
     CanViewPassengerCarWaybills, CanCreatePassengerCarWaybills,
     CanUpdatePassengerCarWaybills, CanDeletePassengerCarWaybills,
-    CanDownloadPassengerCarWaybills, CanDownloadPassengerCarReports,
+    CanDownloadPassengerCarWaybills,
     CanCreatePassengerCarWaybillRecord,
     CanUpdatePassengerCarWaybillRecord,
     CanDeletePassengerCarWaybillRecord,
@@ -71,7 +70,7 @@ from .permissions import (
 
     CanViewFireTruckWaybills, CanCreateFireTruckWaybills,
     CanUpdateFireTruckWaybills, CanDeleteFireTruckWaybills,
-    CanDownloadFireTruckWaybills, CanDownloadFireTruckReports,
+    CanDownloadFireTruckWaybills,
     CanCreateFireTruckWaybillRecord,
     CanUpdateFireTruckWaybillRecord,
     CanDeleteFireTruckWaybillRecord,
@@ -553,6 +552,7 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             total_fuel_used_city += rec.fuel_used_city
             total_fuel_used_area += rec.fuel_used_area
             total_fuel_used_fact += rec.fuel_used
+            total_fuel_used_ref = rec.fuel_used_normal
             total_fuel_used_normal += rec.fuel_used_normal
             total_fuel_refueled += rec.fuel_refueled
             total_savings += savings
@@ -766,7 +766,7 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
         ws = wb.active
 
         ws['D2'] = car.number
-        ws['K2'] = from_date.strftime('%d.%m.%Y')
+        ws['K2'] = from_date.strftime('%d.%м.%Y')
         ws['R2'] = to_date.strftime('%d.%m.%Y')
 
         data_start_row = 7
@@ -801,8 +801,6 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
 
         for rec in records:
             wb_obj = rec.fire_truck_waybill
-            driver = wb_obj.driver
-
             route = getattr(rec, 'driving_route', '') or ''
             name_place = (rec.target or '') + (f" {route}" if route else '')
 
@@ -877,13 +875,13 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
 
         data_end_row = row_idx
         for r in range(data_start_row, data_end_row + 1):
-            for c in range(1, 21 + 1):
+            for c in range(1, 20):
                 cell = ws.cell(row=r, column=c)
                 cell.border = thin_border
                 cell.font = center_font
                 cell.alignment = center_align
 
-        for c in range(1, 19 + 1):
+        for c in range(1, 20):
             ws.cell(row=data_end_row, column=c).font = bold_font
 
         output = BytesIO()
@@ -990,6 +988,145 @@ class NormsTechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
     def get_permissions(self):
         return [IsAuthenticated()]
 
+    @action(detail=False, methods=['get'], url_path='remaining-hours')
+    def remaining_hours(self, request):
+        """
+        GET /api/technical-maintenance-norms/remaining-hours/?passenger_car=<id>
+        или
+        GET /api/technical-maintenance-norms/remaining-hours/?fire_truck=<id>
+
+        Возвращает, сколько осталось моточасов до каждого вида ТО.
+        """
+        passenger_car_id = request.query_params.get('passenger_car')
+        fire_truck_id = request.query_params.get('fire_truck')
+        date_str = request.query_params.get('date')
+
+        if (not passenger_car_id and not fire_truck_id) or (passenger_car_id and fire_truck_id):
+            return Response(
+                {"detail": "Нужно указать либо passenger_car, либо fire_truck"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        calc_date = parse_date(date_str) if date_str else date.today()
+        if date_str and not calc_date:
+            return Response(
+                {"detail": "Неверный формат date, используйте YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = request.user
+        role_perm = getattr(getattr(user, 'role', None), 'role', None)
+        if not role_perm:
+            return Response({"detail": "Нет прав"}, status=status.HTTP_403_FORBIDDEN)
+
+        if passenger_car_id and not getattr(role_perm, 'view_passenger_cars_norms', False):
+            return Response({"detail": "Нет прав на просмотр норм легкового автомобиля"}, status=403)
+
+        if fire_truck_id and not getattr(role_perm, 'view_fire_truck_norms', False):
+            return Response({"detail": "Нет прав на просмотр норм пожарного автомобиля"}, status=403)
+
+        result = []
+
+        if passenger_car_id:
+            last_hours = (
+                OperatingHoursCars.objects
+                .filter(passenger_car_id=passenger_car_id, date__lte=calc_date)
+                .order_by('-date', '-id')
+                .first()
+            )
+            current_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
+
+            norms = (
+                NormsTechnicalMaintenance.objects
+                .filter(passenger_car_id=passenger_car_id, fire_truck__isnull=True, date__lte=calc_date)
+                .order_by('maintenance_type', '-date', '-id')
+            )
+
+            seen_types = set()
+            for norm in norms:
+                if norm.maintenance_type in seen_types:
+                    continue
+                seen_types.add(norm.maintenance_type)
+
+                last_tm = (
+                    TechnicalMaintenance.objects
+                    .filter(passenger_car_id=passenger_car_id, maintenance_type=norm.maintenance_type, date__lte=calc_date)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+                last_tm_hours = last_tm.operating_hours if last_tm else Decimal('0.000')
+                spent_since = current_hours - last_tm_hours
+                remaining = norm.norm - spent_since
+                overdue = Decimal('0.000')
+                if remaining < 0:
+                    overdue = -remaining
+                    remaining = Decimal('0.000')
+
+                result.append({
+                    'car_type': 'passenger',
+                    'passenger_car': int(passenger_car_id),
+                    'maintenance_type': norm.maintenance_type,
+                    'maintenance_type_label': norm.get_maintenance_type_display(),
+                    'norm': str(norm.norm),
+                    'current_operating_hours': str(current_hours),
+                    'last_maintenance_operating_hours': str(last_tm_hours),
+                    'spent_since_last_maintenance': str(spent_since),
+                    'remaining_hours': str(remaining),
+                    'overdue_hours': str(overdue),
+                    'is_due': overdue > 0 or remaining == 0,
+                })
+
+        if fire_truck_id:
+            last_hours = (
+                OperatingHoursCars.objects
+                .filter(fire_truck_id=fire_truck_id, date__lte=calc_date)
+                .order_by('-date', '-id')
+                .first()
+            )
+            current_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
+
+            norms = (
+                NormsTechnicalMaintenance.objects
+                .filter(fire_truck_id=fire_truck_id, passenger_car__isnull=True, date__lte=calc_date)
+                .order_by('maintenance_type', '-date', '-id')
+            )
+
+            seen_types = set()
+            for norm in norms:
+                if norm.maintenance_type in seen_types:
+                    continue
+                seen_types.add(norm.maintenance_type)
+
+                last_tm = (
+                    TechnicalMaintenance.objects
+                    .filter(fire_truck_id=fire_truck_id, maintenance_type=norm.maintenance_type, date__lte=calc_date)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+                last_tm_hours = last_tm.operating_hours if last_tm else Decimal('0.000')
+                spent_since = current_hours - last_tm_hours
+                remaining = norm.norm - spent_since
+                overdue = Decimal('0.000')
+                if remaining < 0:
+                    overdue = -remaining
+                    remaining = Decimal('0.000')
+
+                result.append({
+                    'car_type': 'fire_truck',
+                    'fire_truck': int(fire_truck_id),
+                    'maintenance_type': norm.maintenance_type,
+                    'maintenance_type_label': norm.get_maintenance_type_display(),
+                    'norm': str(norm.norm),
+                    'current_operating_hours': str(current_hours),
+                    'last_maintenance_operating_hours': str(last_tm_hours),
+                    'spent_since_last_maintenance': str(spent_since),
+                    'remaining_hours': str(remaining),
+                    'overdue_hours': str(overdue),
+                    'is_due': overdue > 0 or remaining == 0,
+                })
+
+        return Response(result)
+
 
 class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
     queryset = TechnicalMaintenance.objects.all()
@@ -1006,18 +1143,3 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
         elif self.action == 'destroy':
             return base + [CanDeleteTechnicalMaintenance()]
         return base
-
-
-class MaintenanceNotificationViewSet(SoftDeleteModelViewSet):
-    queryset = MaintenanceNotification.objects.all().order_by('-created_at')
-    serializer_class = MaintenanceNotificationSerializer
-
-    def get_permissions(self):
-        return [IsAuthenticated()]
-
-    @action(detail=True, methods=['post'], url_path='mark-read')
-    def mark_read(self, request, pk=None):
-        obj = self.get_object()
-        obj.is_read = True
-        obj.save(update_fields=['is_read'])
-        return Response({'detail': 'Уведомление отмечено как прочитанное'})

@@ -11,6 +11,11 @@ from .views import (
     FireTruckViewSet, NormsFireTruckViewSet,
     FireTruckWaybillViewSet, FireTruckWaybillRecordViewSet,
     OdometerFuelFireTruckViewSet,
+    OperatingHoursCarsViewSet,
+    NormsOperatingHoursPassengerCarViewSet,
+    NormsOperatingHoursFireTruckViewSet,
+    TechnicalMaintenanceViewSet,
+    NormsTechnicalMaintenanceViewSet
 )
 
 router = DefaultRouter()
@@ -35,6 +40,14 @@ router.register(r'fire-truck-norms', NormsFireTruckViewSet)
 router.register(r'fire-truck-odometer-fuel', OdometerFuelFireTruckViewSet)
 router.register(r'fire-truck-waybills', FireTruckWaybillViewSet)
 router.register(r'fire-truck-records', FireTruckWaybillRecordViewSet)
+
+
+# ТО
+router.register(r'operating-hours', OperatingHoursCarsViewSet)
+router.register(r'passenger-car-operating-hours-norms', NormsOperatingHoursPassengerCarViewSet)
+router.register(r'fire-truck-operating-hours-norms', NormsOperatingHoursFireTruckViewSet)
+router.register(r'technical-maintenance', TechnicalMaintenanceViewSet)
+router.register(r'technical-maintenance-norms', NormsTechnicalMaintenanceViewSet)
 
 urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),

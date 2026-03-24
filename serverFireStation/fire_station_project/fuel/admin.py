@@ -1,18 +1,16 @@
 from django.contrib import admin
 from .models import (
-    Role,
-    User,
-    PassengerCar,
-    FireTruck,
-    PassengerCarWaybill,
-    PassengerCarWaybillRecord,
-    FireTruckWaybill,
-    FireTruckWaybillRecord,
-    OdometerFuelFireTruck,
-    OdometerFuelPassengerCar,
-    NormsFireTruck,
-    NormsPassengerCars,
-    Permission
+    Role, Permission, User,
+    PassengerCar, NormsPassengerCars, PassengerCarWaybill,
+    PassengerCarWaybillRecord, OdometerFuelPassengerCar,
+    FireTruck, NormsFireTruck, FireTruckWaybill,
+    FireTruckWaybillRecord, OdometerFuelFireTruck,
+
+    OperatingHoursCars,
+    NormsOperatingHoursPassengerCar,
+    NormsOperatingHoursFireTruck,
+    TechnicalMaintenance,
+    NormsTechnicalMaintenance,
 )
 
 
@@ -33,3 +31,9 @@ admin.site.register(FireTruckWaybill)
 admin.site.register(FireTruckWaybillRecord)
 admin.site.register(OdometerFuelFireTruck)
 admin.site.register(NormsFireTruck)
+
+admin.site.register(OperatingHoursCars)
+admin.site.register(NormsOperatingHoursPassengerCar)
+admin.site.register(NormsOperatingHoursFireTruck)
+admin.site.register(TechnicalMaintenance)
+admin.site.register(NormsTechnicalMaintenance)

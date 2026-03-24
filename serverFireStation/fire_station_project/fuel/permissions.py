@@ -1,4 +1,3 @@
-# fuel/permissions.py
 from rest_framework.permissions import BasePermission
 
 
@@ -295,8 +294,7 @@ class CanDeleteTechnicalMaintenance(RolePermission):
 
 class CanViewOperatingHours(RolePermission):
     perm_attr = 'can_view_operating_hourse'
-
-
+    
 # ================= MOBILE ONLY ACTIONS =================
 
 class CanBookCarFromMobile(BasePermission):

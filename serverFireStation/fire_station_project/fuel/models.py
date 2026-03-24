@@ -59,7 +59,7 @@ class SoftDeleteModel(models.Model):
 
 def next_doc_number(model_cls, length=6):
     """
-    Автонумерация документов формата 000001, 000002, ...
+    Автонумерация документов вида 000001, 000002, ...
     """
     last_obj = (
         model_cls.all_objects
@@ -243,7 +243,7 @@ class FuelType(models.TextChoices):
     DIESEL = 'diesel', 'Дизельное топливо'
 
 
-# --- Легковой автомобиль -----------------------------------------------------
+# --- Легковые автомобили -----------------------------------------------------
 
 class PassengerCar(SoftDeleteModel):
     number = models.CharField(
@@ -354,75 +354,13 @@ class PassengerCarWaybill(SoftDeleteModel):
         help_text="тип топлива"
     )
 
-    upon_issuance = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="наличие ГСМ при выдаче, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    total_spent = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="всего израсходовано, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    total_received = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="всего получено (заправки), л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    required_by_norm = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="положено по норме, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    availability_upon_delivery = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="наличие при сдаче, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    savings = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="экономия, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    overrun = models.DecimalField(
-        max_digits=6,
-        decimal_places=3,
-        null=False,
-        editable=False,
-        default=Decimal('0.000'),
-        help_text="перерасход, л",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
+    upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_spent = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_received = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    required_by_norm = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    availability_upon_delivery = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    savings = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    overrun = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
 
     def __str__(self):
         return f"Путевой лист {self.car.number} от {self.date}"
@@ -467,17 +405,15 @@ class PassengerCarWaybill(SoftDeleteModel):
             self.overrun = -diff
 
         if save:
-            self.save(
-                update_fields=[
-                    'upon_issuance',
-                    'total_spent',
-                    'total_received',
-                    'required_by_norm',
-                    'availability_upon_delivery',
-                    'savings',
-                    'overrun',
-                ]
-            )
+            self.save(update_fields=[
+                'upon_issuance',
+                'total_spent',
+                'total_received',
+                'required_by_norm',
+                'availability_upon_delivery',
+                'savings',
+                'overrun',
+            ])
 
 
 class OdometerFuelPassengerCar(SoftDeleteModel):
@@ -773,43 +709,6 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
-    def _check_maintenance_due(self, current_total_hours):
-        car = self.passenger_car_waybill.car
-
-        norms = (
-            NormsTechnicalMaintenance.objects
-            .filter(passenger_car=car, fire_truck__isnull=True, date__lte=self.passenger_car_waybill.date)
-            .order_by('maintenance_type', '-date', '-id')
-        )
-
-        seen_types = set()
-        for norm in norms:
-            if norm.maintenance_type in seen_types:
-                continue
-            seen_types.add(norm.maintenance_type)
-
-            last_tm = (
-                TechnicalMaintenance.objects
-                .filter(passenger_car=car, maintenance_type=norm.maintenance_type)
-                .order_by('-date', '-id')
-                .first()
-            )
-
-            last_hours = last_tm.operating_hours if last_tm else Decimal('0.000')
-            delta = current_total_hours - last_hours
-
-            if delta >= norm.norm:
-                MaintenanceNotification.objects.get_or_create(
-                    passenger_car=car,
-                    maintenance_type=norm.maintenance_type,
-                    is_resolved=False,
-                    defaults={
-                        'message': f"Необходимо ТО: {norm.get_maintenance_type_display()} для автомобиля {car.number}",
-                        'current_operating_hours': current_total_hours,
-                        'maintenance_norm': norm.norm,
-                    }
-                )
-
     def save(self, *args, **kwargs):
         with transaction.atomic():
             self._fill_start_values()
@@ -833,12 +732,10 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
                 date=self.passenger_car_waybill.date,
             )
 
-            self._check_maintenance_due(total_hours)
-
             self.passenger_car_waybill.recalc_totals()
 
 
-# --- Пожарный автомобиль -----------------------------------------------------
+# --- Пожарные автомобили -----------------------------------------------------
 
 class FireTruck(SoftDeleteModel):
     number = models.CharField(
@@ -1025,13 +922,11 @@ class OdometerFuelFireTruck(SoftDeleteModel):
         null=False,
         blank=True,
     )
-
     odometer = models.PositiveIntegerField(
         null=False,
         blank=True,
         validators=[MaxValueValidator(999999)]
     )
-
     fuel = models.DecimalField(
         max_digits=6,
         decimal_places=3,
@@ -1039,12 +934,10 @@ class OdometerFuelFireTruck(SoftDeleteModel):
         blank=True,
         validators=[MinValueValidator(Decimal('0.000'))]
     )
-
     date = models.DateField(
         default=date.today,
         null=False,
     )
-
     waybill = models.ForeignKey(
         FireTruckWaybill,
         on_delete=models.CASCADE,
@@ -1321,43 +1214,6 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
-    def _check_maintenance_due(self, current_total_hours):
-        car = self.fire_truck_waybill.car
-
-        norms = (
-            NormsTechnicalMaintenance.objects
-            .filter(fire_truck=car, passenger_car__isnull=True, date__lte=self.fire_truck_waybill.date)
-            .order_by('maintenance_type', '-date', '-id')
-        )
-
-        seen_types = set()
-        for norm in norms:
-            if norm.maintenance_type in seen_types:
-                continue
-            seen_types.add(norm.maintenance_type)
-
-            last_tm = (
-                TechnicalMaintenance.objects
-                .filter(fire_truck=car, maintenance_type=norm.maintenance_type)
-                .order_by('-date', '-id')
-                .first()
-            )
-
-            last_hours = last_tm.operating_hours if last_tm else Decimal('0.000')
-            delta = current_total_hours - last_hours
-
-            if delta >= norm.norm:
-                MaintenanceNotification.objects.get_or_create(
-                    fire_truck=car,
-                    maintenance_type=norm.maintenance_type,
-                    is_resolved=False,
-                    defaults={
-                        'message': f"Необходимо ТО: {norm.get_maintenance_type_display()} для ПА {car.number}",
-                        'current_operating_hours': current_total_hours,
-                        'maintenance_norm': norm.norm,
-                    }
-                )
-
     def save(self, *args, **kwargs):
         with transaction.atomic():
             self._fill_start_values()
@@ -1381,18 +1237,110 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 date=self.fire_truck_waybill.date,
             )
 
-            self._check_maintenance_due(total_hours)
-
             self.fire_truck_waybill.recalc_totals()
 
 
-# --- ТО и моточасы -----------------------------------------------------------
+# --- Моточасы и ТО -----------------------------------------------------------
 
 class MaintenanceType(models.TextChoices):
     ENGINE_OIL = 'engine_oil', 'Замена моторного масла и фильтра'
     AIR_FILTER = 'air_filter', 'Замена воздушного фильтра'
     CABINE_FILTER = 'cabine_filter', 'Замена салонного фильтра'
     ANTIFREEZE = 'antifreeze', 'Замена антифриза'
+
+
+class TechnicalMaintenance(SoftDeleteModel):
+    number = models.CharField(
+        max_length=6,
+        null=False,
+        blank=True,
+        editable=False,
+        help_text="номер документа о техническом обслуживании",
+        unique=True,
+    )
+
+    date = models.DateField(
+        null=False,
+        help_text="дата"
+    )
+
+    TYPE_CHOICES = (
+        ('passenger', 'Легковой'),
+        ('fire_truck', 'Пожарный'),
+    )
+
+    car_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
+
+    passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
+    fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
+
+    maintenance_type = models.CharField(
+        max_length=30,
+        choices=MaintenanceType.choices,
+        null=False,
+        help_text="вид ТО"
+    )
+
+    spent = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=False,
+        help_text="израсходовано"
+    )
+
+    received = models.DecimalField(
+        max_digits=9,
+        decimal_places=3,
+        null=False,
+        help_text="получено"
+    )
+
+    operating_hours = models.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        null=False,
+        help_text="моточасы на момент ТО",
+        validators=[MinValueValidator(Decimal('0.000'))]
+    )
+
+    def clean(self):
+        super().clean()
+
+        if not self.passenger_car and not self.fire_truck:
+            raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
+        if self.passenger_car and self.fire_truck:
+            raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
+
+        if self.car_type == 'passenger' and self.fire_truck:
+            raise ValidationError("Для легкового автомобиля нельзя заполнять поле fire_truck.")
+        if self.car_type == 'fire_truck' and self.passenger_car:
+            raise ValidationError("Для пожарного автомобиля нельзя заполнять passenger_car.")
+
+    def save(self, *args, **kwargs):
+        if not self.number:
+            self.number = next_doc_number(TechnicalMaintenance, length=6)
+
+        if self.passenger_car_id:
+            last_hours = (
+                OperatingHoursCars.objects
+                .filter(passenger_car=self.passenger_car)
+                .order_by('-date', '-id')
+                .first()
+            )
+        else:
+            last_hours = (
+                OperatingHoursCars.objects
+                .filter(fire_truck=self.fire_truck)
+                .order_by('-date', '-id')
+                .first()
+            )
+
+        self.operating_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.number} - {self.date} - {self.maintenance_type} - {self.car_type}"
 
 
 class NormsOperatingHoursFireTruck(SoftDeleteModel):
@@ -1521,152 +1469,6 @@ class OperatingHoursCars(SoftDeleteModel):
     def clean(self):
         super().clean()
 
-        if not self.passenger_car and not self.fire_truck:
-            raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
-        if self.passenger_car and self.fire_truck:
-            raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
-
-
-class TechnicalMaintenance(SoftDeleteModel):
-    number = models.CharField(
-        max_length=6,
-        null=False,
-        blank=True,
-        editable=False,
-        help_text="номер документа о техническом обслуживании",
-        unique=True,
-    )
-
-    date = models.DateField(
-        null=False,
-        help_text="дата"
-    )
-
-    TYPE_CHOICES = (
-        ('passenger', 'Легковой'),
-        ('fire_truck', 'Пожарный'),
-    )
-
-    car_type = models.CharField(max_length=20, choices=TYPE_CHOICES)
-
-    passenger_car = models.ForeignKey(PassengerCar, null=True, blank=True, on_delete=models.CASCADE)
-    fire_truck = models.ForeignKey(FireTruck, null=True, blank=True, on_delete=models.CASCADE)
-
-    maintenance_type = models.CharField(
-        max_length=30,
-        choices=MaintenanceType.choices,
-        null=False,
-        help_text="вид ТО"
-    )
-
-    spent = models.DecimalField(
-        max_digits=9,
-        decimal_places=3,
-        null=False,
-        help_text="израсходовано"
-    )
-
-    received = models.DecimalField(
-        max_digits=9,
-        decimal_places=3,
-        null=False,
-        help_text="получено"
-    )
-
-    operating_hours = models.DecimalField(
-        max_digits=12,
-        decimal_places=3,
-        null=False,
-        help_text="моточасы на момент ТО",
-        validators=[MinValueValidator(Decimal('0.000'))]
-    )
-
-    def clean(self):
-        super().clean()
-
-        if not self.passenger_car and not self.fire_truck:
-            raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
-        if self.passenger_car and self.fire_truck:
-            raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
-
-        if self.car_type == 'passenger' and self.fire_truck:
-            raise ValidationError("Для легкового автомобиля нельзя заполнять поле fire_truck.")
-        if self.car_type == 'fire_truck' and self.passenger_car:
-            raise ValidationError("Для пожарного автомобиля нельзя заполнять passenger_car.")
-
-    def save(self, *args, **kwargs):
-        if not self.number:
-            self.number = next_doc_number(TechnicalMaintenance, length=6)
-
-        if self.passenger_car_id:
-            last_hours = (
-                OperatingHoursCars.objects
-                .filter(passenger_car=self.passenger_car)
-                .order_by('-date', '-id')
-                .first()
-            )
-        else:
-            last_hours = (
-                OperatingHoursCars.objects
-                .filter(fire_truck=self.fire_truck)
-                .order_by('-date', '-id')
-                .first()
-            )
-
-        self.operating_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
-
-        super().save(*args, **kwargs)
-
-        qs = MaintenanceNotification.objects.filter(
-            maintenance_type=self.maintenance_type,
-            is_resolved=False,
-        )
-        if self.passenger_car_id:
-            qs = qs.filter(passenger_car=self.passenger_car)
-        else:
-            qs = qs.filter(fire_truck=self.fire_truck)
-
-        qs.update(is_resolved=True, resolved_at=timezone.now())
-
-    def __str__(self):
-        return f"{self.number} - {self.date} - {self.maintenance_type} - {self.car_type}"
-
-
-class MaintenanceNotification(SoftDeleteModel):
-    passenger_car = models.ForeignKey(
-        PassengerCar,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name='maintenance_notifications'
-    )
-    fire_truck = models.ForeignKey(
-        FireTruck,
-        null=True,
-        blank=True,
-        on_delete=models.CASCADE,
-        related_name='maintenance_notifications'
-    )
-
-    maintenance_type = models.CharField(
-        max_length=30,
-        choices=MaintenanceType.choices,
-        null=False,
-        help_text="Какое ТО требуется"
-    )
-
-    message = models.TextField(null=False)
-    current_operating_hours = models.DecimalField(max_digits=12, decimal_places=3, null=False)
-    maintenance_norm = models.DecimalField(max_digits=9, decimal_places=3, null=False)
-
-    is_read = models.BooleanField(default=False)
-    is_resolved = models.BooleanField(default=False)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    resolved_at = models.DateTimeField(null=True, blank=True)
-
-    def clean(self):
-        super().clean()
         if not self.passenger_car and not self.fire_truck:
             raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
         if self.passenger_car and self.fire_truck:
