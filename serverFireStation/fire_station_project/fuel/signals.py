@@ -74,6 +74,16 @@ DEFAULT_ROLES = [
 
             "can_download_passenger_cars_reports": True,
             "view_passenger_cars_reports": True,
+
+            "can_download_drivers_reports": True,
+            "view_drivers_reports": True,
+
+            "can_create_technical_maintenance": True,
+            "can_delete_technical_maintenance": True,
+            "can_update_technical_maintenance": True,
+            "view_technical_maintenance": True,
+
+            "can_view_operating_hourse": True
         },
     },
     {
@@ -142,6 +152,16 @@ DEFAULT_ROLES = [
 
             "can_download_passenger_cars_reports": True,
             "view_passenger_cars_reports": True,
+
+            "can_download_drivers_reports": True,
+            "view_drivers_reports": True,
+
+            "can_create_technical_maintenance": True,
+            "can_delete_technical_maintenance": True,
+            "can_update_technical_maintenance": True,
+            "view_technical_maintenance": True,
+
+            "can_view_operating_hourse": True
         },
     },
     {
@@ -210,6 +230,16 @@ DEFAULT_ROLES = [
 
             "can_download_passenger_cars_reports": False,
             "view_passenger_cars_reports": False,
+
+            "can_download_drivers_reports": False,
+            "view_drivers_reports": False,
+
+            "can_create_technical_maintenance": False,
+            "can_delete_technical_maintenance": False,
+            "can_update_technical_maintenance": False,
+            "view_technical_maintenance": False,
+
+            "can_view_operating_hourse": False
         },
     },
 ]
