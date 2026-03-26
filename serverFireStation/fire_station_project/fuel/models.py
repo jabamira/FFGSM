@@ -8,8 +8,7 @@ from decimal import Decimal
 from datetime import date
 
 
-# --- Мягкое удаление ---------------------------------------------------------
-
+# --- Мягкое удаление ---
 class SoftDeleteQuerySet(models.QuerySet):
     def delete(self):
         return super().update(deleted_at=timezone.now())
@@ -265,6 +264,14 @@ class PassengerCar(SoftDeleteModel):
         help_text="модель"
     )
 
+    fuel_type = models.CharField(
+        max_length=20,
+        choices=FuelType.choices,
+        null=False,
+        help_text="тип топлива"
+    )
+
+
     def __str__(self):
         return f"Легковой автомобиль {self.number}"
 
@@ -345,13 +352,6 @@ class PassengerCarWaybill(SoftDeleteModel):
         choices=Season.choices,
         null=False,
         help_text="сезон нормы"
-    )
-
-    fuel_type = models.CharField(
-        max_length=10,
-        choices=FuelType.choices,
-        null=False,
-        help_text="тип топлива"
     )
 
     upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
@@ -763,6 +763,14 @@ class FireTruck(SoftDeleteModel):
         help_text="тип"
     )
 
+    fuel_type = models.CharField(
+        max_length=20,
+        choices=FuelType.choices,
+        null=False,
+        help_text="тип топлива"
+    )
+
+
     def __str__(self):
         return f"Пожарный автомобиль с гос. номером {self.number}"
 
@@ -848,13 +856,6 @@ class FireTruckWaybill(SoftDeleteModel):
         choices=Season.choices,
         null=False,
         help_text="сезон нормы"
-    )
-
-    fuel_type = models.CharField(
-        max_length=10,
-        choices=FuelType.choices,
-        null=False,
-        help_text="тип топлива"
     )
 
     upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
