@@ -58,7 +58,7 @@ const auth = useAuthStore();
 defineProps({
   createLabel: {
     type: String,
-    default: 'Добавить'
+    default: 'Создать'
   },
   deleteLabel: {
     type: String,

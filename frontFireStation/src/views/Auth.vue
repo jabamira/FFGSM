@@ -104,15 +104,20 @@ async function submit() {
   }
 
   try {
+    console.log('[Auth View] Attempting login...');
     const ok = await auth.login(loginClean, passwordClean);
     if (ok) {
-      console.log('[Auth] Login successful, permissions loaded, redirecting...');
+      console.log('[Auth View] Login successful, permissions loaded (or loading in background), redirecting...');
+      // Даже если разрешения не загружены в синхронном режиме,
+      // пользователь будет перенаправлен и разрешения загрузятся в фоне
       router.push('/fuel-report');
     } else {
       error.value = 'Неверный логин или пароль';
+      console.error('[Auth View] Login failed');
     }
   } catch (e) {
     error.value = 'Ошибка при подключении';
+    console.error('[Auth View] Connection error:', e);
   }
 }
 </script>

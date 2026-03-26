@@ -19,9 +19,29 @@
     <!-- Add Passenger Car Modal -->
     <Modal :is-open="isAddModalOpen" title="Добавить автомобиль" @close="closeAddModal">
       <form @submit.prevent="addPassengerCar">
-        <TextInput v-model="newPassengerCar.number" label="Гос. номер" required />
-        <TextInput v-model="newPassengerCar.brand" label="Марка" required />
-        <TextInput v-model="newPassengerCar.model" label="Модель" required />
+        <div class="space-y-4 min-w-96">
+          <TextInput 
+            v-model="newPassengerCar.number" 
+            :label="fieldDefinitions.passengerCar.number.label"
+            :hint="fieldDefinitions.passengerCar.number.hint"
+            placeholder="Гос. номер"
+            :required="fieldDefinitions.passengerCar.number.required"
+          />
+          <TextInput 
+            v-model="newPassengerCar.brand" 
+            :label="fieldDefinitions.passengerCar.brand.label"
+            :hint="fieldDefinitions.passengerCar.brand.hint"
+            placeholder="Марка"
+            :required="fieldDefinitions.passengerCar.brand.required"
+          />
+          <TextInput 
+            v-model="newPassengerCar.model" 
+            :label="fieldDefinitions.passengerCar.model.label"
+            :hint="fieldDefinitions.passengerCar.model.hint"
+            placeholder="Модель"
+            :required="fieldDefinitions.passengerCar.model.required"
+          />
+        </div>
         <Button label="Сохранить" variant="primary" type="submit" />
       </form>
     </Modal>
@@ -29,12 +49,35 @@
     <!-- Edit Passenger Car Modal -->
     <Modal :is-open="isEditModalOpen" title="Редактировать данные" @close="closeEditModal">
       <form @submit.prevent="savePassengerCar">
-        <TextInput v-model="editablePassengerCar.number" label="Гос. номер" required />
-        <TextInput v-model="editablePassengerCar.brand" label="Марка" required />
-        <TextInput v-model="editablePassengerCar.model" label="Модель" required />
+        <div class="space-y-4 min-w-96">
+          <TextInput 
+            v-model="editablePassengerCar.number" 
+            :label="fieldDefinitions.passengerCar.number.label"
+            :hint="fieldDefinitions.passengerCar.number.hint"
+            placeholder="Гос. номер"
+            :required="fieldDefinitions.passengerCar.number.required"
+          />
+          <TextInput 
+            v-model="editablePassengerCar.brand" 
+            :label="fieldDefinitions.passengerCar.brand.label"
+            :hint="fieldDefinitions.passengerCar.brand.hint"
+            placeholder="Марка"
+            :required="fieldDefinitions.passengerCar.brand.required"
+          />
+          <TextInput 
+            v-model="editablePassengerCar.model" 
+            :label="fieldDefinitions.passengerCar.model.label"
+            :hint="fieldDefinitions.passengerCar.model.hint"
+            placeholder="Модель"
+            :required="fieldDefinitions.passengerCar.model.required"
+          />
+        </div>
         <Button label="Сохранить" variant="primary" type="submit" />
       </form>
     </Modal>
+
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
   </div>
 </template>
 
@@ -42,10 +85,14 @@
 import { ref, computed, onMounted } from 'vue';
 import { DataTable, TextInput, Modal, Button, palette } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 
 const auth = useAuthStore();
+const errorModalRef = ref(null);
 const passengerCars = ref([]);
 const searchQuery = ref('');
 const isAddModalOpen = ref(false);
@@ -95,14 +142,24 @@ const closeAddModal = () => {
 };
 
 const addPassengerCar = async () => {
+  // Validate all passenger car fields
+  const validationErrors = validateFormFields(newPassengerCar.value, fieldDefinitions.passengerCar);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
+    return;
+  }
+
   try {
     await axios.post('/passenger-cars/', newPassengerCar.value, {
       headers: { Authorization: `Bearer ${auth.token}` }
     });
+    newPassengerCar.value = { number: '', brand: '', model: '' };
     fetchPassengerCars();
     closeAddModal();
   } catch (error) {
     console.error('Ошибка при добавлении автомобиля:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -116,6 +173,14 @@ const closeEditModal = () => {
 };
 
 const savePassengerCar = async () => {
+  // Validate all passenger car fields
+  const validationErrors = validateFormFields(editablePassengerCar.value, fieldDefinitions.passengerCar);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
+    return;
+  }
+
   try {
     await axios.put(`/passenger-cars/${editablePassengerCar.value.id}/`, editablePassengerCar.value, {
       headers: { Authorization: `Bearer ${auth.token}` }
@@ -124,6 +189,7 @@ const savePassengerCar = async () => {
     closeEditModal();
   } catch (error) {
     console.error('Ошибка при сохранении данных:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 

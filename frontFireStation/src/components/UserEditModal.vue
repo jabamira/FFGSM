@@ -1,4 +1,6 @@
 <template>
+  <ErrorModal ref="errorModalRef" />
+  
   <Modal
     :is-open="isOpen"
     title="Редактировать пользователя"
@@ -7,45 +9,69 @@
     <div v-if="editingUser" class="space-y-4 min-w-96">
       <TextInput 
         v-model="editingUser.name" 
-        label="Имя" 
+        :label="fieldDefinitions.userEdit.name.label" 
+        :hint="fieldDefinitions.userEdit.name.hint"
         placeholder="Введите имя"
         :disabled="!auth.permissions.can_update_users"
-        required
+        :required="fieldDefinitions.userEdit.name.required"
       />
       <TextInput 
         v-model="editingUser.surname" 
-        label="Фамилия" 
+        :label="fieldDefinitions.userEdit.surname.label" 
+        :hint="fieldDefinitions.userEdit.surname.hint"
         placeholder="Введите фамилию"
         :disabled="!auth.permissions.can_update_users"
-        required
+        :required="fieldDefinitions.userEdit.surname.required"
       />
       <TextInput 
         v-model="editingUser.last_name" 
-        label="Отчество" 
+        :label="fieldDefinitions.userEdit.last_name.label" 
+        :hint="fieldDefinitions.userEdit.last_name.hint"
         placeholder="Введите отчество"
         :disabled="!auth.permissions.can_update_users"
+        :required="fieldDefinitions.userEdit.last_name.required"
       />
       <TextInput 
         v-model="editingUser.login" 
-        label="Логин" 
+        :label="fieldDefinitions.userEdit.login.label" 
+        :hint="fieldDefinitions.userEdit.login.hint"
         placeholder="Введите логин"
         :disabled="!auth.permissions.can_update_users"
-        required
+        :required="fieldDefinitions.userEdit.login.required"
+      />
+      <TextInput 
+        v-model="editingUser.password" 
+        :label="fieldDefinitions.userEdit.password.label" 
+        :hint="fieldDefinitions.userEdit.password.hint"
+        placeholder="Введите пароль"
+        :disabled="!auth.permissions.can_update_users"
+        :required="fieldDefinitions.userEdit.password.required"
       />
       <TextInput 
         v-model="editingUser.phone" 
-        label="Телефон" 
+        :label="fieldDefinitions.userEdit.phone.label" 
+        :hint="fieldDefinitions.userEdit.phone.hint"
         placeholder="Введите телефон"
         :disabled="!auth.permissions.can_update_users"
+        :required="fieldDefinitions.userEdit.phone.required"
+      />
+      <TextInput 
+        v-model="editingUser.driver_license" 
+        :label="fieldDefinitions.userEdit.driver_license.label" 
+        :hint="fieldDefinitions.userEdit.driver_license.hint"
+        placeholder="Введите номер водительского удостоверения"
+        :disabled="!auth.permissions.can_update_users"
+        :required="fieldDefinitions.userEdit.driver_license.required"
       />
       <SelectInput
         v-if="roles.length > 0"
         v-model="editingUser.role"
-        label="Роль"
+        :label="fieldDefinitions.userEdit.role.label"
+        :hint="fieldDefinitions.userEdit.role.hint"
         :options="roleOptions"
         placeholder="Выберите роль"
         :disabled="!auth.permissions.can_update_users"
-        required
+        :required="fieldDefinitions.userEdit.role.required"
       />
     </div>
 
@@ -74,10 +100,14 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput, SelectInput } from './ui/importUi';
+import ErrorModal from './ErrorModal.vue';
 import { useAuthStore } from '../stores/auth';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 
 const auth = useAuthStore();
+const errorModalRef = ref(null);
 const isOpen = ref(false);
 const editingUser = ref(null);
 const originalUser = ref(null);
@@ -124,8 +154,11 @@ const updateUser = async () => {
     return;
   }
 
-  if (!editingUser.value.name || !editingUser.value.surname || !editingUser.value.login) {
-    alert('Пожалуйста, заполните обязательные поля (Имя, Фамилия, Логин)');
+  // Полная валидация по field definitions
+  const validationErrors = validateFormFields(editingUser.value, fieldDefinitions.userEdit);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
 
@@ -138,7 +171,7 @@ const updateUser = async () => {
     closeModal();
   } catch (error) {
     console.error('Ошибка при обновлении пользователя:', error);
-    alert('Ошибка при обновлении пользователя: ' + (error.response?.data?.detail || error.message));
+    errorModalRef.value?.openModal(error);
   }
 };
 

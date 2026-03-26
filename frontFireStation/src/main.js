@@ -43,9 +43,20 @@ watch(
 if (auth.isAuthenticated) {
   auth.checkConnection().then((ok) => {
     if (!ok && auth.serverError) {
+      console.error("[MAIN] Server error detected on startup");
       router.push("/server-error");
+    } else if (!ok) {
+      console.warn("[MAIN] Authentication check failed");
+      // Don't automatically logout - user might still have cached permissions
     }
   });
 }
+
+console.log("[MAIN] App initialized, auth state:", {
+  isAuthenticated: auth.isAuthenticated,
+  hasUser: !!auth.user,
+  permissionsLoaded: auth.permissionsLoaded,
+  hasPermissions: Object.keys(auth.permissions || {}).length > 0,
+});
 
 app.mount("#app");

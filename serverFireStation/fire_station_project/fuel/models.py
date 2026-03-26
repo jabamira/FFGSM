@@ -174,7 +174,7 @@ class Permission(SoftDeleteModel):
     can_update_technical_maintenance = models.BooleanField(default=False)
     view_technical_maintenance = models.BooleanField(default=False)
 
-    can_view_operating_hourse = models.BooleanField(default=False)
+    can_view_operating_hours = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Права для роли {self.role.name}"

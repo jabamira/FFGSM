@@ -16,24 +16,69 @@
       </div>
     </div>
 
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
+
     <!-- Add Fire Truck Modal -->
     <Modal :is-open="isAddModalOpen" title="Добавить автомобиль" @close="closeAddModal">
-      <form @submit.prevent="addFireTruck">
-        <TextInput v-model="newFireTruck.number" label="Гос. номер" required />
-        <TextInput v-model="newFireTruck.brand" label="Марка" required />
-        <TextInput v-model="newFireTruck.model" label="Модель" required />
-        <Button label="Сохранить" variant="primary" type="submit" />
-      </form>
+      <div class="space-y-4 min-w-96">
+        <TextInput 
+          v-model="newFireTruck.number" 
+          :label="fieldDefinitions.fireTruck.number.label" 
+          :hint="fieldDefinitions.fireTruck.number.hint"
+          placeholder="Гос. номер"
+          :required="fieldDefinitions.fireTruck.number.required"
+        />
+        <TextInput 
+          v-model="newFireTruck.brand" 
+          :label="fieldDefinitions.fireTruck.brand.label" 
+          :hint="fieldDefinitions.fireTruck.brand.hint"
+          placeholder="Марка"
+          :required="fieldDefinitions.fireTruck.brand.required"
+        />
+        <TextInput 
+          v-model="newFireTruck.model" 
+          :label="fieldDefinitions.fireTruck.model.label" 
+          :hint="fieldDefinitions.fireTruck.model.hint"
+          placeholder="Модель"
+          :required="fieldDefinitions.fireTruck.model.required"
+        />
+      </div>
+      <template #footer>
+        <Button variant="secondary" size="md" @click="closeAddModal">Закрыть</Button>
+        <Button variant="primary" size="md" @click="addFireTruck">Добавить</Button>
+      </template>
     </Modal>
 
     <!-- Edit Fire Truck Modal -->
     <Modal :is-open="isEditModalOpen" title="Редактировать данные" @close="closeEditModal">
-      <form @submit.prevent="saveFireTruck">
-        <TextInput v-model="editableFireTruck.number" label="Гос. номер" required />
-        <TextInput v-model="editableFireTruck.brand" label="Марка" required />
-        <TextInput v-model="editableFireTruck.model" label="Модель" required />
-        <Button label="Сохранить" variant="primary" type="submit" />
-      </form>
+      <div class="space-y-4 min-w-96">
+        <TextInput 
+          v-model="editableFireTruck.number" 
+          :label="fieldDefinitions.fireTruck.number.label" 
+          :hint="fieldDefinitions.fireTruck.number.hint"
+          placeholder="Гос. номер"
+          :required="fieldDefinitions.fireTruck.number.required"
+        />
+        <TextInput 
+          v-model="editableFireTruck.brand" 
+          :label="fieldDefinitions.fireTruck.brand.label" 
+          :hint="fieldDefinitions.fireTruck.brand.hint"
+          placeholder="Марка"
+          :required="fieldDefinitions.fireTruck.brand.required"
+        />
+        <TextInput 
+          v-model="editableFireTruck.model" 
+          :label="fieldDefinitions.fireTruck.model.label" 
+          :hint="fieldDefinitions.fireTruck.model.hint"
+          placeholder="Модель"
+          :required="fieldDefinitions.fireTruck.model.required"
+        />
+      </div>
+      <template #footer>
+        <Button variant="secondary" size="md" @click="closeEditModal">Закрыть</Button>
+        <Button variant="primary" size="md" @click="saveFireTruck">Сохранить</Button>
+      </template>
     </Modal>
   </div>
 </template>
@@ -42,12 +87,16 @@
 import { ref, computed, onMounted } from 'vue';
 import { DataTable, TextInput, Modal, Button, palette } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 
 const auth = useAuthStore();
 const fireTrucks = ref([]);
 const searchQuery = ref('');
+const errorModalRef = ref(null);
 const isAddModalOpen = ref(false);
 const isEditModalOpen = ref(false);
 const newFireTruck = ref({ number: '', brand: '', model: '' });
@@ -69,11 +118,12 @@ const fetchFireTrucks = async () => {
 
   try {
     const response = await axios.get('/fire-trucks', {
-      headers: { Authorization: `Bearer ${auth.token}` },
+      headers: { Authorization: `Bearer ${auth.access}` },
     });
     fireTrucks.value = response.data;
   } catch (error) {
     console.error("Ошибка при загрузке пожарных автомобилей:", error);
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -95,14 +145,23 @@ const closeAddModal = () => {
 };
 
 const addFireTruck = async () => {
+  // Validate all fire truck fields
+  const validationErrors = validateFormFields(newFireTruck.value, fieldDefinitions.fireTruck);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
+    return;
+  }
+
   try {
     await axios.post('/fire-trucks/', newFireTruck.value, {
-      headers: { Authorization: `Bearer ${auth.token}` }
+      headers: { Authorization: `Bearer ${auth.access}` }
     });
     fetchFireTrucks();
     closeAddModal();
   } catch (error) {
     console.error('Ошибка при добавлении автомобиля:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -116,25 +175,35 @@ const closeEditModal = () => {
 };
 
 const saveFireTruck = async () => {
+  // Validate all fire truck fields
+  const validationErrors = validateFormFields(editableFireTruck.value, fieldDefinitions.fireTruck);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
+    return;
+  }
+
   try {
     await axios.put(`/fire-trucks/${editableFireTruck.value.id}/`, editableFireTruck.value, {
-      headers: { Authorization: `Bearer ${auth.token}` }
+      headers: { Authorization: `Bearer ${auth.access}` }
     });
     fetchFireTrucks();
     closeEditModal();
   } catch (error) {
     console.error('Ошибка при сохранении данных:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 
 const deleteFireTruck = async (id) => {
   try {
     await axios.delete(`/fire-trucks/${id}/`, {
-      headers: { Authorization: `Bearer ${auth.token}` }
+      headers: { Authorization: `Bearer ${auth.access}` }
     });
     fetchFireTrucks();
   } catch (error) {
     console.error('Ошибка при удалении автомобиля:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 

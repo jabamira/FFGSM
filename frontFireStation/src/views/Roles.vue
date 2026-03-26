@@ -40,6 +40,9 @@
       </div>
     </div>
 
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
+
     <!-- Modal добавления роли -->
     <Modal
       :is-open="showAddModal"
@@ -49,9 +52,10 @@
       <div class="space-y-4 min-w-96">
         <TextInput 
           v-model="newRole.name" 
-          label="Название роли" 
+          :label="fieldDefinitions.role.name.label" 
+          :hint="fieldDefinitions.role.name.hint"
           placeholder="Введите название роли"
-          required
+          :required="fieldDefinitions.role.name.required"
         />
       </div>
       <template #footer>
@@ -109,7 +113,7 @@
     <CrudPanel 
       @create="handleCrudCreate"
       @delete="handleCrudDelete"
-      createLabel="Добавить роль"
+      createLabel="Создать роль"
       :deleteLabel="deleteButtonLabel"
       :isDeleteDisabled="isDeleteDisabled"
     />
@@ -121,8 +125,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button, SelectInput } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import UserEditModal from '../components/UserEditModal.vue';
@@ -130,6 +137,7 @@ import RoleEditModal from '../components/RoleEditModal.vue';
 import CrudPanel from '../components/CrudPanel.vue';
 
 const auth = useAuthStore();
+const errorModalRef = ref(null);
 const roles = ref([]);
 const selectedRoleIds = ref([]);
 const permissionDeniedModal = ref(null);
@@ -251,10 +259,15 @@ const addRole = async () => {
     console.warn('Нет разрешения на создание ролей.');
     return;
   }
-  if (!newRole.value.name) {
-    alert('Пожалуйста, введите название роли!');
+
+  // Полная валидация по field definitions
+  const validationErrors = validateFormFields(newRole.value, fieldDefinitions.role);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
+
   try {
     // 1. Создаём роль
     const roleResp = await axios.post('/roles/', newRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
@@ -272,8 +285,8 @@ const addRole = async () => {
     // Сброс формы
     newRole.value = { name: '' };
   } catch (error) {
-    alert('Ошибка при создании роли или разрешений: ' + (error.response?.data?.detail || error.message));
     console.error('Ошибка при создании роли или разрешений:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 

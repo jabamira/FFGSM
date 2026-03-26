@@ -1,4 +1,6 @@
 <template>
+  <ErrorModal ref="errorModalRef" />
+  
   <Modal
     :is-open="isOpen"
     title="Редактировать роль"
@@ -9,10 +11,11 @@
       <div>
         <TextInput 
           v-model="editingRole.name" 
-          label="Название роли" 
+          :label="fieldDefinitions.role.name.label" 
+          :hint="fieldDefinitions.role.name.hint"
           placeholder="Введите название роли"
           :disabled="!auth.permissions.can_update_roles"
-          required
+          :required="fieldDefinitions.role.name.required"
         />
       </div>
       
@@ -72,10 +75,14 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput, SelectInput, palette } from './ui/importUi';
+import ErrorModal from './ErrorModal.vue';
 import { useAuthStore } from '../stores/auth';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 
 const auth = useAuthStore();
+const errorModalRef = ref(null);
 const isOpen = ref(false);
 const editingRole = ref(null);
 const originalRole = ref(null);
@@ -136,6 +143,13 @@ const permissionsMap = {
   'view_passenger_cars_norms': 'Может просматривать нормы легковых машин',
   'can_download_passenger_cars_reports': 'Может скачивать отчеты легковых машин',
   'view_passenger_cars_reports': 'Может просматривать отчеты легковых машин',
+  'can_download_drivers_reports': 'Может скачивать отчеты водителей',
+  'view_drivers_reports': 'Может просматривать отчеты водителей',
+  'can_create_technical_maintenance': 'Может создавать техническое обслуживание',
+  'can_delete_technical_maintenance': 'Может удалять техническое обслуживание',
+  'can_update_technical_maintenance': 'Может обновлять техническое обслуживание',
+  'view_technical_maintenance': 'Может просматривать техническое обслуживание',
+  'can_view_operating_hours': 'Может просматривать рабочие часы',
 };
 
 const permissionGroups = {
@@ -194,6 +208,18 @@ const permissionGroups = {
   passenger_cars_reports: {
     label: 'Отчеты легковых машин',
     keys: ['can_download_passenger_cars_reports', 'view_passenger_cars_reports']
+  },
+  drivers: {
+    label: 'Водители',
+    keys: ['view_drivers', 'can_download_drivers_reports', 'view_drivers_reports']
+  },
+  technical_maintenance: {
+    label: 'Техническое обслуживание',
+    keys: ['can_create_technical_maintenance', 'can_delete_technical_maintenance', 'can_update_technical_maintenance', 'view_technical_maintenance']
+  },
+  operating_hours: {
+    label: 'Рабочие часы',
+    keys: ['can_view_operating_hours']
   },
 };
 
@@ -293,10 +319,14 @@ const updateRole = async () => {
     return;
   }
 
-  if (!editingRole.value.name) {
-    alert('Пожалуйста, заполните название роли!');
+  // Validate all role fields
+  const validationErrors = validateFormFields(editingRole.value, fieldDefinitions.role);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
+
   try {
     const response = await axios.put(`/roles/${editingRole.value.id}/`, editingRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
     if (auth.permissions.can_update_permissisons && 
@@ -311,7 +341,7 @@ const updateRole = async () => {
     closeModal();
   } catch (error) {
     console.error('Ошибка при обновлении роли:', error);
-    alert('Ошибка при обновлении роли: ' + (error.response?.data?.detail || error.message));
+    errorModalRef.value?.openModal(error);
   }
 };
 

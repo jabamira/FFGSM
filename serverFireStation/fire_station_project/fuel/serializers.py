@@ -69,6 +69,12 @@ class UserSerializer(FriendlyModelSerializer):
             'password': {'write_only': True},
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Пароль обязателен только при создании (когда instance=None)
+        if self.instance is not None:
+            self.fields['password'].required = False
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User(**validated_data)

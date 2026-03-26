@@ -106,6 +106,7 @@ router.beforeEach(async (to) => {
     if (!auth.isAuthenticated) {
       return "/auth";
     }
+
     // if we haven't ever checked before, block until result
     if (!auth.checkedOnce) {
       const ok = await auth.checkConnection();
@@ -123,6 +124,24 @@ router.beforeEach(async (to) => {
           }
         }
       });
+    }
+
+    // ВАЖНО: Убедиться, что разрешения загружены перед переходом на защищённую страницу
+    // Если разрешения не загружены, синхронно дождаться их загрузки перед переходом
+    // Это необходимо чтобы компоненты получили правильное состояние при монтировании
+    if (!auth.permissionsLoaded) {
+      console.log(
+        "[ROUTER] Permissions not yet loaded, waiting for sync load before proceeding to protected route",
+      );
+      const permissionsLoaded = await auth.fetchPermissionsWithRetry(3, 10000);
+
+      if (!permissionsLoaded) {
+        console.warn(
+          "[ROUTER] Failed to load permissions, allowing to proceed but with empty permissions",
+        );
+        // Всё равно разрешаем переход, но с пустыми разрешениями
+        // Это позволяет пользователю видеть красивую ошибку вместо полного зависания
+      }
     }
   }
 

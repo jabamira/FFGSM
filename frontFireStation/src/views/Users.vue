@@ -40,6 +40,9 @@
       </div>
     </div>
 
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
+
     <!-- Modal добавления пользователя -->
     <Modal
       :is-open="showAddModal"
@@ -49,50 +52,59 @@
       <div class="space-y-4 min-w-96">
         <TextInput 
           v-model="newUser.name" 
-          label="Имя" 
+          :label="fieldDefinitions.userCreate.name.label" 
+          :hint="fieldDefinitions.userCreate.name.hint"
           placeholder="Введите имя"
-          required
+          :required="fieldDefinitions.userCreate.name.required"
         />
         <TextInput 
           v-model="newUser.surname" 
-          label="Фамилия" 
+          :label="fieldDefinitions.userCreate.surname.label" 
+          :hint="fieldDefinitions.userCreate.surname.hint"
           placeholder="Введите фамилию"
-          required
+          :required="fieldDefinitions.userCreate.surname.required"
         />
         <TextInput 
           v-model="newUser.last_name" 
-          label="Отчество" 
+          :label="fieldDefinitions.userCreate.last_name.label" 
+          :hint="fieldDefinitions.userCreate.last_name.hint"
           placeholder="Введите отчество"
-          required
+          :required="fieldDefinitions.userCreate.last_name.required"
         />
         <TextInput 
           v-model="newUser.login" 
-          label="Логин" 
+          :label="fieldDefinitions.userCreate.login.label" 
+          :hint="fieldDefinitions.userCreate.login.hint"
           placeholder="Введите логин"
-          required
+          :required="fieldDefinitions.userCreate.login.required"
         />
         <TextInput 
           v-model="newUser.password" 
-          label="Пароль" 
+          :label="fieldDefinitions.userCreate.password.label" 
+          :hint="fieldDefinitions.userCreate.password.hint"
           placeholder="Введите пароль"
           type="password"
-          required
+          :required="fieldDefinitions.userCreate.password.required"
         />
         <TextInput 
           v-model="newUser.phone" 
-          label="Телефон" 
+          :label="fieldDefinitions.userCreate.phone.label" 
+          :hint="fieldDefinitions.userCreate.phone.hint"
           placeholder="Введите телефон"
-          required
+          :required="fieldDefinitions.userCreate.phone.required"
         />
         <TextInput 
           v-model="newUser.driver_license" 
-          label="Водительское удостоверение" 
+          :label="fieldDefinitions.userCreate.driver_license.label" 
+          :hint="fieldDefinitions.userCreate.driver_license.hint"
           placeholder="Введите номер удостоверения (опционально)"
+          :required="fieldDefinitions.userCreate.driver_license.required"
         />
         <SelectInput 
           v-if="auth.permissions.can_view_roles"
           v-model="newUser.role" 
-          label="Роль" 
+          :label="fieldDefinitions.userCreate.role.label"
+          :hint="fieldDefinitions.userCreate.role.hint"
           :options="roleOptions"
         />
       </div>
@@ -143,7 +155,7 @@
     <CrudPanel 
       @create="handleCrudCreate"
       @delete="handleCrudDelete"
-      createLabel="Добавить пользователя"
+      createLabel="Создать пользователя"
       :deleteLabel="deleteButtonLabel"
       :isDeleteDisabled="isDeleteDisabled"
     />
@@ -155,8 +167,11 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button, SelectInput } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import UserEditModal from '../components/UserEditModal.vue';
@@ -167,6 +182,7 @@ const auth = useAuthStore();
 const users = ref([]);
 const roles = ref([]);
 const selectedUserIds = ref([]);
+const errorModalRef = ref(null);
 const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const userEditModal = ref(null);
@@ -308,11 +324,11 @@ const addUser = async () => {
     return;
   }
 
-  // Валидация полей
-  if (!newUser.value.name || !newUser.value.surname || !newUser.value.last_name || 
-      !newUser.value.login || !newUser.value.password || !newUser.value.phone) {
-    console.warn('Все основные поля обязательны для заполнения.');
-    alert('Пожалуйста, заполните все основные поля!');
+  // Полная валидация по field definitions
+  const validationErrors = validateFormFields(newUser.value, fieldDefinitions.userCreate);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
 
@@ -336,7 +352,7 @@ const addUser = async () => {
     closeAddModal();
   } catch (error) {
     console.error('Ошибка при добавлении пользователя:', error);
-    alert('Ошибка при добавлении пользователя: ' + (error.response?.data?.detail || error.message));
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -374,11 +390,11 @@ const updateUser = async () => {
     return;
   }
 
-  // Валидация полей
-  if (!editingUser.value.name || !editingUser.value.surname || !editingUser.value.last_name || 
-      !editingUser.value.login || !editingUser.value.phone) {
-    console.warn('Все основные поля обязательны для заполнения.');
-    alert('Пожалуйста, заполните все основные поля!');
+  // Валидация полей с использованием userEdit определений
+  const validationErrors = validateFormFields(editingUser.value, fieldDefinitions.userEdit);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
 

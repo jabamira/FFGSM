@@ -13,6 +13,7 @@ export const useAuthStore = defineStore("auth", {
     checkedOnce: false,
     healthIntervalId: null,
     permissions: {},
+    permissionsLoaded: false, // флаг чтобы знать загружены ли разрешения
     crudPermissions: {
       canCreate: false,
       canDelete: false,
@@ -42,9 +43,31 @@ export const useAuthStore = defineStore("auth", {
       this.user = user;
 
       if (user) {
-        localStorage.setItem("user", JSON.stringify(user));
+        try {
+          localStorage.setItem("user", JSON.stringify(user));
+        } catch (e) {
+          console.error("[AUTH] Failed to save user to localStorage:", e);
+        }
       } else {
         localStorage.removeItem("user");
+      }
+    },
+
+    setPermissions(permissions) {
+      this.permissions = permissions || {};
+      this.permissionsLoaded = true; // отметить что разрешения загружены
+
+      // Сохраняем разрешения в localStorage для восстановления после refresh
+      if (permissions && Object.keys(permissions).length > 0) {
+        try {
+          localStorage.setItem("permissions", JSON.stringify(permissions));
+          console.debug("[AUTH] Permissions saved to localStorage");
+        } catch (e) {
+          console.error(
+            "[AUTH] Failed to save permissions to localStorage:",
+            e,
+          );
+        }
       }
     },
 
@@ -63,57 +86,81 @@ export const useAuthStore = defineStore("auth", {
         this.setAccess(access);
         this.setUser(user);
 
-        // Загрузка разрешений с retry и timeout
-        const permissionsLoaded = await this.fetchPermissionsWithRetry(3, 5000);
-        if (!permissionsLoaded) {
-          console.error("[AUTH STORE] Failed to load permissions after retries");
-          return false;
-        }
-
         // Убедиться, что флаг checkedOnce установлен перед возвратом
         this.checkedOnce = true;
 
+        // ВАЖНО: Попробуем загрузить разрешения, но не блокируем вход если это не удастся.
+        // Разрешения загрузятся в фоне, и приложение будет работать и без них (с дефолтными)
+        this.fetchPermissionsWithRetry(3, 5000).then((loaded) => {
+          if (loaded) {
+            console.log("[AUTH STORE] Permissions loaded successfully");
+          } else {
+            console.warn(
+              "[AUTH STORE] Failed to load permissions, will retry on navigation",
+            );
+          }
+        });
+
         this.startHealthPolling();
 
-        console.log("[AUTH STORE] Login successful, permissions loaded");
+        console.log("[AUTH STORE] Login successful, redirecting to app");
         return true;
       } catch (err) {
         console.error(
           "[AUTH STORE] Login error:",
           err.response?.data || err.message,
         );
+        this.checkedOnce = false;
         return false;
       }
     },
 
-    async fetchPermissionsWithRetry(maxRetries = 3, timeout = 5000) {
+    async fetchPermissionsWithRetry(maxRetries = 3, timeout = 10000) {
+      let lastError = null;
+
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`[AUTH] Attempting to load permissions (attempt ${attempt}/${maxRetries})`);
-          
+          console.log(
+            `[AUTH] Attempting to load permissions (attempt ${attempt}/${maxRetries})`,
+          );
+
+          // Используем Promise.race с timeout
           const permissionsLoaded = await Promise.race([
             this.fetchPermissions(),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout')), timeout)
-            )
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Permission loading timeout")),
+                timeout,
+              ),
+            ),
           ]);
-          
-          // Проверяем что permissions реально загружены (не пустой объект)
-          if (this.permissions && Object.keys(this.permissions).length > 0) {
+
+          // Если permissionsLoaded установлен, значит разрешения загружены
+          // (даже если они пустые - это нормально)
+          if (this.permissionsLoaded) {
             console.log("[AUTH] Permissions loaded successfully");
             return true;
           }
-          
         } catch (error) {
-          console.warn(`[AUTH] Attempt ${attempt} failed:`, error.message);
+          lastError = error;
+          console.warn(
+            `[AUTH] Attempt ${attempt} failed:`,
+            error?.response?.data || error.message,
+          );
+
           if (attempt < maxRetries) {
-            // Небольшая задержка перед retry
-            await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+            // Экспоненциальная задержка перед retry: 500ms, 1s, 2s...
+            const delay = 500 * Math.pow(2, attempt - 1);
+            console.log(`[AUTH] Retrying after ${delay}ms...`);
+            await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
       }
-      
-      console.error("[AUTH] All permission loading attempts failed");
+
+      console.error(
+        "[AUTH] All permission loading attempts failed:",
+        lastError?.message,
+      );
       return false;
     },
 
@@ -131,7 +178,7 @@ export const useAuthStore = defineStore("auth", {
           },
         });
 
-        this.permissions = res.data;
+        this.setPermissions(res.data);
         console.debug("[AUTH] permissions loaded", this.permissions);
         return true;
       } catch (error) {
@@ -143,9 +190,15 @@ export const useAuthStore = defineStore("auth", {
     logout() {
       this.setAccess(null);
       this.setUser(null);
-      this.permissions = {};
+      this.setPermissions(null);
+      this.permissionsLoaded = false;
       this.clearCrudPermissions();
       this.stopHealthPolling();
+      // Очищаем всё из localStorage при выходе
+      localStorage.removeItem("access");
+      localStorage.removeItem("user");
+      localStorage.removeItem("permissions");
+      console.log("[AUTH] Logged out, cleared all data");
     },
 
     /**
@@ -181,6 +234,7 @@ export const useAuthStore = defineStore("auth", {
     loadFromStorage() {
       const token = localStorage.getItem("access");
       const storedUser = localStorage.getItem("user");
+      const storedPermissions = localStorage.getItem("permissions");
 
       if (token) {
         this.setAccess(token);
@@ -189,13 +243,34 @@ export const useAuthStore = defineStore("auth", {
       if (storedUser) {
         try {
           this.user = JSON.parse(storedUser);
-        } catch {
+        } catch (e) {
+          console.error("[AUTH] Failed to parse user from localStorage:", e);
           this.user = null;
         }
       }
 
+      if (storedPermissions) {
+        try {
+          const parsed = JSON.parse(storedPermissions);
+          this.setPermissions(parsed);
+          console.log("[AUTH] Permissions restored from localStorage");
+        } catch (e) {
+          console.error(
+            "[AUTH] Failed to parse permissions from localStorage:",
+            e,
+          );
+          this.permissions = {};
+          this.permissionsLoaded = false;
+        }
+      }
+
       if (this.access && this.user) {
-        this.fetchPermissions(); // загрузка после reload
+        // Попробуем обновить разрешения, но не блокируем если не удастся
+        this.fetchPermissions().catch((err) => {
+          console.warn(
+            "[AUTH] Could not refresh permissions on startup, using cached",
+          );
+        });
         this.startHealthPolling();
       }
     },

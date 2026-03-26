@@ -94,7 +94,7 @@ DEFAULT_ROLES = [
             "can_create_users": False,
             "can_delete_users": False,
             "can_update_users": False,
-            "view_users": True,
+            "view_users": False,
             "view_drivers": True,
 
             "can_create_roles": False,

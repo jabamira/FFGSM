@@ -21,52 +21,59 @@
     <!-- Modal добавления водителя -->
     <Modal
       :is-open="showAddModal"
-      title="Добавить водителя"
+      title="Создать водителя"
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
         <TextInput 
           v-model="newDriver.name" 
-          label="Имя" 
+          :label="fieldDefinitions.driver.name.label" 
+          :hint="fieldDefinitions.driver.name.hint"
           placeholder="Введите имя"
-          required
+          :required="fieldDefinitions.driver.name.required"
         />
         <TextInput 
           v-model="newDriver.surname" 
-          label="Фамилия" 
+          :label="fieldDefinitions.driver.surname.label" 
+          :hint="fieldDefinitions.driver.surname.hint"
           placeholder="Введите фамилию"
-          required
+          :required="fieldDefinitions.driver.surname.required"
         />
         <TextInput 
           v-model="newDriver.last_name" 
-          label="Отчество" 
+          :label="fieldDefinitions.driver.last_name.label" 
+          :hint="fieldDefinitions.driver.last_name.hint"
           placeholder="Введите отчество"
-          required
+          :required="fieldDefinitions.driver.last_name.required"
         />
         <TextInput 
           v-model="newDriver.login" 
-          label="Логин" 
+          :label="fieldDefinitions.driver.login.label" 
+          :hint="fieldDefinitions.driver.login.hint"
           placeholder="Введите логин"
-          required
+          :required="fieldDefinitions.driver.login.required"
         />
         <TextInput 
           v-model="newDriver.password" 
-          label="Пароль" 
+          :label="fieldDefinitions.driver.password.label" 
+          :hint="fieldDefinitions.driver.password.hint"
           placeholder="Введите пароль"
           type="password"
-          required
+          :required="fieldDefinitions.driver.password.required"
         />
         <TextInput 
           v-model="newDriver.phone" 
-          label="Телефон" 
+          :label="fieldDefinitions.driver.phone.label" 
+          :hint="fieldDefinitions.driver.phone.hint"
           placeholder="Введите телефон"
-          required
+          :required="fieldDefinitions.driver.phone.required"
         />
         <TextInput 
           v-model="newDriver.driver_license" 
-          label="Водительское удостоверение" 
+          :label="fieldDefinitions.driver.driver_license.label" 
+          :hint="fieldDefinitions.driver.driver_license.hint"
           placeholder="Введите номер удостоверения"
-          required
+          :required="fieldDefinitions.driver.driver_license.required"
         />
       </div>
       <template #footer>
@@ -106,45 +113,53 @@
       <div v-if="editingDriver" class="space-y-4 min-w-96">
         <TextInput 
           v-model="editingDriver.name" 
-          label="Имя" 
+          :label="fieldDefinitions.driver.name.label" 
+          :hint="fieldDefinitions.driver.name.hint"
           placeholder="Введите имя"
-          required
+          :required="fieldDefinitions.driver.name.required"
         />
         <TextInput 
           v-model="editingDriver.surname" 
-          label="Фамилия" 
+          :label="fieldDefinitions.driver.surname.label" 
+          :hint="fieldDefinitions.driver.surname.hint"
           placeholder="Введите фамилию"
-          required
+          :required="fieldDefinitions.driver.surname.required"
         />
         <TextInput 
           v-model="editingDriver.last_name" 
-          label="Отчество" 
+          :label="fieldDefinitions.driver.last_name.label" 
+          :hint="fieldDefinitions.driver.last_name.hint"
           placeholder="Введите отчество"
-          required
+          :required="fieldDefinitions.driver.last_name.required"
         />
         <TextInput 
           v-model="editingDriver.login" 
-          label="Логин" 
+          :label="fieldDefinitions.driver.login.label" 
+          :hint="fieldDefinitions.driver.login.hint"
           placeholder="Введите логин"
-          required
+          :required="fieldDefinitions.driver.login.required"
         />
         <TextInput 
           v-model="editingDriver.password" 
-          label="Пароль" 
+          :label="fieldDefinitions.driver.password.label" 
+          :hint="fieldDefinitions.driver.password.hint"
           placeholder="Введите пароль (оставьте пустым, чтобы не менять)"
           type="password"
+          :required="fieldDefinitions.driver.password.required"
         />
         <TextInput 
           v-model="editingDriver.phone" 
-          label="Телефон" 
+          :label="fieldDefinitions.driver.phone.label" 
+          :hint="fieldDefinitions.driver.phone.hint"
           placeholder="Введите телефон"
-          required
+          :required="fieldDefinitions.driver.phone.required"
         />
         <TextInput 
           v-model="editingDriver.driver_license" 
-          label="Водительское удостоверение" 
+          :label="fieldDefinitions.driver.driver_license.label" 
+          :hint="fieldDefinitions.driver.driver_license.hint"
           placeholder="Введите номер удостоверения"
-          required
+          :required="fieldDefinitions.driver.driver_license.required"
         />
       </div>
       <template #footer>
@@ -159,11 +174,14 @@
     <!-- No Selection Modal -->
     <NoSelectionModal ref="noSelectionModal" />
 
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
+
     <!-- CRUD Panel -->
     <CrudPanel 
       @create="handleCrudCreate"
       @delete="handleCrudDelete"
-      createLabel="Добавить водителя"
+      createLabel="Создать водителя"
       :deleteLabel="deleteButtonLabel"
       :isDeleteDisabled="isDeleteDisabled"
     />
@@ -175,17 +193,21 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import CrudPanel from '../components/CrudPanel.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 
 const auth = useAuthStore();
 const drivers = ref([]);
 const selectedDriverIds = ref([]);
 const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
+const errorModalRef = ref(null);
 const { searchQuery, filtered: filteredDrivers } = useSearch(drivers, ['name', 'surname', 'last_name', 'phone', 'driver_license']);
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
@@ -209,7 +231,7 @@ const newDriver = ref({
   password: '',
   phone: '',
   driver_license: '',
-  role: 3, // role_id для водителей
+  role: 3,
 });
 
 const fetchDrivers = async () => {
@@ -273,12 +295,11 @@ const addDriver = async () => {
     return;
   }
 
-  // Валидация полей
-  if (!newDriver.value.name || !newDriver.value.surname || !newDriver.value.last_name || 
-      !newDriver.value.login || !newDriver.value.password || !newDriver.value.phone || 
-      !newDriver.value.driver_license) {
-    console.warn('Все поля обязательны для заполнения.');
-    alert('Пожалуйста, заполните все поля!');
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(newDriver.value, fieldDefinitions.driver);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
 
@@ -297,7 +318,7 @@ const addDriver = async () => {
     closeAddModal();
   } catch (error) {
     console.error('Ошибка при добавлении водителя:', error);
-    alert('Ошибка при добавлении водителя: ' + (error.response?.data?.detail || error.message));
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -347,18 +368,17 @@ const updateDriver = async () => {
     return;
   }
 
-  // Валидация полей
-  if (!editingDriver.value.name || !editingDriver.value.surname || !editingDriver.value.last_name || 
-      !editingDriver.value.login || !editingDriver.value.phone || 
-      !editingDriver.value.driver_license) {
-    console.warn('Все поля обязательны для заполнения.');
-    alert('Пожалуйста, заполните все поля!');
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(editingDriver.value, fieldDefinitions.driver);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
     return;
   }
 
   try {
-    // Если пароль не введён, не отправляем его на сервер
     const updateData = { ...editingDriver.value };
+    // Удаляем пароль если он пустой (не отправляем на сервер)
     if (!updateData.password) {
       delete updateData.password;
     }
@@ -380,7 +400,7 @@ const updateDriver = async () => {
     closeEditModal();
   } catch (error) {
     console.error('Ошибка при обновлении водителя:', error);
-    alert('Ошибка при обновлении водителя: ' + (error.response?.data?.detail || error.message));
+    errorModalRef.value?.openModal(error);
   }
 };
 

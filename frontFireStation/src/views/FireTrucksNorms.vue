@@ -12,13 +12,39 @@
     <!-- Edit Norm Modal -->
     <Modal :is-open="isEditModalOpen" title="Редактировать норму" @close="closeEditModal">
       <form @submit.prevent="saveNorm">
-        <TextInput v-model="editableNorm.season" label="Сезон" required />
-        <TextInput v-model="editableNorm.city_norm" label="Городская норма (л/км)" required />
-        <TextInput v-model="editableNorm.area_norm" label="Областная норма (л/км)" required />
-        <TextInput v-model="editableNorm.date" label="Дата утверждения" required type="date" />
+        <div class="space-y-4 min-w-96">
+          <TextInput 
+            v-model="editableNorm.season" 
+            :label="fieldDefinitions.normsFireTrucks.season.label"
+            :hint="fieldDefinitions.normsFireTrucks.season.hint"
+            :required="fieldDefinitions.normsFireTrucks.season.required"
+          />
+          <TextInput 
+            v-model="editableNorm.city_norm" 
+            :label="fieldDefinitions.normsFireTrucks.city_norm.label"
+            :hint="fieldDefinitions.normsFireTrucks.city_norm.hint"
+            :required="fieldDefinitions.normsFireTrucks.city_norm.required"
+          />
+          <TextInput 
+            v-model="editableNorm.area_norm" 
+            :label="fieldDefinitions.normsFireTrucks.area_norm.label"
+            :hint="fieldDefinitions.normsFireTrucks.area_norm.hint"
+            :required="fieldDefinitions.normsFireTrucks.area_norm.required"
+          />
+          <TextInput 
+            v-model="editableNorm.date" 
+            :label="fieldDefinitions.normsFireTrucks.date.label"
+            :hint="fieldDefinitions.normsFireTrucks.date.hint"
+            :required="fieldDefinitions.normsFireTrucks.date.required"
+            type="date"
+          />
+        </div>
         <Button label="Сохранить" variant="primary" type="submit" />
       </form>
     </Modal>
+
+    <!-- Error Modal -->
+    <ErrorModal ref="errorModalRef" />
   </div>
 </template>
 
@@ -26,10 +52,14 @@
 import { ref, computed, onMounted } from 'vue';
 import { DataTable, TextInput, Modal, Button, palette } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 
 const auth = useAuthStore();
+const errorModalRef = ref(null);
 const norms = ref([]);
 const searchQuery = ref('');
 const isEditModalOpen = ref(false);
@@ -73,6 +103,14 @@ const closeEditModal = () => {
 };
 
 const saveNorm = async () => {
+  // Validate all norm fields
+  const validationErrors = validateFormFields(editableNorm.value, fieldDefinitions.normsFireTrucks);
+  if (Object.keys(validationErrors).length > 0) {
+    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
+    errorModalRef.value?.openModal(error);
+    return;
+  }
+
   try {
     await axios.put(`/api/fire-truck-norms/${editableNorm.value.id}/`, editableNorm.value, {
       headers: { Authorization: `Bearer ${auth.token}` }
@@ -81,6 +119,7 @@ const saveNorm = async () => {
     closeEditModal();
   } catch (error) {
     console.error('Ошибка при сохранении данных:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 
