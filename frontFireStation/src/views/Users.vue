@@ -464,7 +464,11 @@ const onUserUpdated = (updatedUser) => {
   // Обновляем пользователя в списке
   const userIndex = users.value.findIndex(u => u.id === updatedUser.id);
   if (userIndex > -1) {
-    users.value[userIndex] = updatedUser;
+    const newUserData = {
+      ...updatedUser,
+      role_name: roles.value.find(r => r.id === updatedUser.role)?.name || '-'
+    };
+    users.value[userIndex] = newUserData;
   }
 };
 
@@ -473,6 +477,12 @@ const onRoleUpdated = (updatedRole) => {
   const roleIndex = roles.value.findIndex(r => r.id === updatedRole.id);
   if (roleIndex > -1) {
     roles.value[roleIndex] = updatedRole;
+    // Обновляем role_name для всех пользователей с этой ролью
+    users.value.forEach(user => {
+      if (user.role === updatedRole.id) {
+        user.role_name = updatedRole.name;
+      }
+    });
   }
 };
 
@@ -503,7 +513,8 @@ const closeDeleteModal = () => {
 
 const confirmDelete = async () => {
   if (!auth.permissions.can_delete_users) {
-    console.warn('Нет разрешения на удаление пользователей.');
+    permissionDeniedModal.value?.openModal('can_delete_users');
+    closeDeleteModal();
     return;
   }
 
@@ -541,16 +552,17 @@ const handleCrudDelete = () => {
   openDeleteModal();
 };
 
-onMounted(() => {
+onMounted(async () => {
   console.debug("[Users] Permissions loaded from store:", auth.permissions);
   setupCrudPermissions();
   
+  // Загружаем роли первыми, чтобы они были доступны при загрузке пользователей
   if (auth.permissions.can_view_roles) {
-    fetchRoles();
+    await fetchRoles();
   }
   
   if (auth.permissions.view_users) {
-    fetchUsers();
+    await fetchUsers();
   } else {
     console.warn("[Users] User does not have permission to view users.");
   }

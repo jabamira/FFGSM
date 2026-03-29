@@ -78,6 +78,9 @@
 
     <!-- Error Modal -->
     <ErrorModal ref="errorModalRef" />
+
+    <!-- Permission Denied Modal -->
+    <PermissionDeniedModal ref="permissionDeniedModal" />
   </div>
 </template>
 
@@ -90,9 +93,11 @@ import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import ErrorModal from '../components/ErrorModal.vue';
+import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 
 const auth = useAuthStore();
 const errorModalRef = ref(null);
+const permissionDeniedModal = ref(null);
 const passengerCars = ref([]);
 const searchQuery = ref('');
 const isAddModalOpen = ref(false);
@@ -194,6 +199,11 @@ const savePassengerCar = async () => {
 };
 
 const deletePassengerCar = async (id) => {
+  if (!permissions.value.can_delete_passenger_cars) {
+    permissionDeniedModal.value?.openModal('can_delete_passenger_cars');
+    return;
+  }
+
   try {
     await axios.delete(`/passenger-cars/${id}/`, {
       headers: { Authorization: `Bearer ${auth.token}` }
@@ -201,6 +211,7 @@ const deletePassengerCar = async (id) => {
     fetchPassengerCars();
   } catch (error) {
     console.error('Ошибка при удалении автомобиля:', error);
+    errorModalRef.value?.openModal(error);
   }
 };
 

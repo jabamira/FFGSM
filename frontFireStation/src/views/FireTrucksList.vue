@@ -19,6 +19,9 @@
     <!-- Error Modal -->
     <ErrorModal ref="errorModalRef" />
 
+    <!-- Permission Denied Modal -->
+    <PermissionDeniedModal ref="permissionDeniedModal" />
+
     <!-- Add Fire Truck Modal -->
     <Modal :is-open="isAddModalOpen" title="Добавить автомобиль" @close="closeAddModal">
       <div class="space-y-4 min-w-96">
@@ -92,11 +95,13 @@ import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import ErrorModal from '../components/ErrorModal.vue';
+import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 
 const auth = useAuthStore();
 const fireTrucks = ref([]);
 const searchQuery = ref('');
 const errorModalRef = ref(null);
+const permissionDeniedModal = ref(null);
 const isAddModalOpen = ref(false);
 const isEditModalOpen = ref(false);
 const newFireTruck = ref({ number: '', brand: '', model: '' });
@@ -196,6 +201,11 @@ const saveFireTruck = async () => {
 };
 
 const deleteFireTruck = async (id) => {
+  if (!permissions.value.can_delete_fire_trucks) {
+    permissionDeniedModal.value?.openModal('can_delete_fire_trucks');
+    return;
+  }
+
   try {
     await axios.delete(`/fire-trucks/${id}/`, {
       headers: { Authorization: `Bearer ${auth.access}` }

@@ -356,7 +356,8 @@ const closeDeleteModal = () => {
 
 const confirmDelete = async () => {
   if (!auth.permissions.can_delete_roles) {
-    console.warn('Нет разрешения на удаление ролей.');
+    permissionDeniedModal.value?.openModal('can_delete_roles');
+    closeDeleteModal();
     return;
   }
 

@@ -27,53 +27,53 @@
       <div class="space-y-4 min-w-96">
         <TextInput 
           v-model="newDriver.name" 
-          :label="fieldDefinitions.driver.name.label" 
-          :hint="fieldDefinitions.driver.name.hint"
+          :label="fieldDefinitions.driverCreate.name.label" 
+          :hint="fieldDefinitions.driverCreate.name.hint"
           placeholder="Введите имя"
-          :required="fieldDefinitions.driver.name.required"
+          :required="fieldDefinitions.driverCreate.name.required"
         />
         <TextInput 
           v-model="newDriver.surname" 
-          :label="fieldDefinitions.driver.surname.label" 
-          :hint="fieldDefinitions.driver.surname.hint"
+          :label="fieldDefinitions.driverCreate.surname.label" 
+          :hint="fieldDefinitions.driverCreate.surname.hint"
           placeholder="Введите фамилию"
-          :required="fieldDefinitions.driver.surname.required"
+          :required="fieldDefinitions.driverCreate.surname.required"
         />
         <TextInput 
           v-model="newDriver.last_name" 
-          :label="fieldDefinitions.driver.last_name.label" 
-          :hint="fieldDefinitions.driver.last_name.hint"
+          :label="fieldDefinitions.driverCreate.last_name.label" 
+          :hint="fieldDefinitions.driverCreate.last_name.hint"
           placeholder="Введите отчество"
-          :required="fieldDefinitions.driver.last_name.required"
+          :required="fieldDefinitions.driverCreate.last_name.required"
         />
         <TextInput 
           v-model="newDriver.login" 
-          :label="fieldDefinitions.driver.login.label" 
-          :hint="fieldDefinitions.driver.login.hint"
+          :label="fieldDefinitions.driverCreate.login.label" 
+          :hint="fieldDefinitions.driverCreate.login.hint"
           placeholder="Введите логин"
-          :required="fieldDefinitions.driver.login.required"
+          :required="fieldDefinitions.driverCreate.login.required"
         />
         <TextInput 
           v-model="newDriver.password" 
-          :label="fieldDefinitions.driver.password.label" 
-          :hint="fieldDefinitions.driver.password.hint"
+          :label="fieldDefinitions.driverCreate.password.label" 
+          :hint="fieldDefinitions.driverCreate.password.hint"
           placeholder="Введите пароль"
           type="password"
-          :required="fieldDefinitions.driver.password.required"
+          :required="fieldDefinitions.driverCreate.password.required"
         />
         <TextInput 
           v-model="newDriver.phone" 
-          :label="fieldDefinitions.driver.phone.label" 
-          :hint="fieldDefinitions.driver.phone.hint"
+          :label="fieldDefinitions.driverCreate.phone.label" 
+          :hint="fieldDefinitions.driverCreate.phone.hint"
           placeholder="Введите телефон"
-          :required="fieldDefinitions.driver.phone.required"
+          :required="fieldDefinitions.driverCreate.phone.required"
         />
         <TextInput 
           v-model="newDriver.driver_license" 
-          :label="fieldDefinitions.driver.driver_license.label" 
-          :hint="fieldDefinitions.driver.driver_license.hint"
+          :label="fieldDefinitions.driverCreate.driver_license.label" 
+          :hint="fieldDefinitions.driverCreate.driver_license.hint"
           placeholder="Введите номер удостоверения"
-          :required="fieldDefinitions.driver.driver_license.required"
+          :required="fieldDefinitions.driverCreate.driver_license.required"
         />
       </div>
       <template #footer>
@@ -113,53 +113,53 @@
       <div v-if="editingDriver" class="space-y-4 min-w-96">
         <TextInput 
           v-model="editingDriver.name" 
-          :label="fieldDefinitions.driver.name.label" 
-          :hint="fieldDefinitions.driver.name.hint"
+          :label="fieldDefinitions.driverEdit.name.label" 
+          :hint="fieldDefinitions.driverEdit.name.hint"
           placeholder="Введите имя"
-          :required="fieldDefinitions.driver.name.required"
+          :required="fieldDefinitions.driverEdit.name.required"
         />
         <TextInput 
           v-model="editingDriver.surname" 
-          :label="fieldDefinitions.driver.surname.label" 
-          :hint="fieldDefinitions.driver.surname.hint"
+          :label="fieldDefinitions.driverEdit.surname.label" 
+          :hint="fieldDefinitions.driverEdit.surname.hint"
           placeholder="Введите фамилию"
-          :required="fieldDefinitions.driver.surname.required"
+          :required="fieldDefinitions.driverEdit.surname.required"
         />
         <TextInput 
           v-model="editingDriver.last_name" 
-          :label="fieldDefinitions.driver.last_name.label" 
-          :hint="fieldDefinitions.driver.last_name.hint"
+          :label="fieldDefinitions.driverEdit.last_name.label" 
+          :hint="fieldDefinitions.driverEdit.last_name.hint"
           placeholder="Введите отчество"
-          :required="fieldDefinitions.driver.last_name.required"
+          :required="fieldDefinitions.driverEdit.last_name.required"
         />
         <TextInput 
           v-model="editingDriver.login" 
-          :label="fieldDefinitions.driver.login.label" 
-          :hint="fieldDefinitions.driver.login.hint"
+          :label="fieldDefinitions.driverEdit.login.label" 
+          :hint="fieldDefinitions.driverEdit.login.hint"
           placeholder="Введите логин"
-          :required="fieldDefinitions.driver.login.required"
+          :required="fieldDefinitions.driverEdit.login.required"
         />
         <TextInput 
           v-model="editingDriver.password" 
-          :label="fieldDefinitions.driver.password.label" 
-          :hint="fieldDefinitions.driver.password.hint"
+          :label="fieldDefinitions.driverEdit.password.label" 
+          :hint="fieldDefinitions.driverEdit.password.hint"
           placeholder="Введите пароль (оставьте пустым, чтобы не менять)"
           type="password"
-          :required="fieldDefinitions.driver.password.required"
+          :required="fieldDefinitions.driverEdit.password.required"
         />
         <TextInput 
           v-model="editingDriver.phone" 
-          :label="fieldDefinitions.driver.phone.label" 
-          :hint="fieldDefinitions.driver.phone.hint"
+          :label="fieldDefinitions.driverEdit.phone.label" 
+          :hint="fieldDefinitions.driverEdit.phone.hint"
           placeholder="Введите телефон"
-          :required="fieldDefinitions.driver.phone.required"
+          :required="fieldDefinitions.driverEdit.phone.required"
         />
         <TextInput 
           v-model="editingDriver.driver_license" 
-          :label="fieldDefinitions.driver.driver_license.label" 
-          :hint="fieldDefinitions.driver.driver_license.hint"
+          :label="fieldDefinitions.driverEdit.driver_license.label" 
+          :hint="fieldDefinitions.driverEdit.driver_license.hint"
           placeholder="Введите номер удостоверения"
-          :required="fieldDefinitions.driver.driver_license.required"
+          :required="fieldDefinitions.driverEdit.driver_license.required"
         />
       </div>
       <template #footer>
@@ -296,7 +296,7 @@ const addDriver = async () => {
   }
 
   // Валидация полей на клиенте
-  const validationErrors = validateFormFields(newDriver.value, fieldDefinitions.driver);
+  const validationErrors = validateFormFields(newDriver.value, fieldDefinitions.driverCreate);
   if (Object.keys(validationErrors).length > 0) {
     const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
     errorModalRef.value?.openModal(error);
@@ -369,7 +369,7 @@ const updateDriver = async () => {
   }
 
   // Валидация полей на клиенте
-  const validationErrors = validateFormFields(editingDriver.value, fieldDefinitions.driver);
+  const validationErrors = validateFormFields(editingDriver.value, fieldDefinitions.driverEdit);
   if (Object.keys(validationErrors).length > 0) {
     const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
     errorModalRef.value?.openModal(error);
@@ -418,7 +418,8 @@ const closeDeleteModal = () => {
 
 const confirmDelete = async () => {
   if (!auth.permissions.can_delete_users) {
-    console.warn('Нет разрешения на удаление водителей.');
+    permissionDeniedModal.value?.openModal('can_delete_users');
+    closeDeleteModal();
     return;
   }
 

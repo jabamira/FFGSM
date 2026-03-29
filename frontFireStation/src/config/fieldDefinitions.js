@@ -39,7 +39,7 @@ export const fieldDefinitions = {
       required: true,
       minLength: 6,
       noKyrillic: true,
-      hint: "Минимум 6 символов, латиница, цифры и спецсимволы (без кириллицы)",
+      hint: "Минимум 6 символов, латиница, цифры и спецсимволы",
     },
     phone: {
       label: "Телефон",
@@ -98,7 +98,7 @@ export const fieldDefinitions = {
       label: "Пароль",
       required: false,
       minLength: 6,
-      hint: "Минимум 6 символов",
+      hint: "Минимум 6 символов, латиница (оставьте пустым, чтобы не менять)",
     },
     phone: {
       label: "Телефон",
@@ -124,9 +124,7 @@ export const fieldDefinitions = {
       hint: "Выберите роль пользователя",
     },
   },
-
-  // Driver fields (для водителей - driver_license обязателен)
-  driver: {
+  driverEdit: {
     name: {
       label: "Имя",
       required: true,
@@ -158,7 +156,66 @@ export const fieldDefinitions = {
       required: false,
       minLength: 6,
       noKyrillic: true,
-      hint: "Минимум 6 символов, латиница, цифры и спецсимволы (без кириллицы, оставьте пустым, чтобы не менять)",
+      hint: "Минимум 6 символов, латиница (оставьте пустым, чтобы не менять)",
+    },
+    phone: {
+      label: "Телефон",
+      required: false,
+      minLength: 11,
+      maxLength: 11,
+      unique: true,
+      onlyDigits: true,
+      hint: "11 цифр, уникальный",
+    },
+    driver_license: {
+      label: "Водительское удостоверение",
+      required: true,
+      minLength: 10,
+      maxLength: 10,
+      unique: true,
+      onlyDigits: true,
+      hint: "10 цифр, обязательное, уникальное",
+    },
+    role: {
+      label: "Роль",
+      required: false,
+      hint: "Выберите роль пользователя",
+    },
+  },
+  // Driver fields (для водителей - driver_license обязателен)
+  driverCreate: {
+    name: {
+      label: "Имя",
+      required: true,
+      maxLength: 40,
+      hint: "До 40 символов",
+    },
+    surname: {
+      label: "Фамилия",
+      required: true,
+      maxLength: 40,
+      hint: "До 40 символов",
+    },
+    last_name: {
+      label: "Отчество",
+      required: false,
+      maxLength: 40,
+      hint: "До 40 символов",
+    },
+    login: {
+      label: "Логин",
+      required: true,
+      maxLength: 15,
+      unique: true,
+      onlyLatinAndSpecial: true,
+      hint: "До 15 символов, латиница, цифры и символы (- _ .), уникальный",
+    },
+    password: {
+      label: "Пароль",
+      required: true,
+      minLength: 6,
+      noKyrillic: true,
+      hint: "Минимум 6 символов, латиница",
     },
     phone: {
       label: "Телефон",
