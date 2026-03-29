@@ -83,7 +83,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": True,
             "view_technical_maintenance": True,
 
-            "can_view_operating_hourse": True
+            "can_view_operating_hours": True
         },
     },
     {
@@ -161,7 +161,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": True,
             "view_technical_maintenance": True,
 
-            "can_view_operating_hourse": True
+            "can_view_operating_hours": True
         },
     },
     {
@@ -239,7 +239,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": False,
             "view_technical_maintenance": False,
 
-            "can_view_operating_hourse": False
+            "can_view_operating_hours": False
         },
     },
 ]

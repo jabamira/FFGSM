@@ -3,18 +3,361 @@
     <NavigationMenu />
     <div class="p-6 max-w-6xl mx-auto">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Путевые листы легковых автомобилей</h2>
-      <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
-        <p :style="{ color: palette.medium }">Здесь будет список путевых листов легковых автомобилей...</p>
-        <Alert 
-          type="info"
-          message="Раздел в разработке. Скоро здесь появится управление путевыми листами."
-        />
+      
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+        <div class="bg-white rounded shadow p-4">
+          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Автомобиль</label>
+          <SelectInput
+            v-model="filterCar"
+            :options="carsFilterOptions"
+            placeholder="Все автомобили"
+          />
+        </div>
+        <div v-if="auth.permissions.view_drivers" class="bg-white rounded shadow p-4">
+          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Водитель</label>
+          <SelectInput
+            v-model="filterDriver"
+            :options="driversFilterOptions"
+            placeholder="Все водители"
+          />
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Сезон</label>
+          <SelectInput
+            v-model="filterSeason"
+            :options="[
+              { value: '', label: 'Все сезоны' },
+              { value: 'summer', label: 'Лето' },
+              { value: 'winter', label: 'Зима' }
+            ]"
+            placeholder="Все сезоны"
+          />
+        </div>
+        <div class="bg-white rounded shadow p-4">
+          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Тип топлива</label>
+          <SelectInput
+            v-model="filterFuelType"
+            :options="[
+              { value: '', label: 'Все типы' },
+              { value: 'petrol95', label: 'АИ-95' },
+              { value: 'petrol92', label: 'АИ-92' },
+              { value: 'diesel', label: 'Дизель' }
+            ]"
+            placeholder="Все типы"
+          />
+        </div>
       </div>
+
+      <!-- Search and Info -->
+      <div class="flex justify-between items-center mb-4">
+        <div class="flex-1 max-w-md">
+          <TextInput
+            v-model="searchQuery"
+            type="text"
+            placeholder="Поиск по номеру путевого листа..."
+          />
+        </div>
+        <span class="text-sm" :style="{ color: palette.medium }">Всего: {{ filteredWaybills.length }}</span>
+      </div>
+
+      <!-- DataTable -->
+      <div class="bg-white rounded shadow overflow-hidden mb-16">
+        <DataTable
+          :columns="columns"
+          :data="filteredWaybills"
+          :selectedIds="selectedWaybillIds"
+          @select="(ids) => selectedWaybillIds = ids"
+          :hideActions="false"
+        >
+          <template #cell-car="{ row }">
+            {{ getCar(row.car_id)?.number || '-' }} ({{ getCar(row.car_id)?.brand }} {{ getCar(row.car_id)?.model }})
+          </template>
+          <template #cell-driver="{ row }">
+            {{ getDriver(row.driver_id) ? `${getDriver(row.driver_id).name} ${getDriver(row.driver_id).surname} ${getDriver(row.driver_id).last_name}`.trim() : '-' }}
+          </template>
+          <template #cell-date="{ row }">
+            {{ formatDate(row.date) }}
+          </template>
+          <template #cell-norm_season="{ row }">
+            {{ row.norm_season === 'summer' ? 'Лето' : 'Зима' }}
+          </template>
+          <template #cell-fuel_type="{ row }">
+            {{ formatFuelType(row.fuel_type) }}
+          </template>
+          <template #actions="{ row }">
+            <button
+              @click="openEditWaybillModal(row)"
+              class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
+            >
+              Редактировать
+            </button>
+          </template>
+        </DataTable>
+      </div>
+
+      <!-- Edit Modals Component -->
+      <WaybillEditModal
+        ref="waybillModal"
+        :carOptions="carOptions"
+        :driverOptions="driverOptions"
+        @add="handleAddWaybill"
+        @edit="handleEditWaybill"
+        @delete="handleDeleteWaybills"
+      />
+
+      <!-- CRUD Panel -->
+      <CrudPanel
+        @create="openAddWaybillModal"
+        @delete="openDeleteWaybillModal"
+        createLabel="Создать путевой лист"
+        :deleteLabel="deleteButtonLabel"
+        :isDeleteDisabled="isDeleteDisabled"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { palette, Alert } from '../components/ui/importUi';
+import { ref, computed, onMounted } from 'vue';
+import { useAuthStore } from '../stores/auth';
+import { palette, SelectInput, TextInput } from '../components/ui/importUi';
+import CrudPanel from '../components/CrudPanel.vue';
+import DataTable from '../components/ui/DataTable.vue';
 import NavigationMenu from '../components/NavigationMenu.vue';
+import WaybillEditModal from '../components/WaybillEditModal.vue';
+import axios from 'axios';
+import { formatFuelType } from '../config/fuelTypes';
+
+const auth = useAuthStore();
+
+// Data
+const waybills = ref([]);
+const passengerCars = ref([]);
+const drivers = ref([]);
+
+// Selection and Modals
+const selectedWaybillIds = ref([]);
+const waybillModal = ref(null);
+
+// Filters
+const searchQuery = ref('');
+const filterCar = ref('');
+const filterDriver = ref('');
+const filterSeason = ref('');
+const filterFuelType = ref('');
+
+// Computed
+const carOptions = computed(() => {
+  return passengerCars.value.map(car => ({
+    value: car.id,
+    label: `${car.number} - ${car.brand} ${car.model}`
+  }));
+});
+
+const driverOptions = computed(() => {
+  return drivers.value.map(driver => ({
+    value: driver.id,
+    label: `${driver.name} ${driver.surname} ${driver.last_name}`.trim()
+  }));
+});
+
+const carsFilterOptions = computed(() => {
+  return [
+    { value: '', label: 'Все автомобили' },
+    ...passengerCars.value.map(car => ({
+      value: car.id,
+      label: `${car.number} - ${car.brand} ${car.model}`
+    }))
+  ];
+});
+
+const driversFilterOptions = computed(() => {
+  return [
+    { value: '', label: 'Все водители' },
+    ...drivers.value.map(driver => ({
+      value: driver.id,
+      label: `${driver.name} ${driver.surname} ${driver.last_name}`.trim()
+    }))
+  ];
+});
+
+const filteredWaybills = computed(() => {
+  let filtered = waybills.value;
+
+  if (searchQuery.value) {
+    filtered = filtered.filter(w => 
+      w.id.toString().includes(searchQuery.value)
+    );
+  }
+
+  if (filterCar.value) {
+    filtered = filtered.filter(w => w.car_id === parseInt(filterCar.value));
+  }
+
+  if (filterDriver.value) {
+    filtered = filtered.filter(w => w.driver_id === parseInt(filterDriver.value));
+  }
+
+  if (filterSeason.value) {
+    filtered = filtered.filter(w => w.norm_season === filterSeason.value);
+  }
+
+  if (filterFuelType.value) {
+    filtered = filtered.filter(w => w.fuel_type === filterFuelType.value);
+  }
+
+  return filtered;
+});
+
+const columns = computed(() => [
+  { key: 'id', label: 'ID', sortable: true },
+  { key: 'car', label: 'Автомобиль', sortable: false },
+  { key: 'driver', label: 'Водитель', sortable: false },
+  { key: 'date', label: 'Дата', sortable: true },
+  { key: 'norm_season', label: 'Сезон', sortable: true },
+  { key: 'fuel_type', label: 'Тип топлива', sortable: true }
+]);
+
+// Methods
+const getCar = (carId) => {
+  return passengerCars.value.find(c => c.id === carId);
+};
+
+const getDriver = (driverId) => {
+  return drivers.value.find(d => d.id === driverId);
+};
+
+const formatDate = (dateString) => {
+  return new Date(dateString).toLocaleDateString('ru-RU');
+};
+
+const openAddWaybillModal = () => {
+  waybillModal.value?.openAddModal();
+};
+
+const openDeleteWaybillModal = () => {
+  waybillModal.value?.openDeleteModal(selectedWaybillIds.value.length);
+};
+
+const openEditWaybillModal = (waybill) => {
+  waybillModal.value?.openEditModal(waybill);
+};
+
+const handleAddWaybill = async (waybillData) => {
+  try {
+    await axios.post('passenger-car-waybills/', waybillData, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    await fetchWaybills();
+  } catch (error) {
+    waybillModal.value?.showError(
+      'Ошибка создания путевого листа',
+      error.response?.data?.detail || 'Произошла ошибка при создании путевого листа'
+    );
+  }
+};
+
+const handleEditWaybill = async (waybillData) => {
+  try {
+    await axios.patch(`passenger-car-waybills/${waybillData.id}/`, waybillData, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    await fetchWaybills();
+  } catch (error) {
+    waybillModal.value?.showError(
+      'Ошибка обновления путевого листа',
+      error.response?.data?.detail || 'Произошла ошибка при обновлении путевого листа'
+    );
+  }
+};
+
+const handleDeleteWaybills = async () => {
+  try {
+    for (const id of selectedWaybillIds.value) {
+      await axios.delete(`passenger-car-waybills/${id}/`, {
+        headers: { Authorization: `Bearer ${auth.access}` }
+      });
+    }
+    await fetchWaybills();
+    selectedWaybillIds.value = [];
+  } catch (error) {
+    if (error.response?.status === 403) {
+      waybillModal.value?.showPermissionError();
+    } else {
+      waybillModal.value?.showError(
+        'Ошибка удаления путевого листа',
+        error.response?.data?.detail || 'Произошла ошибка при удалении путевого листа'
+      );
+    }
+  }
+};
+
+const fetchWaybills = async () => {
+  try {
+    const response = await axios.get('passenger-car-waybills/', {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    waybills.value = response.data;
+  } catch (error) {
+    console.error('Error fetching waybills:', error);
+  }
+};
+
+const fetchPassengerCars = async () => {
+  try {
+    const response = await axios.get('passenger-cars/', {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    passengerCars.value = response.data;
+  } catch (error) {
+    console.error('Error fetching passenger cars:', error);
+  }
+};
+
+const fetchDrivers = async () => {
+  try {
+    const response = await axios.get('users/drivers/', {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    drivers.value = response.data;
+  } catch (error) {
+    console.error('Error fetching drivers:', error);
+  }
+};
+
+const setupCrudPermissions = () => {
+  auth.setCrudPermissions({
+    canCreate: auth.permissions.can_create_passenger_cars_waybills || false,
+    canDelete: auth.permissions.can_delete_passenger_cars_waybills || false,
+  });
+};
+
+const deleteButtonLabel = computed(() => {
+  const count = selectedWaybillIds.value.length;
+  if (count === 0) return 'Удалить путевой лист';
+  if (count === 1) return 'Удалить путевой лист';
+  return `Удалить путевых листов (${count})`;
+});
+
+const isDeleteDisabled = computed(() => selectedWaybillIds.value.length === 0);
+
+onMounted(async () => {
+  setupCrudPermissions();
+  
+  const fetchTasks = [];
+  
+  if (auth.permissions.view_passenger_cars) {
+    fetchTasks.push(fetchPassengerCars());
+  }
+  
+  if (auth.permissions.view_drivers) {
+    fetchTasks.push(fetchDrivers());
+  }
+  
+  if (fetchTasks.length > 0) {
+    await Promise.all(fetchTasks);
+  }
+  
+  await fetchWaybills();
+});
 </script>

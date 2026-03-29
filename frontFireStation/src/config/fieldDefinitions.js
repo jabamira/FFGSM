@@ -274,6 +274,11 @@ export const fieldDefinitions = {
       maxLength: 60,
       hint: "До 60 символов",
     },
+    fuel_type: {
+      label: "Тип топлива",
+      required: true,
+      hint: "Выберите тип топлива",
+    },
   },
 
   // FireTruck fields
@@ -302,6 +307,11 @@ export const fieldDefinitions = {
       required: true,
       maxLength: 60,
       hint: "До 60 символов",
+    },
+    fuel_type: {
+      label: "Тип топлива",
+      required: true,
+      hint: "Выберите тип топлива",
     },
   },
 

@@ -293,7 +293,7 @@ class CanDeleteTechnicalMaintenance(RolePermission):
 
 
 class CanViewOperatingHours(RolePermission):
-    perm_attr = 'can_view_operating_hourse'
+    perm_attr = 'can_view_operating_hours'
     
 # ================= MOBILE ONLY ACTIONS =================
 

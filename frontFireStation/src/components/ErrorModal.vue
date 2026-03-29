@@ -1,14 +1,14 @@
 <template>
   <Modal
     ref="modalRef"
-    :is-open="isOpen"
-    title="Ошибка"
+    :is-open="currentIsOpen"
+    :title="currentTitle"
     @close="closeModal"
   >
     <div class="space-y-4 min-w-96">
       <div class="rounded-lg p-4" :style="{ backgroundColor: `${palette.error}15`, borderLeft: `4px solid ${palette.error}` }">
-        <p class="font-semibold" :style="{ color: palette.error }">{{ errorTitle }}</p>
-        <p class="text-sm mt-2" :style="{ color: palette.dark }">{{ errorMessage }}</p>
+        <p class="font-semibold" :style="{ color: palette.error }">{{ currentTitle }}</p>
+        <p class="text-sm mt-2" :style="{ color: palette.dark }">{{ currentMessage }}</p>
       </div>
 
       <!-- Детали ошибок (если есть fieldErrors) -->
@@ -38,16 +38,54 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Modal, Button, palette } from './ui/importUi';
 import { formatFieldName } from '../utils/errorUtils';
 
+const props = defineProps({
+  isOpen: {
+    type: Boolean,
+    default: false
+  },
+  title: {
+    type: String,
+    default: ''
+  },
+  message: {
+    type: String,
+    default: ''
+  }
+});
+
+const emit = defineEmits(['close']);
+
 const modalRef = ref(null);
 
-const isOpen = ref(false);
+const internalIsOpen = ref(false);
 const errorTitle = ref('');
 const errorMessage = ref('');
 const fieldErrors = ref([]);
+
+// Determine if using prop-based or method-based API
+const currentIsOpen = computed(() => {
+  return props.isOpen !== false ? props.isOpen : internalIsOpen.value;
+});
+
+const currentTitle = computed(() => {
+  return props.title || errorTitle.value || 'Ошибка';
+});
+
+const currentMessage = computed(() => {
+  return props.message || errorMessage.value;
+});
+
+const closeModal = () => {
+  internalIsOpen.value = false;
+  emit('close');
+  errorTitle.value = '';
+  errorMessage.value = '';
+  fieldErrors.value = [];
+};
 
 const openModal = (error) => {
   if (modalRef.value) {
@@ -84,17 +122,7 @@ const openModal = (error) => {
     fieldErrors.value = [];
   }
   
-  isOpen.value = true;
-};
-
-const closeModal = () => {
-  isOpen.value = false;
-  if (modalRef.value) {
-    modalRef.value.isErrorModal.value = false;
-  }
-  errorTitle.value = '';
-  errorMessage.value = '';
-  fieldErrors.value = [];
+  internalIsOpen.value = true;
 };
 
 defineExpose({

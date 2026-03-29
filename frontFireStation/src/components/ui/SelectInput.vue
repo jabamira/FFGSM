@@ -112,17 +112,18 @@ let closeTimeout;
 const selectedValue = computed(() => props.modelValue);
 
 const selectedLabel = computed(() => {
-  const option = props.options.find(o => o.value === props.modelValue);
-  return option?.label || '';
+  const option = props.options?.find(o => o?.value === props.modelValue);
+  return option?.label ? String(option.label) : '';
 });
 
 const filteredOptions = computed(() => {
   if (!searchQuery.value) return props.options;
   
   const query = searchQuery.value.toLowerCase();
-  return props.options.filter(option =>
-    option.label.toLowerCase().includes(query)
-  );
+  return props.options.filter(option => {
+    if (!option || !option.label) return false;
+    return String(option.label).toLowerCase().includes(query);
+  });
 });
 
 const inputStyle = computed(() => {
