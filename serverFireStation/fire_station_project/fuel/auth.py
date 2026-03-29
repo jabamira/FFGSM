@@ -11,7 +11,7 @@ from .models import User
 
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = 'HS256'
-ACCESS_TOKEN_LIFETIME_MINUTES = 60
+ACCESS_TOKEN_LIFETIME_MINUTES = 1440
 
 
 def _password_fingerprint(user: User) -> str:
