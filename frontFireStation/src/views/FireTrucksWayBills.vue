@@ -1,67 +1,64 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto">
+    <div class="p-6 max-w-[80%] mx-auto">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Путевые листы пожарных автомобилей</h2>
       
-      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white rounded shadow p-4">
-          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Автомобиль</label>
-          <SelectInput
-            v-model="filterCar"
-            :options="carsFilterOptions"
-            placeholder="Все автомобили"
-          />
+      <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
+        <!-- Filters Row 1 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div>
+            <SelectInput
+              v-model="filterCar"
+              label="Автомобиль"
+              :options="carsFilterOptions"
+              placeholder="Все автомобили"
+            />
+          </div>
+          <div v-if="auth.permissions.view_drivers">
+            <SelectInput
+              v-model="filterDriver"
+              label="Водитель"
+              :options="driversFilterOptions"
+              placeholder="Все водители"
+            />
+          </div>
+          <div>
+            <SelectInput
+              v-model="filterSeason"
+              label="Сезон"
+              :options="[
+                { value: '', label: 'Все сезоны' },
+                { value: 'summer', label: 'Лето' },
+                { value: 'winter', label: 'Зима' }
+              ]"
+              placeholder="Все сезоны"
+            />
+          </div>
         </div>
-        <div v-if="auth.permissions.view_drivers" class="bg-white rounded shadow p-4">
-          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Водитель</label>
-          <SelectInput
-            v-model="filterDriver"
-            :options="driversFilterOptions"
-            placeholder="Все водители"
-          />
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Сезон</label>
-          <SelectInput
-            v-model="filterSeason"
-            :options="[
-              { value: '', label: 'Все сезоны' },
-              { value: 'summer', label: 'Лето' },
-              { value: 'winter', label: 'Зима' }
-            ]"
-            placeholder="Все сезоны"
-          />
-        </div>
-        <div class="bg-white rounded shadow p-4">
-          <label class="block text-sm font-medium mb-2" :style="{ color: palette.dark }">Тип топлива</label>
-          <SelectInput
-            v-model="filterFuelType"
-            :options="[
-              { value: '', label: 'Все типы' },
-              { value: 'petrol95', label: 'АИ-95' },
-              { value: 'petrol92', label: 'АИ-92' },
-              { value: 'diesel', label: 'Дизель' }
-            ]"
-            placeholder="Все типы"
-          />
-        </div>
-      </div>
 
-      <!-- Search and Info -->
-      <div class="flex justify-between items-center mb-4">
-        <div class="flex-1 max-w-md">
-          <TextInput
-            v-model="searchQuery"
-            type="text"
-            placeholder="Поиск по номеру путевого листа..."
-          />
+        <!-- Filters Row 2 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+          <div>
+            <TextInput
+              v-model="searchQuery"
+              label="Поиск"
+              type="text"
+              placeholder="По номеру путевого листа..."
+            />
+          </div>
+          <div class="lg:col-span-2">
+            <DateRangeInput
+              :modelValue="dateRange"
+              @update:modelValue="(val) => dateRange = val"
+              label="Период"
+              startLabel="От"
+              endLabel="До"
+            />
+          </div>
         </div>
-        <span class="text-sm" :style="{ color: palette.medium }">Всего: {{ filteredWaybills.length }}</span>
-      </div>
 
-      <!-- DataTable -->
-      <div class="bg-white rounded shadow overflow-hidden mb-16">
+        <!-- DataTable -->
         <DataTable
           :columns="columns"
           :data="filteredWaybills"
@@ -70,19 +67,16 @@
           :hideActions="false"
         >
           <template #cell-car="{ row }">
-            {{ getCar(row.car_id)?.number || '-' }} ({{ getCar(row.car_id)?.brand }} {{ getCar(row.car_id)?.model }})
+            {{ getCar(row.car)?.number || '-' }} ({{ getCar(row.car)?.brand }} {{ getCar(row.car)?.model }})
           </template>
           <template #cell-driver="{ row }">
-            {{ getDriver(row.driver_id) ? `${getDriver(row.driver_id).name} ${getDriver(row.driver_id).surname} ${getDriver(row.driver_id).last_name}`.trim() : '-' }}
+            {{ getDriver(row.driver) ? `${getDriver(row.driver).name} ${getDriver(row.driver).surname} ${getDriver(row.driver).last_name}`.trim() : '-' }}
           </template>
           <template #cell-date="{ row }">
             {{ formatDate(row.date) }}
           </template>
           <template #cell-norm_season="{ row }">
             {{ row.norm_season === 'summer' ? 'Лето' : 'Зима' }}
-          </template>
-          <template #cell-fuel_type="{ row }">
-            {{ formatFuelType(row.fuel_type) }}
           </template>
           <template #actions="{ row }">
             <button
@@ -95,7 +89,8 @@
         </DataTable>
       </div>
 
-      <!-- Edit Modals Component -->
+      <!-- Blank spacer for bottom nav -->
+      <div class="pb-16"></div>
       <WaybillEditModal
         ref="waybillModal"
         :carOptions="carOptions"
@@ -120,7 +115,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { palette, SelectInput, TextInput } from '../components/ui/importUi';
+import { palette, SelectInput, TextInput, DateRangeInput } from '../components/ui/importUi';
+import { useSearch } from '../composables/useSearch';
 import CrudPanel from '../components/CrudPanel.vue';
 import DataTable from '../components/ui/DataTable.vue';
 import NavigationMenu from '../components/NavigationMenu.vue';
@@ -140,11 +136,29 @@ const selectedWaybillIds = ref([]);
 const waybillModal = ref(null);
 
 // Filters
-const searchQuery = ref('');
 const filterCar = ref('');
 const filterDriver = ref('');
 const filterSeason = ref('');
-const filterFuelType = ref('');
+const dateRange = ref({ start: '', end: '' });
+
+// Prepare waybills for search with searchable text fields
+const waybillsForSearch = computed(() => {
+  return waybills.value.map(w => {
+    const car = getCar(w.car);
+    const driver = getDriver(w.driver);
+    const carText = car ? `${car.number} ${car.brand} ${car.model}` : '';
+    const driverText = driver ? `${driver.name} ${driver.surname} ${driver.last_name}`.trim() : '';
+    const seasonText = w.norm_season === 'summer' ? 'лето' : 'зима';
+    
+    return {
+      ...w,
+      searchText: `${w.number} ${carText} ${driverText} ${seasonText}`
+    };
+  });
+});
+
+// Search with useSearch composable
+const { searchQuery, filtered: searchFiltered } = useSearch(waybillsForSearch, ['searchText']);
 
 // Computed
 const carOptions = computed(() => {
@@ -182,40 +196,38 @@ const driversFilterOptions = computed(() => {
 });
 
 const filteredWaybills = computed(() => {
-  let filtered = waybills.value;
-
-  if (searchQuery.value) {
-    filtered = filtered.filter(w => 
-      w.id.toString().includes(searchQuery.value)
-    );
-  }
+  // Start with search results
+  let filtered = searchFiltered.value;
 
   if (filterCar.value) {
-    filtered = filtered.filter(w => w.car_id === parseInt(filterCar.value));
+    filtered = filtered.filter(w => w.car === parseInt(filterCar.value));
   }
 
   if (filterDriver.value) {
-    filtered = filtered.filter(w => w.driver_id === parseInt(filterDriver.value));
+    filtered = filtered.filter(w => w.driver === parseInt(filterDriver.value));
   }
 
   if (filterSeason.value) {
     filtered = filtered.filter(w => w.norm_season === filterSeason.value);
   }
 
-  if (filterFuelType.value) {
-    filtered = filtered.filter(w => w.fuel_type === filterFuelType.value);
+  if (dateRange.value.start) {
+    filtered = filtered.filter(w => w.date >= dateRange.value.start);
+  }
+
+  if (dateRange.value.end) {
+    filtered = filtered.filter(w => w.date <= dateRange.value.end);
   }
 
   return filtered;
 });
 
 const columns = computed(() => [
-  { key: 'id', label: 'ID', sortable: true },
+  { key: 'number', label: 'Номер', sortable: true },
   { key: 'car', label: 'Автомобиль', sortable: false },
   { key: 'driver', label: 'Водитель', sortable: false },
   { key: 'date', label: 'Дата', sortable: true },
-  { key: 'norm_season', label: 'Сезон', sortable: true },
-  { key: 'fuel_type', label: 'Тип топлива', sortable: true }
+  { key: 'norm_season', label: 'Сезон', sortable: true }
 ]);
 
 // Methods

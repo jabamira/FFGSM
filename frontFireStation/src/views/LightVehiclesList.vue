@@ -1,12 +1,24 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto pb-24">
+    <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Легковые автомобили</h2>
       <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
-        <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите гос. номер, марку или модель" class="mb-4" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите гос. номер, марку или модель" />
+          </div>
+          <div>
+            <SelectInput 
+              v-model="filterFuelType" 
+              label="Тип топлива"
+              :options="fuelsFilterOptions"
+              placeholder="Все типы"
+            />
+          </div>
+        </div>
         <DataTable 
-          :data="filteredPassengerCars" 
+          :data="finalFilteredPassengerCars" 
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
@@ -192,11 +204,20 @@ const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const { searchQuery, filtered: filteredPassengerCars } = useSearch(passengerCars, ['number', 'brand', 'model']);
+const filterFuelType = ref('');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const showEditModal = ref(false);
 const editingPassengerCar = ref(null);
 const originalPassengerCar = ref(null);
+
+const finalFilteredPassengerCars = computed(() => {
+  let filtered = filteredPassengerCars.value;
+  if (filterFuelType.value) {
+    filtered = filtered.filter(car => car.fuel_type === filterFuelType.value);
+  }
+  return filtered;
+});
 
 const columns = [
   { key: 'number', label: 'Гос. номер' },
@@ -237,18 +258,25 @@ const fetchPassengerCars = async () => {
   }
 };
 
+const fuelsFilterOptions = computed(() => {
+  return [
+    { value: '', label: 'Все типы' },
+    ...fuelTypeOptions
+  ];
+});
+
 const passengerCarsToDelete = computed(() => {
-  return filteredPassengerCars.value.filter(c => selectedPassengerCarIds.value.includes(c.id));
+  return finalFilteredPassengerCars.value.filter(c => selectedPassengerCarIds.value.includes(c.id));
 });
 
 const getSelectedIndexes = () => {
-  return filteredPassengerCars.value
+  return finalFilteredPassengerCars.value
     .map((car, index) => selectedPassengerCarIds.value.includes(car.id) ? index : -1)
     .filter(index => index !== -1);
 };
 
 const onRowsSelected = (selectedIndexes) => {
-  selectedPassengerCarIds.value = selectedIndexes.map(idx => filteredPassengerCars.value[idx].id);
+  selectedPassengerCarIds.value = selectedIndexes.map(idx => finalFilteredPassengerCars.value[idx].id);
 };
 
 const openAddModal = () => {

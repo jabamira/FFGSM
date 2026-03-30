@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto pb-24">
+    <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Водители</h2>
       <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
         <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите ФИО, телефон или удостоверение" class="mb-4" />

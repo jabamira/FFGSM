@@ -5,5 +5,6 @@ export { default as DataTable } from "./DataTable.vue";
 export { default as Modal } from "./Modal.vue";
 export { default as Alert } from "./Alert.vue";
 export { default as Badge } from "./Badge.vue";
+export { default as DateRangeInput } from "./DateRangeInput.vue";
 
 export { theme, palette } from "./theme";

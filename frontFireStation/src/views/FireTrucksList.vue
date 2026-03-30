@@ -1,12 +1,24 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto pb-24">
+    <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Пожарные автомобили</h2>
       <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
-        <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите гос. номер, марку или модель" class="mb-4" />
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите гос. номер, марку или модель" />
+          </div>
+          <div>
+            <SelectInput 
+              v-model="filterFuelType" 
+              label="Тип топлива"
+              :options="fuelsFilterOptions"
+              placeholder="Все типы"
+            />
+          </div>
+        </div>
         <DataTable 
-          :data="filteredFireTrucks" 
+          :data="finalFilteredFireTrucks" 
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
@@ -206,11 +218,20 @@ const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const { searchQuery, filtered: filteredFireTrucks } = useSearch(fireTrucks, ['number', 'brand', 'model', 'type']);
+const filterFuelType = ref('');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const showEditModal = ref(false);
 const editingFireTruck = ref(null);
 const originalFireTruck = ref(null);
+
+const finalFilteredFireTrucks = computed(() => {
+  let filtered = filteredFireTrucks.value;
+  if (filterFuelType.value) {
+    filtered = filtered.filter(truck => truck.fuel_type === filterFuelType.value);
+  }
+  return filtered;
+});
 
 const columns = [
   { key: 'number', label: 'Гос. номер' },
@@ -253,18 +274,25 @@ const fetchFireTrucks = async () => {
   }
 };
 
+const fuelsFilterOptions = computed(() => {
+  return [
+    { value: '', label: 'Все типы' },
+    ...fuelTypeOptions
+  ];
+});
+
 const fireTrucksToDelete = computed(() => {
-  return filteredFireTrucks.value.filter(t => selectedFireTruckIds.value.includes(t.id));
+  return finalFilteredFireTrucks.value.filter(t => selectedFireTruckIds.value.includes(t.id));
 });
 
 const getSelectedIndexes = () => {
-  return filteredFireTrucks.value
+  return finalFilteredFireTrucks.value
     .map((truck, index) => selectedFireTruckIds.value.includes(truck.id) ? index : -1)
     .filter(index => index !== -1);
 };
 
 const onRowsSelected = (selectedIndexes) => {
-  selectedFireTruckIds.value = selectedIndexes.map(idx => filteredFireTrucks.value[idx].id);
+  selectedFireTruckIds.value = selectedIndexes.map(idx => finalFilteredFireTrucks.value[idx].id);
 };
 
 const openAddModal = () => {

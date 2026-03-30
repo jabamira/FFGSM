@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto pb-24">
+    <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Пользователи</h2>
       <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
         <div class="grid grid-cols-1 gap-4 mb-4" :class="auth.permissions.can_view_roles ? 'md:grid-cols-2' : ''">
@@ -122,7 +122,7 @@
     >
       <div class="space-y-4">
         <p :style="{ color: palette.dark }">Вы уверены что хотите удалить следующих пользователей:</p>
-          <div class="max-w-6xl mx-auto mt-8 mb-4 text-sm text-gray-500">
+          <div class="max-w-full mx-auto mt-8 mb-4 text-sm text-gray-500">
 
           </div>
         <div class="bg-red-50 border border-red-200 rounded p-4">

@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-6xl mx-auto">
+    <div class="p-6 max-w-[80%] mx-auto">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Отчёт по ГСМ — заполнение механиком</h2>
 
     <p class="text-sm mb-4" :style="{ color: palette.medium }">Заполните поля ниже. Вводимые поля — редактируемые, вычисляемые — выделены цветом.</p>
