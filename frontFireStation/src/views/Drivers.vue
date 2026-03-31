@@ -164,7 +164,7 @@
       </div>
       <template #footer>
         <Button variant="secondary" size="md" @click="closeEditModal">Закрыть</Button>
-        <Button variant="primary" size="md" @click="updateDriver">Сохранить</Button>
+        <Button variant="primary" size="md" @click="updateDriver" :disabled="!hasDriverChanged()">Сохранить</Button>
       </template>
     </Modal>
 
@@ -479,6 +479,7 @@ onMounted(() => {
     fetchDrivers();
   } else {
     console.warn("[Drivers] User does not have permission to view drivers.");
+    permissionDeniedModal.value?.openModal('view_drivers');
   }
 });
 

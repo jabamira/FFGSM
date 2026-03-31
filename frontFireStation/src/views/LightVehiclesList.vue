@@ -46,6 +46,7 @@
           :hint="fieldDefinitions.passengerCar.number.hint"
           placeholder="Введите гос. номер"
           :required="fieldDefinitions.passengerCar.number.required"
+          :uppercase="fieldDefinitions.passengerCar.number.uppercase"
         />
         <TextInput 
           v-model="newPassengerCar.brand" 
@@ -99,55 +100,17 @@
     </Modal>
 
     <!-- Modal редактирования легкового автомобиля -->
-    <Modal
+    <PassengerCarEditModal
+      ref="passengerCarEditModalRef"
       :is-open="showEditModal"
-      title="Редактировать легковой автомобиль"
+      :car="editingPassengerCar"
+      :original-car="originalPassengerCar"
+      :has-odometer="editingPassengerCar ? hasOdometer(editingPassengerCar.id) : false"
+      :can-view-passenger-cars="auth.permissions.view_passenger_cars"
       @close="closeEditModal"
-    >
-      <div v-if="editingPassengerCar" class="space-y-4 min-w-96">
-        <TextInput 
-          v-model="editingPassengerCar.number" 
-          :label="fieldDefinitions.passengerCar.number.label" 
-          :hint="fieldDefinitions.passengerCar.number.hint"
-          placeholder="Введите гос. номер"
-          :required="fieldDefinitions.passengerCar.number.required"
-        />
-        <TextInput 
-          v-model="editingPassengerCar.brand" 
-          :label="fieldDefinitions.passengerCar.brand.label" 
-          :hint="fieldDefinitions.passengerCar.brand.hint"
-          placeholder="Введите марку"
-          :required="fieldDefinitions.passengerCar.brand.required"
-        />
-        <TextInput 
-          v-model="editingPassengerCar.model" 
-          :label="fieldDefinitions.passengerCar.model.label" 
-          :hint="fieldDefinitions.passengerCar.model.hint"
-          placeholder="Введите модель"
-          :required="fieldDefinitions.passengerCar.model.required"
-        />
-        <SelectInput 
-          v-model="editingPassengerCar.fuel_type" 
-          :label="fieldDefinitions.passengerCar.fuel_type.label" 
-          :hint="fieldDefinitions.passengerCar.fuel_type.hint"
-          :options="fuelTypeOptions"
-          placeholder="Выберите тип топлива"
-          :required="fieldDefinitions.passengerCar.fuel_type.required"
-        />
-      </div>
-      <template #footer>
-        <Button 
-          v-if="editingPassengerCar && !hasOdometer(editingPassengerCar.id) && auth.permissions.view_passenger_cars"
-          variant="secondary" 
-          size="md" 
-          @click="openOdometerFromEdit"
-        >
-          Внести стартовые данные
-        </Button>
-        <Button variant="secondary" size="md" @click="closeEditModal">Закрыть</Button>
-        <Button variant="primary" size="md" @click="updatePassengerCar">Сохранить</Button>
-      </template>
-    </Modal>
+      @save="handleEditSave"
+      @odometer-click="openOdometerFromEdit"
+    />
 
     <!-- Modal внесения стартовых данных -->
     <OdometerModal
@@ -196,6 +159,7 @@ import NoSelectionModal from '../components/NoSelectionModal.vue';
 import CrudPanel from '../components/CrudPanel.vue';
 import ErrorModal from '../components/ErrorModal.vue';
 import OdometerModal from '../components/OdometerModal.vue';
+import PassengerCarEditModal from '../components/PassengerCarEditModal.vue';
 
 const auth = useAuthStore();
 const passengerCars = ref([]);
@@ -203,6 +167,7 @@ const selectedPassengerCarIds = ref([]);
 const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
+const passengerCarEditModalRef = ref(null);
 const { searchQuery, filtered: filteredPassengerCars } = useSearch(passengerCars, ['number', 'brand', 'model']);
 const filterFuelType = ref('');
 const showAddModal = ref(false);
@@ -249,7 +214,7 @@ const fetchPassengerCars = async () => {
   }
 
   try {
-    const response = await axios.get('/passenger-cars/', {
+    const response = await axios.get('/passenger-cars/?include_odometer=true', {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     passengerCars.value = response.data;
@@ -347,6 +312,16 @@ const openEditModal = (car) => {
   originalPassengerCar.value = { ...car };
   editingPassengerCar.value = { ...car };
   showEditModal.value = true;
+};
+
+const handleEditSave = async () => {
+  // Получить отредактированные данные из компонента
+  if (passengerCarEditModalRef.value) {
+    editingPassengerCar.value = passengerCarEditModalRef.value.getCar();
+  }
+  
+  // Вызвать стандартное сохранение
+  await updatePassengerCar();
 };
 
 const closeEditModal = () => {
@@ -471,7 +446,7 @@ const submitOdometerData = async () => {
 
 const hasOdometer = (carId) => {
   const car = passengerCars.value.find(c => c.id === carId);
-  return car && car.odometer_fuel_passenger_cars && car.odometer_fuel_passenger_cars.length > 0;
+  return car && car.odometer_fuel_records && car.odometer_fuel_records.length > 0;
 };
 
 const openOdometerFromEdit = () => {
@@ -485,9 +460,15 @@ const openOdometerFromEdit = () => {
   showOdometerModal.value = true;
 };
 
-const handleOdometerSubmitted = () => {
+const handleOdometerSubmitted = async () => {
   showOdometerModal.value = false;
   isOdometerRequired.value = true;
+  
+  // Перезагружаем данные машин чтобы обновить статус одометра
+  await fetchPassengerCars();
+  
+  // Закрываем окно редактирования
+  closeEditModal();
   closeOdometerModal();
 };
 
@@ -523,6 +504,7 @@ onMounted(() => {
     fetchPassengerCars();
   } else {
     console.warn("[PassengerCars] User does not have permission to view passenger cars.");
+    permissionDeniedModal.value?.openModal('view_passenger_cars');
   }
 });
 

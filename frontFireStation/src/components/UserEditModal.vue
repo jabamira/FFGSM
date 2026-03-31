@@ -162,6 +162,18 @@ const updateUser = async () => {
     return;
   }
 
+  // Проверка разрешения перед отправкой
+  if (!auth.permissions.can_update_users) {
+    errorModalRef.value?.openModal({
+      response: {
+        data: {
+          detail: 'У вас нет прав на редактирование пользователей'
+        }
+      }
+    });
+    return;
+  }
+
   try {
     const response = await axios.put(`/users/${editingUser.value.id}/`, editingUser.value, {
       headers: { Authorization: `Bearer ${auth.access}` }

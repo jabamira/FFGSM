@@ -98,9 +98,18 @@ class UserSerializer(FriendlyModelSerializer):
 # ---------- ЛЕГКОВЫЕ ----------
 
 class PassengerCarSerializer(FriendlyModelSerializer):
+    odometer_fuel_records = serializers.SerializerMethodField()
+
     class Meta:
         model = PassengerCar
         fields = '__all__'
+
+    def get_odometer_fuel_records(self, obj):
+        request = self.context.get('request')
+        if request and request.query_params.get('include_odometer') == 'true':
+            records = obj.odometer_fuel_records.all()
+            return OdometerFuelPassengerCarSerializer(records, many=True).data
+        return None
 
 
 class NormsPassengerCarsSerializer(FriendlyModelSerializer):
@@ -150,9 +159,18 @@ class PassengerCarWaybillRecordSerializer(FriendlyModelSerializer):
 # ---------- ПОЖАРНЫЕ ----------
 
 class FireTruckSerializer(FriendlyModelSerializer):
+    odometer_fuel_records = serializers.SerializerMethodField()
+
     class Meta:
         model = FireTruck
         fields = '__all__'
+
+    def get_odometer_fuel_records(self, obj):
+        request = self.context.get('request')
+        if request and request.query_params.get('include_odometer') == 'true':
+            records = obj.odometer_fuel_records.all()
+            return OdometerFuelFireTruckSerializer(records, many=True).data
+        return None
 
 
 class NormsFireTruckSerializer(FriendlyModelSerializer):

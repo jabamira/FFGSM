@@ -98,12 +98,25 @@ export function validateFormFields(data, definitions) {
     // Skip further validation if no value
     if (!value) return;
 
-    const strValue = String(value).trim();
-    const numValue = Number(value);
+    let strValue = String(value).trim();
+
+    // Apply uppercase transformation if needed
+    if (fieldDef.uppercase) {
+      strValue = strValue.toUpperCase();
+    }
+
+    const numValue = Number(strValue);
 
     // Check onlyDigits constraint - only numbers allowed
     if (fieldDef.onlyDigits && !/^\d+$/.test(strValue.replace(/\s/g, ""))) {
       errors[fieldName] = "Допускаются только цифры";
+      return;
+    }
+
+    // Check validRussianCar constraint - valid Russian license plate format
+    if (fieldDef.validRussianCar && !isValidRussianCarPlate(strValue)) {
+      errors[fieldName] =
+        "Формат: А123ВО99 (буквы: А В Е К М Н О Р С Т У Х, цифры, 2-3 цифры)";
       return;
     }
 
@@ -257,4 +270,58 @@ export function createValidationError(
 function isValidEmail(email) {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
+}
+
+/**
+ * Validate Russian car license plate format
+ * Format: Л123СС12 or Л123СС123
+ * Russian license plates use only 12 letters: А, В, Е, К, М, Н, О, Р, С, Т, У, Х
+ * - 1st char: Russian letter (А В Е К М Н О Р С Т У Х)
+ * - 2-4: three digits
+ * - 5-6: two Russian letters (А В Е К М Н О Р С Т У Х)
+ * - 7-9: two or three digits (region code)
+ * @param {string} plate - license plate number
+ * @returns {boolean}
+ */
+export function isValidRussianCarPlate(plate) {
+  if (!plate || typeof plate !== "string") return false;
+
+  // Only 12 Russian letters are allowed in license plates: А В Е К М Н О Р С Т У Х
+  const russianLetters = "АВЕКМНОРСТУХ";
+  const normalizedPlate = plate.toUpperCase().trim();
+
+  // Check length: should be 8 or 9 characters
+  if (normalizedPlate.length !== 8 && normalizedPlate.length !== 9) {
+    return false;
+  }
+
+  // Char 0: Russian letter (А В Е К М Н О Р С Т У Х)
+  if (!russianLetters.includes(normalizedPlate[0])) {
+    return false;
+  }
+
+  // Chars 1-3: three digits
+  if (
+    !/^\d$/.test(normalizedPlate[1]) ||
+    !/^\d$/.test(normalizedPlate[2]) ||
+    !/^\d$/.test(normalizedPlate[3])
+  ) {
+    return false;
+  }
+
+  // Chars 4-5: two Russian letters (А В Е К М Н О Р С Т У Х)
+  if (
+    !russianLetters.includes(normalizedPlate[4]) ||
+    !russianLetters.includes(normalizedPlate[5])
+  ) {
+    return false;
+  }
+
+  // Chars 6-8 or 6-7: two or three digits
+  const remainingChars = normalizedPlate.substring(6);
+  if (!/^\d{2,3}$/.test(remainingChars)) {
+    return false;
+  }
+
+  return true;
 }

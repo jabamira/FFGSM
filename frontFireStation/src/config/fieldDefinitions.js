@@ -260,7 +260,9 @@ export const fieldDefinitions = {
       required: true,
       maxLength: 9,
       unique: true,
-      hint: "До 9 символов, уникальный",
+      validRussianCar: true,
+      uppercase: true,
+      hint: "Формат: А123ВО99",
     },
     brand: {
       label: "Марка",
@@ -288,7 +290,9 @@ export const fieldDefinitions = {
       required: true,
       maxLength: 9,
       unique: true,
-      hint: "До 9 символов, уникальный",
+      validRussianCar: true,
+      uppercase: true,
+      hint: "Формат: А123ВО99",
     },
     brand: {
       label: "Марка",

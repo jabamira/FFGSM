@@ -28,10 +28,9 @@
           step="0.001"
           :required="true"
         />
-        <TextInput 
+        <DateInput 
           v-model="form.date" 
           label="Дата"
-          type="date"
           :required="true"
         />
       </div>
@@ -80,15 +79,23 @@
       </Button>
     </template>
   </Modal>
+  <PermissionDeniedModal ref="permissionDeniedModal" />
+  <ErrorModal ref="errorModalRef" />
 </template>
 
 <script setup>
 import { ref, watch } from 'vue';
-import { Modal, Button, TextInput } from './ui/importUi';
+import { Modal, Button, TextInput, DateInput } from './ui/importUi';
+import PermissionDeniedModal from './PermissionDeniedModal.vue';
+import ErrorModal from './ErrorModal.vue';
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { validateFormFields } from '../utils/errorUtils';
+import { fieldDefinitions } from '../config/fieldDefinitions';
 
 const auth = useAuthStore();
+const permissionDeniedModal = ref(null);
+const errorModalRef = ref(null);
 
 const props = defineProps({
   isOpen: {
@@ -156,6 +163,41 @@ const skipOdometer = () => {
 
 const submitData = async () => {
   try {
+    // Валидация данных перед отправкой
+    const validationData = {
+      odometer: form.value.odometer,
+      fuel: form.value.fuel,
+      date: form.value.date
+    };
+
+    const errors = validateFormFields(validationData, fieldDefinitions.odometerFuel);
+    if (Object.keys(errors).length > 0) {
+      // Создаем объект ошибки в формате, который понимает ErrorModal
+      const errorObj = {
+        response: {
+          data: {}
+        }
+      };
+      
+      Object.entries(errors).forEach(([field, message]) => {
+        errorObj.response.data[field] = message;
+      });
+      
+      errorModalRef.value?.openModal(errorObj);
+      return;
+    }
+
+    // Проверка разрешения в зависимости от типа машины
+    const isFireTruck = props.carType === 'fire-truck';
+    const requiredPermission = isFireTruck 
+      ? 'can_create_fire_truck_waybills_record'
+      : 'can_create_passenger_cars_waybills_record';
+
+    if (!auth.permissions[requiredPermission]) {
+      permissionDeniedModal.value?.openModal(requiredPermission);
+      return;
+    }
+
     const payload = {
       car: props.carId,
       odometer: parseInt(form.value.odometer),
@@ -171,7 +213,9 @@ const submitData = async () => {
     emit('submitted');
   } catch (error) {
     console.error('[OdometerModal] Error saving odometer data:', error);
-    throw error;
+    
+    // Показать ошибку в модальном окне вместо выброса
+    errorModalRef.value?.openModal(error);
   }
 };
 </script>

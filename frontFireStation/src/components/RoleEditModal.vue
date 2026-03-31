@@ -327,6 +327,18 @@ const updateRole = async () => {
     return;
   }
 
+  // Проверка разрешения перед отправкой
+  if (!auth.permissions.can_update_roles) {
+    errorModalRef.value?.openModal({
+      response: {
+        data: {
+          detail: 'У вас нет прав на редактирование ролей'
+        }
+      }
+    });
+    return;
+  }
+
   try {
     const response = await axios.put(`/roles/${editingRole.value.id}/`, editingRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
     if (auth.permissions.can_update_permissisons && 

@@ -421,9 +421,14 @@ onMounted(() => {
      fetchRoles();
   } else {
     console.warn("[Roles] User does not have permission to view roles.");
+    permissionDeniedModal.value?.openModal('can_view_roles');
   }
   // Загружаем пользователей если есть право на просмотр
-  fetchUsers();
+  if (auth.permissions.view_users) {
+    fetchUsers();
+  } else {
+    permissionDeniedModal.value?.openModal('view_users');
+  }
  });
 
 

@@ -565,6 +565,7 @@ onMounted(async () => {
     await fetchUsers();
   } else {
     console.warn("[Users] User does not have permission to view users.");
+    permissionDeniedModal.value?.openModal('view_users');
   }
 });
 

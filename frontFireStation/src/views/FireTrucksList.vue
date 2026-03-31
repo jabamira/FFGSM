@@ -46,6 +46,7 @@
           :hint="fieldDefinitions.fireTruck.number.hint"
           placeholder="Введите гос. номер"
           :required="fieldDefinitions.fireTruck.number.required"
+          :uppercase="fieldDefinitions.fireTruck.number.uppercase"
         />
         <TextInput 
           v-model="newFireTruck.brand" 
@@ -106,62 +107,17 @@
     </Modal>
 
     <!-- Modal редактирования пожарной машины -->
-    <Modal
+    <FireTruckEditModal
+      ref="firetruckEditModalRef"
       :is-open="showEditModal"
-      title="Редактировать пожарный автомобиль"
+      :truck="editingFireTruck"
+      :original-truck="originalFireTruck"
+      :has-odometer="editingFireTruck ? hasOdometer(editingFireTruck.id) : false"
+      :can-view-fire-trucks="auth.permissions.view_fire_trucks"
       @close="closeEditModal"
-    >
-      <div v-if="editingFireTruck" class="space-y-4 min-w-96">
-        <TextInput 
-          v-model="editingFireTruck.number" 
-          :label="fieldDefinitions.fireTruck.number.label" 
-          :hint="fieldDefinitions.fireTruck.number.hint"
-          placeholder="Введите гос. номер"
-          :required="fieldDefinitions.fireTruck.number.required"
-        />
-        <TextInput 
-          v-model="editingFireTruck.brand" 
-          :label="fieldDefinitions.fireTruck.brand.label" 
-          :hint="fieldDefinitions.fireTruck.brand.hint"
-          placeholder="Введите марку"
-          :required="fieldDefinitions.fireTruck.brand.required"
-        />
-        <TextInput 
-          v-model="editingFireTruck.model" 
-          :label="fieldDefinitions.fireTruck.model.label" 
-          :hint="fieldDefinitions.fireTruck.model.hint"
-          placeholder="Введите модель"
-          :required="fieldDefinitions.fireTruck.model.required"
-        />
-        <TextInput 
-          v-model="editingFireTruck.type" 
-          :label="fieldDefinitions.fireTruck.type.label" 
-          :hint="fieldDefinitions.fireTruck.type.hint"
-          placeholder="Введите тип"
-          :required="fieldDefinitions.fireTruck.type.required"
-        />
-        <SelectInput 
-          v-model="editingFireTruck.fuel_type" 
-          :label="fieldDefinitions.fireTruck.fuel_type.label" 
-          :hint="fieldDefinitions.fireTruck.fuel_type.hint"
-          :options="fuelTypeOptions"
-          placeholder="Выберите тип топлива"
-          :required="fieldDefinitions.fireTruck.fuel_type.required"
-        />
-      </div>
-      <template #footer>
-        <Button 
-          v-if="editingFireTruck && !hasOdometer(editingFireTruck.id) && auth.permissions.view_fire_trucks"
-          variant="secondary" 
-          size="md" 
-          @click="openOdometerFromEdit"
-        >
-          Внести стартовые данные
-        </Button>
-        <Button variant="secondary" size="md" @click="closeEditModal">Закрыть</Button>
-        <Button variant="primary" size="md" @click="updateFireTruck">Сохранить</Button>
-      </template>
-    </Modal>
+      @save="handleEditSave"
+      @odometer-click="openOdometerFromEdit"
+    />
 
     <!-- Modal внесения стартовых данных -->
     <OdometerModal
@@ -210,6 +166,7 @@ import NoSelectionModal from '../components/NoSelectionModal.vue';
 import CrudPanel from '../components/CrudPanel.vue';
 import ErrorModal from '../components/ErrorModal.vue';
 import OdometerModal from '../components/OdometerModal.vue';
+import FireTruckEditModal from '../components/FireTruckEditModal.vue';
 
 const auth = useAuthStore();
 const fireTrucks = ref([]);
@@ -217,6 +174,7 @@ const selectedFireTruckIds = ref([]);
 const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
+const firetruckEditModalRef = ref(null);
 const { searchQuery, filtered: filteredFireTrucks } = useSearch(fireTrucks, ['number', 'brand', 'model', 'type']);
 const filterFuelType = ref('');
 const showAddModal = ref(false);
@@ -265,7 +223,7 @@ const fetchFireTrucks = async () => {
   }
 
   try {
-    const response = await axios.get('/fire-trucks/', {
+    const response = await axios.get('/fire-trucks/?include_odometer=true', {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     fireTrucks.value = response.data;
@@ -364,6 +322,16 @@ const openEditModal = (truck) => {
   originalFireTruck.value = { ...truck };
   editingFireTruck.value = { ...truck };
   showEditModal.value = true;
+};
+
+const handleEditSave = async () => {
+  // Получить отредактированные данные из компонента
+  if (firetruckEditModalRef.value) {
+    editingFireTruck.value = firetruckEditModalRef.value.getTruck();
+  }
+  
+  // Вызвать стандартное сохранение
+  await updateFireTruck();
 };
 
 const closeEditModal = () => {
@@ -488,7 +456,7 @@ const submitOdometerData = async () => {
 
 const hasOdometer = (carId) => {
   const truck = fireTrucks.value.find(t => t.id === carId);
-  return truck && truck.odometer_fuel_fire_trucks && truck.odometer_fuel_fire_trucks.length > 0;
+  return truck && truck.odometer_fuel_records && truck.odometer_fuel_records.length > 0;
 };
 
 const openOdometerFromEdit = () => {
@@ -502,9 +470,15 @@ const openOdometerFromEdit = () => {
   showOdometerModal.value = true;
 };
 
-const handleOdometerSubmitted = () => {
+const handleOdometerSubmitted = async () => {
   showOdometerModal.value = false;
   isOdometerRequired.value = true;
+  
+  // Перезагружаем данные машин чтобы обновить статус одометра
+  await fetchFireTrucks();
+  
+  // Закрываем окно редактирования
+  closeEditModal();
   closeOdometerModal();
 };
 
@@ -540,6 +514,7 @@ onMounted(() => {
     fetchFireTrucks();
   } else {
     console.warn("[FireTrucks] User does not have permission to view fire trucks.");
+    permissionDeniedModal.value?.openModal('view_fire_trucks');
   }
 });
 

@@ -110,6 +110,7 @@
       />
     </div>
   </div>
+  <PermissionDeniedModal ref="permissionDeniedModal" />
 </template>
 
 <script setup>
@@ -121,10 +122,12 @@ import CrudPanel from '../components/CrudPanel.vue';
 import DataTable from '../components/ui/DataTable.vue';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import WaybillEditModal from '../components/WaybillEditModal.vue';
+import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import axios from 'axios';
 import { formatFuelType } from '../config/fuelTypes';
 
 const auth = useAuthStore();
+const permissionDeniedModal = ref(null);
 
 // Data
 const waybills = ref([]);
@@ -305,6 +308,10 @@ const handleDeleteWaybills = async () => {
 };
 
 const fetchWaybills = async () => {
+  if (!auth.permissions.view_passenger_cars_waybills) {
+    permissionDeniedModal.value?.openModal('view_passenger_cars_waybills');
+    return;
+  }
   try {
     const response = await axios.get('passenger-car-waybills/', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -316,6 +323,10 @@ const fetchWaybills = async () => {
 };
 
 const fetchPassengerCars = async () => {
+  if (!auth.permissions.view_passenger_cars) {
+    permissionDeniedModal.value?.openModal('view_passenger_cars');
+    return;
+  }
   try {
     const response = await axios.get('passenger-cars/', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -327,6 +338,10 @@ const fetchPassengerCars = async () => {
 };
 
 const fetchDrivers = async () => {
+  if (!auth.permissions.view_drivers) {
+    permissionDeniedModal.value?.openModal('view_drivers');
+    return;
+  }
   try {
     const response = await axios.get('users/drivers/', {
       headers: { Authorization: `Bearer ${auth.access}` }

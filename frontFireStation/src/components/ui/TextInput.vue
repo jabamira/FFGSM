@@ -13,7 +13,7 @@
       :required="required"
       :style="inputStyle"
       class="w-full px-4 py-2 rounded-lg outline-none transition"
-      @input="$emit('update:modelValue', $event.target.value)"
+      @input="handleInput($event)"
       @blur="$emit('blur')"
       @focus="$emit('focus')"
     />
@@ -61,13 +61,17 @@ export default {
       type: Boolean,
       default: false,
     },
+    uppercase: {
+      type: Boolean,
+      default: false,
+    },
     id: {
       type: String,
       default: () => `input-${Math.random().toString(36).substr(2, 9)}`,
     },
   },
   emits: ['update:modelValue', 'blur', 'focus'],
-  setup(props) {
+  setup(props, { emit }) {
     const inputStyle = computed(() => {
       const style = {
         color: palette.dark,
@@ -86,7 +90,15 @@ export default {
       };
     });
 
-    return { palette, inputStyle };
+    const handleInput = (event) => {
+      let value = event.target.value;
+      if (props.uppercase) {
+        value = value.toUpperCase();
+      }
+      emit('update:modelValue', value);
+    };
+
+    return { palette, inputStyle, handleInput };
   },
 };
 </script>
