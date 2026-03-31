@@ -1354,21 +1354,14 @@ class NormsOperatingHoursFireTruck(SoftDeleteModel):
     km_norm = models.DecimalField(
         max_digits=5,
         decimal_places=4,
-        help_text="норма по переводу в моточасы км",
+        help_text="норма по переводу в моточасы км(ч/км)",
         validators=[MinValueValidator(Decimal('0.0000'))]
     )
 
     with_pump_norm = models.DecimalField(
-        max_digits=5,
+        max_digits=6,
         decimal_places=4,
-        help_text="норма по переводу в моточасы с насосом",
-        validators=[MinValueValidator(Decimal('0.0000'))]
-    )
-
-    without_pump_norm = models.DecimalField(
-        max_digits=5,
-        decimal_places=4,
-        help_text="норма по переводу в моточасы без насоса",
+        help_text="норма по переводу в моточасы с насосом(просто коэффициент)",
         validators=[MinValueValidator(Decimal('0.0000'))]
     )
 
@@ -1393,7 +1386,7 @@ class NormsOperatingHoursPassengerCar(SoftDeleteModel):
         max_digits=5,
         decimal_places=4,
         null=False,
-        help_text="норма по переводу в моточасы по городу",
+        help_text="норма по переводу в моточасы по городу(ч/км)",
         validators=[MinValueValidator(Decimal('0.0000'))]
     )
 
@@ -1401,7 +1394,7 @@ class NormsOperatingHoursPassengerCar(SoftDeleteModel):
         max_digits=5,
         decimal_places=4,
         null=False,
-        help_text="норма по переводу в моточасы по области",
+        help_text="норма по переводу в моточасы по области(ч/км)",
         validators=[MinValueValidator(Decimal('0.0000'))]
     )
 
