@@ -81,7 +81,7 @@
 
     <!-- Empty State -->
     <div v-if="data.length === 0" class="text-center py-8" :style="{ color: palette.medium }">
-      <p>No data available</p>
+      <p>Данные отсутствуют</p>
     </div>
 
     <!-- Pagination -->

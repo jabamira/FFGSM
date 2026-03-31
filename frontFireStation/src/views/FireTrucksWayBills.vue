@@ -64,6 +64,7 @@
           :data="filteredWaybills"
           :selectedIds="selectedWaybillIds"
           @select="(ids) => selectedWaybillIds = ids"
+          @row-click="(waybill) => navigateToWaybill(waybill)"
           :hideActions="false"
         >
           <template #cell-car="{ row }">
@@ -100,6 +101,26 @@
         @delete="handleDeleteWaybills"
       />
 
+      <!-- Delete Waybills Modal -->
+      <Modal
+        :isOpen="showDeleteWaybillModal"
+        title="Подтверждение удаления"
+        @close="closeDeleteWaybillModal"
+      >
+        <p :style="{ color: palette.dark }">Вы уверены что хотите удалить следующие путевые листы:</p>
+        <div class="bg-red-50 border border-red-200 rounded p-4">
+          <ul class="space-y-2">
+            <li v-for="waybill in waybillsToDelete" :key="waybill.id" :style="{ color: palette.dark }">
+              №{{ waybill.number }} - {{ getCar(waybill.car)?.number }} ({{ formatDate(waybill.date) }})
+            </li>
+          </ul>
+        </div>
+        <template #footer>
+          <Button variant="secondary" size="md" @click="closeDeleteWaybillModal">Отмена</Button>
+          <Button variant="danger" size="md" @click="confirmDeleteWaybills">Удалить</Button>
+        </template>
+      </Modal>
+
       <!-- CRUD Panel -->
       <CrudPanel
         @create="openAddWaybillModal"
@@ -111,23 +132,30 @@
     </div>
   </div>
   <PermissionDeniedModal ref="permissionDeniedModal" />
+  <NoSelectionModal ref="noSelectionModal" />
+  <ErrorModal ref="errorModalRef" />
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { palette, SelectInput, TextInput, DateRangeInput } from '../components/ui/importUi';
+import { palette, SelectInput, TextInput, DateRangeInput, Modal, Button } from '../components/ui/importUi';
 import { useSearch } from '../composables/useSearch';
 import CrudPanel from '../components/CrudPanel.vue';
 import DataTable from '../components/ui/DataTable.vue';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import WaybillEditModal from '../components/WaybillEditModal.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
+import NoSelectionModal from '../components/NoSelectionModal.vue';
+import ErrorModal from '../components/ErrorModal.vue';
 import axios from 'axios';
 import { formatFuelType } from '../config/fuelTypes';
+import { useNavigation } from '../router/navigation';
+import { useRoute } from 'vue-router';
 
 const auth = useAuthStore();
-const permissionDeniedModal = ref(null);
+const navigation = useNavigation();
+const route = useRoute();
 
 // Data
 const waybills = ref([]);
@@ -137,6 +165,10 @@ const drivers = ref([]);
 // Selection and Modals
 const selectedWaybillIds = ref([]);
 const waybillModal = ref(null);
+const showDeleteWaybillModal = ref(false);
+const permissionDeniedModal = ref(null);
+const noSelectionModal = ref(null);
+const errorModalRef = ref(null);
 
 // Filters
 const filterCar = ref('');
@@ -251,7 +283,47 @@ const openAddWaybillModal = () => {
 };
 
 const openDeleteWaybillModal = () => {
-  waybillModal.value?.openDeleteModal(selectedWaybillIds.value.length);
+  if (selectedWaybillIds.value.length === 0) {
+    noSelectionModal.value?.openModal();
+    return;
+  }
+  if (!auth.permissions.can_delete_fire_truck_waybills) {
+    permissionDeniedModal.value?.openModal('can_delete_fire_truck_waybills');
+    return;
+  }
+  showDeleteWaybillModal.value = true;
+};
+
+const closeDeleteWaybillModal = () => {
+  showDeleteWaybillModal.value = false;
+};
+
+const confirmDeleteWaybills = async () => {
+  try {
+    for (const id of selectedWaybillIds.value) {
+      await axios.delete(`fire-truck-waybills/${id}/`, {
+        headers: { Authorization: `Bearer ${auth.access}` }
+      });
+    }
+    
+    console.log('[FireTrucksWayBills] Waybills deleted successfully');
+    
+    selectedWaybillIds.value = [];
+    await fetchWaybills();
+    closeDeleteWaybillModal();
+  } catch (error) {
+    console.error('Error deleting waybills:', error);
+    errorModalRef.value?.openModal(error);
+    closeDeleteWaybillModal();
+  }
+};
+
+const navigateToWaybill = (waybill) => {
+  if (!auth.permissions.view_fire_truck_waybills) {
+    permissionDeniedModal.value?.openModal('view_fire_truck_waybills');
+    return;
+  }
+  navigation.NavigateFireTruckWaybill(waybill.id);
 };
 
 const openEditWaybillModal = (waybill) => {
@@ -265,10 +337,7 @@ const handleAddWaybill = async (waybillData) => {
     });
     await fetchWaybills();
   } catch (error) {
-    waybillModal.value?.showError(
-      'Ошибка создания путевого листа',
-      error.response?.data?.detail || 'Произошла ошибка при создании путевого листа'
-    );
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -279,10 +348,7 @@ const handleEditWaybill = async (waybillData) => {
     });
     await fetchWaybills();
   } catch (error) {
-    waybillModal.value?.showError(
-      'Ошибка обновления путевого листа',
-      error.response?.data?.detail || 'Произошла ошибка при обновлении путевого листа'
-    );
+    errorModalRef.value?.openModal(error);
   }
 };
 
@@ -358,6 +424,10 @@ const setupCrudPermissions = () => {
     canDelete: auth.permissions.can_delete_fire_truck_waybills || false,
   });
 };
+
+const waybillsToDelete = computed(() => {
+  return filteredWaybills.value.filter(w => selectedWaybillIds.value.includes(w.id));
+});
 
 const deleteButtonLabel = computed(() => {
   const count = selectedWaybillIds.value.length;

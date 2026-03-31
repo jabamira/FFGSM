@@ -23,6 +23,10 @@ export function useNavigation() {
     router.push("/light-vehicles-waybills");
   const NavigateLightVehiclesNorms = () => router.push("/light-vehicles-norms");
   const NavigatePassengerCars = () => router.push("/passenger-cars");
+  const NavigateFireTruckWaybill = (id) =>
+    router.push(`/fire-truck-waybill/${id}`);
+  const NavigatePassengerCarWaybill = (id) =>
+    router.push(`/passenger-car-waybill/${id}`);
 
   return {
     NavigateAuth,
@@ -40,5 +44,7 @@ export function useNavigation() {
     NavigateLightVehiclesWayBills,
     NavigateLightVehiclesNorms,
     NavigatePassengerCars,
+    NavigateFireTruckWaybill,
+    NavigatePassengerCarWaybill,
   };
 }

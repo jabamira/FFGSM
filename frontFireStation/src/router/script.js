@@ -11,6 +11,7 @@ import FireTrucksNorms from "../views/FireTrucksNorms.vue";
 import LightVehiclesList from "../views/LightVehiclesList.vue";
 import LightVehiclesWayBills from "../views/LightVehiclesWayBills.vue";
 import LightVehiclesNorms from "../views/LightVehiclesNorms.vue";
+import WaybillManagement from "../views/WaybillManagement.vue";
 import { useAuthStore } from "../stores/auth"; // used in navigation guard
 
 const routes = [
@@ -36,6 +37,11 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: "/fire-truck-waybill/:id",
+    component: WaybillManagement,
+    meta: { requiresAuth: true },
+  },
+  {
     path: "/fire-trucks-norms",
     component: FireTrucksNorms,
     meta: { requiresAuth: true },
@@ -48,6 +54,11 @@ const routes = [
   {
     path: "/light-vehicles-waybills",
     component: LightVehiclesWayBills,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/passenger-car-waybill/:id",
+    component: WaybillManagement,
     meta: { requiresAuth: true },
   },
   {

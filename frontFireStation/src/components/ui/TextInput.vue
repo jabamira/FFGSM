@@ -11,6 +11,8 @@
       :placeholder="placeholder"
       :disabled="disabled"
       :required="required"
+      :min="min"
+      :step="step"
       :style="inputStyle"
       class="w-full px-4 py-2 rounded-lg outline-none transition"
       @input="handleInput($event)"
@@ -64,6 +66,14 @@ export default {
     uppercase: {
       type: Boolean,
       default: false,
+    },
+    min: {
+      type: [String, Number],
+      default: undefined,
+    },
+    step: {
+      type: [String, Number],
+      default: undefined,
     },
     id: {
       type: String,

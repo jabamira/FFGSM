@@ -7,5 +7,6 @@ export { default as Alert } from "./Alert.vue";
 export { default as Badge } from "./Badge.vue";
 export { default as DateRangeInput } from "./DateRangeInput.vue";
 export { default as DateInput } from "./DateInput.vue";
+export { default as TimeInput } from "./TimeInput.vue";
 
 export { theme, palette } from "./theme";

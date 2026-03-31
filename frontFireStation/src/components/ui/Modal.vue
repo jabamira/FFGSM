@@ -11,11 +11,11 @@
         @mousedown.self="closeModal"
       >
         <div 
-          class="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[800px] overflow-y-auto modal-scrollbar"
+          class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[800px] overflow-y-auto modal-scrollbar"
           :style="{ zIndex: isErrorModal ? 201 : 51 }"
         >
           <!-- Header -->
-          <div class="flex items-center justify-between px-12 py-4 border-b" :style="{ borderColor: palette.light }">
+          <div class="flex items-center justify-between px-8 py-4 border-b" :style="{ borderColor: palette.light }">
             <h2 class="text-lg font-semibold" :style="{ color: palette.dark }">{{ title }}</h2>
             <button
               @click="closeModal"
@@ -27,12 +27,12 @@
           </div>
 
           <!-- Body -->
-          <div class="px-12 py-4 overflow-y-auto">
+          <div class="px-8 py-4 overflow-y-auto">
             <slot />
           </div>
 
           <!-- Footer -->
-          <div class="flex items-center justify-end gap-3 px-12 py-4 border-t" :style="{ borderColor: palette.light, backgroundColor: `${palette.light}20` }">
+          <div class="flex items-center justify-end gap-3 px-8 py-4 border-t" :style="{ borderColor: palette.light, backgroundColor: `${palette.light}20` }">
             <slot name="footer" />
           </div>
         </div>
@@ -76,6 +76,16 @@ export default {
 .modal-enter-active,
 .modal-leave-active {
   transition: opacity 0.3s ease;
+}
+
+/* Ensure full width for modal content */
+:deep(.space-y-4 > *) {
+  width: 100%;
+}
+
+:deep(.flatpickr-calendar) {
+  position: fixed !important;
+  z-index: 999 !important;
 }
 
 .modal-enter-from,
