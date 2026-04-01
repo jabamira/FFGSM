@@ -131,16 +131,22 @@ const generalError = ref('');
 
 // Computed properties
 const isFormValid = computed(() => {
-  return form.value.target.trim() !== '' &&
-         form.value.departure_time.trim() !== '' &&
-         form.value.arrival_time.trim() !== '' &&
-         form.value.distance_city_km !== null &&
-         form.value.distance_city_km >= 0 &&
-         form.value.distance_area_km !== null &&
-         form.value.distance_area_km >= 0 &&
-         form.value.fuel_used !== null &&
-         form.value.fuel_used >= 0 &&
-         (isEditMode.value || !areFormAndOriginalEqual());
+  // In edit mode: form must differ from original
+  if (isEditMode.value) {
+    return !areFormAndOriginalEqual();
+  }
+  
+  // In add mode: enable if ANY field has content
+  const hasAnyContent = 
+    form.value.target.trim() !== '' ||
+    form.value.departure_time.trim() !== '' ||
+    form.value.arrival_time.trim() !== '' ||
+    (form.value.distance_city_km !== null && form.value.distance_city_km !== '') ||
+    (form.value.distance_area_km !== null && form.value.distance_area_km !== '') ||
+    (form.value.fuel_refueled !== null && form.value.fuel_refueled !== '') ||
+    (form.value.fuel_used !== null && form.value.fuel_used !== '');
+  
+  return hasAnyContent;
 });
 
 const areFormAndOriginalEqual = () => {
@@ -166,49 +172,46 @@ const validateForm = () => {
   clearErrors();
   let isValid = true;
 
-  // Validate target
-  if (!form.value.target.trim()) {
-    errors.value.target = 'Цель выезда обязательна';
+  // Validate target (only if provided)
+  if (form.value.target.trim() && form.value.target.trim().length < 2) {
+    errors.value.target = 'Цель выезда должна быть не менее 2 символов';
     isValid = false;
   }
 
-  // Validate departure_time
-  if (!form.value.departure_time.trim()) {
-    errors.value.departure_time = 'Время выезда обязательно';
+  // Validate departure_time (only if provided)
+  if (form.value.departure_time.trim() && !validateTime(form.value.departure_time)) {
+    errors.value.departure_time = 'Некорректное время выезда';
     isValid = false;
   }
 
-  // Validate arrival_time
-  if (!form.value.arrival_time.trim()) {
-    errors.value.arrival_time = 'Время прибытия обязательно';
+  // Validate arrival_time (only if provided)
+  if (form.value.arrival_time.trim() && !validateTime(form.value.arrival_time)) {
+    errors.value.arrival_time = 'Некорректное время прибытия';
     isValid = false;
   }
 
-  // Validate distance_city_km
-  if (form.value.distance_city_km === null || form.value.distance_city_km === '') {
-    errors.value.distance_city_km = 'Км по городу обязательны';
-    isValid = false;
-  } else if (form.value.distance_city_km < 0) {
-    errors.value.distance_city_km = 'Значение не может быть отрицательным';
-    isValid = false;
+  // Validate distance_city_km (only if provided)
+  if (form.value.distance_city_km !== null && form.value.distance_city_km !== '') {
+    if (form.value.distance_city_km < 0) {
+      errors.value.distance_city_km = 'Значение не может быть отрицательным';
+      isValid = false;
+    }
   }
 
-  // Validate distance_area_km
-  if (form.value.distance_area_km === null || form.value.distance_area_km === '') {
-    errors.value.distance_area_km = 'Км по области обязательны';
-    isValid = false;
-  } else if (form.value.distance_area_km < 0) {
-    errors.value.distance_area_km = 'Значение не может быть отрицательным';
-    isValid = false;
+  // Validate distance_area_km (only if provided)
+  if (form.value.distance_area_km !== null && form.value.distance_area_km !== '') {
+    if (form.value.distance_area_km < 0) {
+      errors.value.distance_area_km = 'Значение не может быть отрицательным';
+      isValid = false;
+    }
   }
 
-  // Validate fuel_used
-  if (form.value.fuel_used === null || form.value.fuel_used === '') {
-    errors.value.fuel_used = 'Израсходованное топливо обязательно';
-    isValid = false;
-  } else if (form.value.fuel_used < 0) {
-    errors.value.fuel_used = 'Значение не может быть отрицательным';
-    isValid = false;
+  // Validate fuel_used (only if provided)
+  if (form.value.fuel_used !== null && form.value.fuel_used !== '') {
+    if (form.value.fuel_used < 0) {
+      errors.value.fuel_used = 'Значение не может быть отрицательным';
+      isValid = false;
+    }
   }
 
   return isValid;

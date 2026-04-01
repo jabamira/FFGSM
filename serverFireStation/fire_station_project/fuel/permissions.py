@@ -61,7 +61,7 @@ class CanDownloadDriversReports(RolePermission):
 # ================= ROLES =================
 
 class CanViewRoles(RolePermission):
-    perm_attr = 'can_view_roles'
+    perm_attr = 'view_roles'
 
 
 class CanCreateRoles(RolePermission):
@@ -79,7 +79,7 @@ class CanDeleteRoles(RolePermission):
 # ================= PERMISSIONS =================
 
 class CanViewPermissions(RolePermission):
-    perm_attr = 'can_view_permissisons'
+    perm_attr = 'view_permissisons'
 
 
 class CanCreatePermissions(RolePermission):
@@ -173,15 +173,17 @@ class CanCreatePassengerCarWaybillRecord(BasePermission):
         if client == 'mobile':
             return bool(getattr(perm_obj, 'can_use_mobile_booking', False))
 
-        return bool(getattr(perm_obj, 'can_create_passenger_cars_waybills_record', False))
+        return bool(getattr(perm_obj, 'can_create_passenger_cars_waybills_records', False))
 
 
 class CanUpdatePassengerCarWaybillRecord(RolePermission):
-    perm_attr = 'can_update_passenger_cars_waybills_record'
 
+    perm_attr = 'can_update_passenger_cars_waybills_records'
+class CanViewPassengerCarWaybillRecord(RolePermission):
+    perm_attr = 'view_passenger_cars_waybills_records'
 
 class CanDeletePassengerCarWaybillRecord(RolePermission):
-    perm_attr = 'can_delete_passenger_cars_waybills_record'
+    perm_attr = 'can_delete_passenger_cars_waybills_records'
 
 
 # ================= FIRE TRUCKS =================
@@ -263,15 +265,18 @@ class CanCreateFireTruckWaybillRecord(BasePermission):
         if client == 'mobile':
             return bool(getattr(perm_obj, 'can_use_mobile_booking', False))
 
-        return bool(getattr(perm_obj, 'can_create_fire_truck_waybills_record', False))
+        return bool(getattr(perm_obj, 'can_create_fire_truck_waybills_records', False))
 
 
 class CanUpdateFireTruckWaybillRecord(RolePermission):
-    perm_attr = 'can_update_fire_truck_waybills_record'
+    perm_attr = 'can_update_fire_truck_waybills_records'
+
+class CanViewFireTruckWaybillRecord(RolePermission):
+    perm_attr = 'view_fire_truck_waybills_records'
 
 
 class CanDeleteFireTruckWaybillRecord(RolePermission):
-    perm_attr = 'can_delete_fire_truck_waybills_record'
+    perm_attr = 'can_delete_fire_truck_waybills_records'
 
 
 # ================= TECHNICAL MAINTENANCE =================
@@ -293,7 +298,7 @@ class CanDeleteTechnicalMaintenance(RolePermission):
 
 
 class CanViewOperatingHours(RolePermission):
-    perm_attr = 'can_view_operating_hours'
+    perm_attr = 'view_operating_hours'
     
 # ================= MOBILE ONLY ACTIONS =================
 

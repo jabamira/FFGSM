@@ -187,7 +187,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { palette, SelectInput, TextInput, Modal, Button } from '../components/ui/importUi';
@@ -310,6 +310,20 @@ const deleteRecordsLabel = computed(() => {
 
 const isDeleteDisabled = computed(() => selectedRecordIds.value.length === 0);
 
+const canCreateRecords = computed(() => {
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_create_fire_truck_records'
+    : 'can_create_passenger_car_records';
+  return auth.permissions[permissionKey] || false;
+});
+
+const canDeleteRecords = computed(() => {
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_delete_fire_truck_records'
+    : 'can_delete_passenger_car_records';
+  return auth.permissions[permissionKey] || false;
+});
+
 // Methods
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('ru-RU');
@@ -411,6 +425,14 @@ const handleEditWaybill = async (waybillData) => {
 };
 
 const openAddRecord = () => {
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_create_fire_truck_records'
+    : 'can_create_passenger_car_records';
+  
+  if (!auth.permissions[permissionKey]) {
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
   recordEditModal.value?.openAddModal();
 };
 
@@ -465,8 +487,8 @@ const openDeleteRecordsModal = () => {
     return;
   }
   const permissionKey = carType.value === 'fire-truck'
-    ? 'can_delete_fire_truck_waybills'
-    : 'can_delete_passenger_cars_waybills';
+    ? 'can_delete_fire_truck_records'
+    : 'can_delete_passenger_car_records';
   
   if (!auth.permissions[permissionKey]) {
     permissionDeniedModal.value?.openModal(permissionKey);
@@ -506,10 +528,26 @@ const goBack = () => {
   router.back();
 };
 
+const setupCrudPermissions = () => {
+  auth.setCrudPermissions({
+    canCreate: carType.value === 'fire-truck'
+      ? auth.permissions.can_create_fire_truck_waybills_record || false
+      : auth.permissions.can_create_passenger_cars_waybills_record || false,
+    canDelete: carType.value === 'fire-truck'
+      ? auth.permissions.can_delete_fire_truck_waybills_record || false
+      : auth.permissions.can_delete_passenger_cars_waybills_record || false
+  });
+};
+
 // Lifecycle
 onMounted(async () => {
   const fetchTasks = [fetchWaybill(), fetchRecords(), fetchCars(), fetchDrivers()];
   
   await Promise.all(fetchTasks);
+  setupCrudPermissions();
+});
+
+onUnmounted(() => {
+  auth.clearCrudPermissions();
 });
 </script>

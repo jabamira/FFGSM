@@ -179,7 +179,7 @@ const permissionGroups = {
   },
   fire_truck_waybill_records: {
     label: 'Записи путевых листов пожарных машин',
-    keys: ['can_create_fire_truck_waybills_record', 'can_delete_fire_truck_waybills_record', 'can_update_fire_truck_waybills_record']
+    keys: ['can_create_fire_truck_waybills_records', 'can_delete_fire_truck_waybills_records','view_fire_truck_waybills_records', 'can_update_fire_truck_waybills_records']
   },
   fire_truck_norms: {
     label: 'Нормы пожарных машин',
@@ -199,7 +199,7 @@ const permissionGroups = {
   },
   passenger_cars_waybill_records: {
     label: 'Записи путевых листов легковых машин',
-    keys: ['can_create_passenger_cars_waybills_record', 'can_delete_passenger_cars_waybills_record', 'can_update_passenger_cars_waybills_record']
+    keys: ['can_create_passenger_cars_waybills_records', 'can_delete_passenger_cars_waybills_records', 'can_update_passenger_cars_waybills_records', 'view_passenger_cars_waybills_records']
   },
   passenger_cars_norms: {
     label: 'Нормы легковых машин',

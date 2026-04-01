@@ -22,12 +22,12 @@ DEFAULT_ROLES = [
             "can_create_roles": True,
             "can_delete_roles": True,
             "can_update_roles": True,
-            "can_view_roles": True,
+            "view_roles": True,
 
             "can_create_permissions": True,
             "can_delete_permissisons": True,
             "can_update_permissisons": True,
-            "can_view_permissisons": True,
+            "view_permissisons": True,
 
             "can_create_fire_trucks": True,
             "can_delete_fire_trucks": True,
@@ -40,9 +40,10 @@ DEFAULT_ROLES = [
             "can_download_fire_truck_waybills": True,
             "view_fire_truck_waybills": True,
 
-            "can_create_fire_truck_waybills_record": True,
-            "can_delete_fire_truck_waybills_record": True,
-            "can_update_fire_truck_waybills_record": True,
+            "can_create_fire_truck_waybills_records": True,
+            "can_delete_fire_truck_waybills_records": True,
+            "can_update_fire_truck_waybills_records": True,
+            "view_fire_truck_waybills_records": True,
 
             "can_create_fire_truck_norms": True,
             "can_delete_fire_truck_norms": True,
@@ -63,9 +64,10 @@ DEFAULT_ROLES = [
             "can_download_passenger_cars_waybills": True,
             "view_passenger_cars_waybills": True,
 
-            "can_create_passenger_cars_waybills_record": True,
-            "can_delete_passenger_cars_waybills_record": True,
-            "can_update_passenger_cars_waybills_record": True,
+            "can_create_passenger_cars_waybills_records": True,
+            "can_delete_passenger_cars_waybills_records": True,
+            "can_update_passenger_cars_waybills_records": True,
+            "view_passenger_cars_waybills_records": True,
 
             "can_create_passenger_cars_norms": True,
             "can_delete_passenger_cars_norms": True,
@@ -83,7 +85,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": True,
             "view_technical_maintenance": True,
 
-            "can_view_operating_hours": True
+            "view_operating_hours": True
         },
     },
     {
@@ -100,12 +102,12 @@ DEFAULT_ROLES = [
             "can_create_roles": False,
             "can_delete_roles": False,
             "can_update_roles": False,
-            "can_view_roles": False,
+            "view_roles": False,
 
             "can_create_permissions": False,
             "can_delete_permissisons": False,
             "can_update_permissisons": False,
-            "can_view_permissisons": False,
+            "view_permissisons": False,
 
             "can_create_fire_trucks": True,
             "can_delete_fire_trucks": False,
@@ -118,9 +120,10 @@ DEFAULT_ROLES = [
             "can_download_fire_truck_waybills": True,
             "view_fire_truck_waybills": True,
 
-            "can_create_fire_truck_waybills_record": True,
-            "can_delete_fire_truck_waybills_record": True,
-            "can_update_fire_truck_waybills_record": True,
+            "can_create_fire_truck_waybills_records": True,
+            "can_delete_fire_truck_waybills_records": True,
+            "can_update_fire_truck_waybills_records": True,
+            "view_fire_truck_waybills_records": True,
 
             "can_create_fire_truck_norms": True,
             "can_delete_fire_truck_norms": True,
@@ -141,9 +144,10 @@ DEFAULT_ROLES = [
             "can_download_passenger_cars_waybills": True,
             "view_passenger_cars_waybills": True,
 
-            "can_create_passenger_cars_waybills_record": True,
-            "can_delete_passenger_cars_waybills_record": True,
-            "can_update_passenger_cars_waybills_record": True,
+            "can_create_passenger_cars_waybills_records": True,
+            "can_delete_passenger_cars_waybills_records": True,
+            "can_update_passenger_cars_waybills_records": True,
+            "view_passenger_cars_waybills_records": True,
 
             "can_create_passenger_cars_norms": True,
             "can_delete_passenger_cars_norms": True,
@@ -161,7 +165,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": True,
             "view_technical_maintenance": True,
 
-            "can_view_operating_hours": True
+            "view_operating_hours": True
         },
     },
     {
@@ -178,12 +182,12 @@ DEFAULT_ROLES = [
             "can_create_roles": False,
             "can_delete_roles": False,
             "can_update_roles": False,
-            "can_view_roles": False,
+            "view_roles": False,
 
             "can_create_permissions": False,
             "can_delete_permissisons": False,
             "can_update_permissisons": False,
-            "can_view_permissisons": False,
+            "view_permissisons": False,
 
             "can_create_fire_trucks": False,
             "can_delete_fire_trucks": False,
@@ -196,9 +200,10 @@ DEFAULT_ROLES = [
             "can_download_fire_truck_waybills": False,
             "view_fire_truck_waybills": True,
 
-            "can_create_fire_truck_waybills_record": True,
-            "can_delete_fire_truck_waybills_record": False,
-            "can_update_fire_truck_waybills_record": False,
+            "can_create_fire_truck_waybills_records": True,
+            "can_delete_fire_truck_waybills_records": False,
+            "can_update_fire_truck_waybills_records": False,
+            "view_fire_truck_waybills_records": False,
 
             "can_create_fire_truck_norms": False,
             "can_delete_fire_truck_norms": False,
@@ -239,7 +244,7 @@ DEFAULT_ROLES = [
             "can_update_technical_maintenance": False,
             "view_technical_maintenance": False,
 
-            "can_view_operating_hours": False
+            "view_operating_hours": False
         },
     },
 ]

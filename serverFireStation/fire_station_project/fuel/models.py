@@ -112,12 +112,12 @@ class Permission(SoftDeleteModel):
     can_create_roles = models.BooleanField(default=False)
     can_delete_roles = models.BooleanField(default=False)
     can_update_roles = models.BooleanField(default=False)
-    can_view_roles = models.BooleanField(default=False)
+    view_roles = models.BooleanField(default=False)
 
     can_create_permissions = models.BooleanField(default=False)
     can_delete_permissisons = models.BooleanField(default=False)
     can_update_permissisons = models.BooleanField(default=False)
-    can_view_permissisons = models.BooleanField(default=False)
+    view_permissisons = models.BooleanField(default=False)
 
     can_create_fire_trucks = models.BooleanField(default=False)
     can_delete_fire_trucks = models.BooleanField(default=False)
@@ -130,9 +130,10 @@ class Permission(SoftDeleteModel):
     can_download_fire_truck_waybills = models.BooleanField(default=False)
     view_fire_truck_waybills = models.BooleanField(default=False)
 
-    can_create_fire_truck_waybills_record = models.BooleanField(default=False)
-    can_delete_fire_truck_waybills_record = models.BooleanField(default=False)
-    can_update_fire_truck_waybills_record = models.BooleanField(default=False)
+    can_create_fire_truck_waybills_records = models.BooleanField(default=False)
+    can_delete_fire_truck_waybills_records = models.BooleanField(default=False)
+    can_update_fire_truck_waybills_records = models.BooleanField(default=False)
+    view_fire_truck_waybills_records = models.BooleanField(default=False)
 
     can_create_fire_truck_norms = models.BooleanField(default=False)
     can_delete_fire_truck_norms = models.BooleanField(default=False)
@@ -153,9 +154,10 @@ class Permission(SoftDeleteModel):
     can_download_passenger_cars_waybills = models.BooleanField(default=False)
     view_passenger_cars_waybills = models.BooleanField(default=False)
 
-    can_create_passenger_cars_waybills_record = models.BooleanField(default=False)
-    can_delete_passenger_cars_waybills_record = models.BooleanField(default=False)
-    can_update_passenger_cars_waybills_record = models.BooleanField(default=False)
+    can_create_passenger_cars_waybills_records = models.BooleanField(default=False)
+    can_delete_passenger_cars_waybills_records = models.BooleanField(default=False)
+    can_update_passenger_cars_waybills_records = models.BooleanField(default=False)
+    view_passenger_cars_waybills_records = models.BooleanField(default=False)
 
     can_create_passenger_cars_norms = models.BooleanField(default=False)
     can_delete_passenger_cars_norms = models.BooleanField(default=False)
@@ -173,7 +175,7 @@ class Permission(SoftDeleteModel):
     can_update_technical_maintenance = models.BooleanField(default=False)
     view_technical_maintenance = models.BooleanField(default=False)
 
-    can_view_operating_hours = models.BooleanField(default=False)
+    view_operating_hours = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Права для роли {self.role.name}"
