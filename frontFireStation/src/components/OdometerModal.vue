@@ -123,10 +123,17 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submitted', 'skipped']);
 
+const getCurrentLocalDate = () => {
+  const now = new Date();
+  // Новосибирск UTC+7 - добавляем 7 часов к UTC
+  const novosibirskTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  return novosibirskTime.toISOString().split('T')[0];
+};
+
 const form = ref({
   odometer: '',
   fuel: '',
-  date: new Date().toISOString().split('T')[0]
+  date: getCurrentLocalDate()
 });
 
 const showWarning = ref(false);
@@ -136,7 +143,7 @@ watch(() => props.isOpen, (newVal) => {
     form.value = {
       odometer: '',
       fuel: '',
-      date: new Date().toISOString().split('T')[0]
+      date: getCurrentLocalDate()
     };
     showWarning.value = false;
   }
@@ -190,8 +197,8 @@ const submitData = async () => {
     // Проверка разрешения в зависимости от типа машины
     const isFireTruck = props.carType === 'fire-truck';
     const requiredPermission = isFireTruck 
-      ? 'can_create_fire_truck_waybills_record'
-      : 'can_create_passenger_cars_waybills_record';
+      ? 'can_create_fire_trucks'
+      : 'can_create_passenger_cars';
 
     if (!auth.permissions[requiredPermission]) {
       permissionDeniedModal.value?.openModal(requiredPermission);

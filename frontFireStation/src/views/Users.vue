@@ -4,10 +4,10 @@
     <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Пользователи</h2>
       <div class="bg-white rounded shadow p-6" :style="{ borderColor: palette.light }">
-        <div class="grid grid-cols-1 gap-4 mb-4" :class="auth.permissions.can_view_roles ? 'md:grid-cols-2' : ''">
+        <div class="grid grid-cols-1 gap-4 mb-4" :class="auth.permissions.view_roles ? 'md:grid-cols-2' : ''">
           <TextInput v-model="searchQuery" label="Поиск" placeholder="Введите ФИО, логин или телефон" />
           <SelectInput 
-            v-if="auth.permissions.can_view_roles"
+            v-if="auth.permissions.view_roles"
             v-model="selectedRoleFilter" 
             label="Фильтр по роли" 
             :options="roleFilterOptions"
@@ -23,7 +23,7 @@
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
         >
-          <template v-if="auth.permissions.can_view_roles" #cell-role_name="{ row }">
+          <template v-if="auth.permissions.view_roles" #cell-role_name="{ row }">
             <span 
               v-if="auth.permissions.can_update_roles || auth.permissions.can_update_permissisons"
               :style="{ color: palette.primary }"
@@ -101,7 +101,7 @@
           :required="fieldDefinitions.userCreate.driver_license.required"
         />
         <SelectInput 
-          v-if="auth.permissions.can_view_roles"
+          v-if="auth.permissions.view_roles"
           v-model="newUser.role" 
           :label="fieldDefinitions.userCreate.role.label"
           :hint="fieldDefinitions.userCreate.role.hint"
@@ -204,7 +204,7 @@ const columns = computed(() => {
     { key: 'phone', label: 'Телефон' }
   ];
   
-  if (auth.permissions.can_view_roles) {
+  if (auth.permissions.view_roles) {
     baseCols.push({ key: 'role_name', label: 'Роль' });
   }
   
@@ -314,7 +314,7 @@ const resetNewUser = () => {
     password: '',
     phone: '',
     driver_license: '',
-    role: auth.permissions.can_view_roles ? null : undefined,
+    role: auth.permissions.view_roles ? null : undefined,
   };
 };
 
@@ -335,7 +335,7 @@ const addUser = async () => {
   try {
     const userData = { ...newUser.value };
     // Убираем роль если она не требуется
-    if (!auth.permissions.can_view_roles) {
+    if (!auth.permissions.view_roles) {
       delete userData.role;
     }
     
@@ -404,7 +404,7 @@ const updateUser = async () => {
       delete updateData.password;
     }
     // Убираем роль если нет прав на просмотр ролей
-    if (!auth.permissions.can_view_roles) {
+    if (!auth.permissions.view_roles) {
       delete updateData.role;
     }
 
@@ -557,7 +557,7 @@ onMounted(async () => {
   setupCrudPermissions();
   
   // Загружаем роли первыми, чтобы они были доступны при загрузке пользователей
-  if (auth.permissions.can_view_roles) {
+  if (auth.permissions.view_roles) {
     await fetchRoles();
   }
   

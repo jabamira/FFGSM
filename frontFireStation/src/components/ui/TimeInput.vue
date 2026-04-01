@@ -110,7 +110,7 @@ export default {
       return `${hours}:${minutes}`;
     };
 
-    // Форматировать время с маской HH:MM
+    // Форматировать время с маской HH:MM всегда с нулями
     const formatTimeInput = (input) => {
       // Оставить только цифры
       const digits = input.replace(/\D/g, '');
@@ -122,10 +122,42 @@ export default {
       
       // Если больше 2, добавляем двоеточие
       if (digits.length >= 3) {
-        return `${digits.slice(0, 2)}:${digits.slice(2, 4)}`;
+        const hours = String(parseInt(digits.slice(0, 2))).padStart(2, '0');
+        const minutes = digits.slice(2, 4);
+        return `${hours}:${minutes}`;
       }
       
       return digits;
+    };
+    
+    // Преобразовать время из любого формата в HH:MM с нулями
+    const normalizeTimeFormat = (timeStr) => {
+      if (!timeStr || typeof timeStr !== 'string') return '';
+      
+      const trimmed = timeStr.trim();
+      if (!trimmed) return '';
+      
+      // Извлечь только цифры
+      const digits = trimmed.replace(/\D/g, '');
+      
+      // Если есть хотя бы 4 цифры (HHMM)
+      if (digits.length >= 4) {
+        const hours = String(parseInt(digits.slice(0, 2))).padStart(2, '0');
+        const minutes = String(parseInt(digits.slice(2, 4))).padStart(2, '0');
+        return `${hours}:${minutes}`;
+      }
+      
+      // Если есть двоеточие, попытаться распарсить
+      if (trimmed.includes(':')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          const hours = String(parseInt(parts[0] || 0)).padStart(2, '0');
+          const minutes = String(parseInt(parts[1] || 0)).padStart(2, '0');
+          return `${hours}:${minutes}`;
+        }
+      }
+      
+      return trimmed;
     };
 
     const handleManualInput = (event) => {
@@ -141,8 +173,14 @@ export default {
 
     onMounted(() => {
       if (timeInputRef.value && !props.disabled) {
-        // Инициализировать текущим временем если пусто
-        const initialTime = props.modelValue || getCurrentTime();
+        // Если значение уже передано, использовать его
+        // Иначе использовать текущее время (если нужно)
+        let initialTime = props.modelValue;
+        if (!initialTime) {
+          initialTime = getCurrentTime(); // Установить текущее время если пусто
+        }
+        
+        initialTime = normalizeTimeFormat(initialTime);
         displayValue.value = initialTime;
         
         flatpickrInstance = flatpickr(timeInputRef.value, {
@@ -155,11 +193,14 @@ export default {
           locale: Russian,
           position: 'auto',
           onClose: (selectedDates, dateStr) => {
-            displayValue.value = dateStr;
-            emit('update:modelValue', dateStr);
+            const normalized = normalizeTimeFormat(dateStr);
+            displayValue.value = normalized;
+            emit('update:modelValue', normalized);
           },
           onChange: (selectedDates, dateStr) => {
-            displayValue.value = dateStr;
+            const normalized = normalizeTimeFormat(dateStr);
+            displayValue.value = normalized;
+            emit('update:modelValue', normalized);
           },
           defaultDate: initialTime || undefined,
         });
@@ -172,6 +213,7 @@ export default {
       displayValue,
       inputStyle,
       handleManualInput,
+      normalizeTimeFormat,
     };
   },
 };

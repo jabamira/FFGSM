@@ -1,9 +1,11 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.utils.dateparse import parse_date
 from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
+from django.core.exceptions import ValidationError
 from io import BytesIO
 from django.conf import settings
 from openpyxl import Workbook, load_workbook
@@ -614,6 +616,22 @@ class PassengerCarWaybillRecordViewSet(SoftDeleteModelViewSet):
             return base + [CanDeletePassengerCarWaybillRecord()]
         return base
 
+    def perform_create(self, serializer):
+        try:
+            serializer.save()
+        except ValidationError as e:
+            # Преобразуем ValidationError в DRF format
+            error_detail = e.message if hasattr(e, 'message') else str(e)
+            raise DRFValidationError(error_detail)
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except ValidationError as e:
+            # Преобразуем ValidationError в DRF format
+            error_detail = e.message if hasattr(e, 'message') else str(e)
+            raise DRFValidationError(error_detail)
+
 
 # ================= ПОЖАРНЫЕ =================
 
@@ -914,6 +932,22 @@ class FireTruckWaybillRecordViewSet(SoftDeleteModelViewSet):
         elif self.action == 'destroy':
             return base + [CanDeleteFireTruckWaybillRecord()]
         return base
+
+    def perform_create(self, serializer):
+        try:
+            serializer.save()
+        except ValidationError as e:
+            # Преобразуем ValidationError в DRF format
+            error_detail = e.message if hasattr(e, 'message') else str(e)
+            raise DRFValidationError(error_detail)
+
+    def perform_update(self, serializer):
+        try:
+            serializer.save()
+        except ValidationError as e:
+            # Преобразуем ValidationError в DRF format
+            error_detail = e.message if hasattr(e, 'message') else str(e)
+            raise DRFValidationError(error_detail)
 
 
 # ================= МОТОЧАСЫ / ТО =================

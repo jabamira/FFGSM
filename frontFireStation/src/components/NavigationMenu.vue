@@ -20,7 +20,7 @@
           Пользователи
         </router-link>
           <router-link 
-            v-if="auth.user && auth.permissions && auth.permissions.can_view_roles"
+            v-if="auth.user && auth.permissions && auth.permissions.view_roles"
             to="/roles" 
             :class="['px-3 py-1.5 rounded transition', isActive('/roles') ? 'font-semibold' : 'hover:bg-gray-100']"
             :style="isActive('/roles') ? { color: palette.primary, backgroundColor: palette.primary + '10' } : { color: palette.dark }"

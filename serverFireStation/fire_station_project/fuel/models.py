@@ -237,6 +237,11 @@ class Season(models.TextChoices):
     WINTER = 'winter', 'Зима'
     SUMMER = 'summer', 'Лето'
 
+    @classmethod
+    def get_display(cls, value):
+        """Получить человеческое название сезона"""
+        return dict(cls.choices).get(value, value)
+
 
 class FuelType(models.TextChoices):
     PETROL95 = 'petrol95', 'Бензин (АИ-95)'
@@ -663,8 +668,9 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             .first()
         )
         if not norm:
+            season_display = Season.get_display(wb.norm_season)
             raise ValidationError(
-                f"Не найдена норма для {car.number}, сезон={wb.norm_season}"
+                f"Не найдена норма для {car.number}, сезон={season_display}"
             )
 
         self.distance_total_km = self.distance_city_km + self.distance_area_km
@@ -1163,8 +1169,9 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             .first()
         )
         if not norm:
+            season_display = Season.get_display(wb.norm_season)
             raise ValidationError(
-                f"Не найдена норма для ПА {car.number}, сезон={wb.norm_season}"
+                f"Не найдена норма для {car.number}, сезон={season_display}"
             )
 
         self.distance_km = self.odometer_after - self.odometer_before

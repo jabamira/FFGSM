@@ -109,7 +109,7 @@ const form = ref({
   arrival_time: '',
   distance_city_km: 0,
   distance_area_km: 0,
-  fuel_refueled: null,
+  fuel_refueled: 0,
   fuel_used: 0
 });
 
@@ -136,14 +136,13 @@ const isFormValid = computed(() => {
     return !areFormAndOriginalEqual();
   }
   
-  // In add mode: enable if ANY field has content
+  // In add mode: enable if ANY field has content (excluding fuel_refueled which is optional)
   const hasAnyContent = 
     form.value.target.trim() !== '' ||
     form.value.departure_time.trim() !== '' ||
     form.value.arrival_time.trim() !== '' ||
     (form.value.distance_city_km !== null && form.value.distance_city_km !== '') ||
     (form.value.distance_area_km !== null && form.value.distance_area_km !== '') ||
-    (form.value.fuel_refueled !== null && form.value.fuel_refueled !== '') ||
     (form.value.fuel_used !== null && form.value.fuel_used !== '');
   
   return hasAnyContent;
@@ -206,6 +205,14 @@ const validateForm = () => {
     }
   }
 
+  // Validate fuel_refueled (only if provided)
+  if (form.value.fuel_refueled && form.value.fuel_refueled !== 0) {
+    if (form.value.fuel_refueled < 0) {
+      errors.value.fuel_refueled = 'Значение не может быть отрицательным';
+      isValid = false;
+    }
+  }
+
   // Validate fuel_used (only if provided)
   if (form.value.fuel_used !== null && form.value.fuel_used !== '') {
     if (form.value.fuel_used < 0) {
@@ -217,18 +224,27 @@ const validateForm = () => {
   return isValid;
 };
 
+// Получить текущее время в формате HH:MM
+const getCurrentTime = () => {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 const openAddModal = () => {
   isEditMode.value = false;
   originalData.value = null;
   clearErrors();
+  const currentTime = getCurrentTime();
   form.value = {
     id: null,
     target: '',
-    departure_time: '',
-    arrival_time: '',
+    departure_time: currentTime,
+    arrival_time: currentTime,
     distance_city_km: 0,
     distance_area_km: 0,
-    fuel_refueled: null,
+    fuel_refueled: 0,
     fuel_used: 0
   };
   showModal.value = true;
@@ -244,7 +260,7 @@ const openEditModal = (record) => {
     arrival_time: record.arrival_time || '',
     distance_city_km: record.distance_city_km || 0,
     distance_area_km: record.distance_area_km || 0,
-    fuel_refueled: record.fuel_refueled || null,
+    fuel_refueled: record.fuel_refueled || 0,
     fuel_used: record.fuel_used || 0
   };
   originalData.value = JSON.parse(JSON.stringify(form.value));
@@ -256,6 +272,42 @@ const closeModal = () => {
   clearErrors();
 };
 
+// Нормализовать время в формат HH:MM
+const normalizeTime = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return '';
+  
+  // Убедиться что время не пустая строка
+  const trimmed = timeStr.trim();
+  if (!trimmed) return '';
+  
+  // Если время в формате HH:MM:SS или HH:MM, извлечь HH:MM
+  const parts = trimmed.split(':');
+  if (parts.length >= 2) {
+    const hours = String(parseInt(parts[0] || 0)).padStart(2, '0');
+    const minutes = String(parseInt(parts[1] || 0)).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+  
+  return trimmed;
+};
+
+// Преобразовать топливо в число (default 0)
+const normalizeFuelRefueled = (value) => {
+  // Если значение null, undefined или пустая строка - вернуть 0
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+  
+  const num = parseFloat(value);
+  // Если NaN, вернуть 0
+  if (isNaN(num)) {
+    return 0;
+  }
+  
+  // Вернуть число
+  return num;
+};
+
 const submitForm = async () => {
   if (!validateForm()) {
     generalError.value = 'Пожалуйста исправьте ошибки в форме';
@@ -263,26 +315,33 @@ const submitForm = async () => {
   }
 
   try {
+    const departure_time = normalizeTime(form.value.departure_time);
+    const arrival_time = normalizeTime(form.value.arrival_time);
+    const fuel_refueled = normalizeFuelRefueled(form.value.fuel_refueled);
+    const fuel_used = form.value.fuel_used !== null && form.value.fuel_used !== '' 
+      ? parseFloat(form.value.fuel_used) 
+      : 0;
+    
     if (isEditMode.value) {
       await emit('edit', {
         id: form.value.id,
         target: form.value.target,
-        departure_time: form.value.departure_time,
-        arrival_time: form.value.arrival_time,
+        departure_time: departure_time,
+        arrival_time: arrival_time,
         distance_city_km: form.value.distance_city_km,
         distance_area_km: form.value.distance_area_km,
-        fuel_refueled: form.value.fuel_refueled,
-        fuel_used: form.value.fuel_used
+        fuel_refueled: fuel_refueled,
+        fuel_used: fuel_used
       });
     } else {
       await emit('add', {
         target: form.value.target,
-        departure_time: form.value.departure_time,
-        arrival_time: form.value.arrival_time,
+        departure_time: departure_time,
+        arrival_time: arrival_time,
         distance_city_km: form.value.distance_city_km,
         distance_area_km: form.value.distance_area_km,
-        fuel_refueled: form.value.fuel_refueled,
-        fuel_used: form.value.fuel_used
+        fuel_refueled: fuel_refueled,
+        fuel_used: fuel_used
       });
     }
     closeModal();

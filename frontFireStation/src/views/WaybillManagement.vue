@@ -22,11 +22,23 @@
           </div>
           <div class="text-center">
             <p :style="{ color: palette.medium }" class="text-xs uppercase">Автомобиль</p>
-            <p class="font-semibold text-lg" :style="{ color: palette.dark }">{{ carInfo?.number }}</p>
+            <p 
+              class="font-semibold text-lg cursor-pointer hover:opacity-70 transition-opacity" 
+              style="color: #2563EB"
+              @click="carType === 'fire-truck' ? openEditFireTruck() : openEditPassengerCar()"
+            >
+              {{ carInfo?.number }}
+            </p>
           </div>
           <div class="text-center">
             <p :style="{ color: palette.medium }" class="text-xs uppercase">Водитель</p>
-            <p class="font-semibold text-lg" :style="{ color: palette.dark }">{{ driverName }}</p>
+            <p 
+              class="font-semibold text-lg cursor-pointer hover:opacity-70 transition-opacity" 
+              style="color: #2563EB"
+              @click="openEditDriver()"
+            >
+              {{ driverName }}
+            </p>
           </div>
           <div class="text-center">
             <p :style="{ color: palette.medium }" class="text-xs uppercase">Дата</p>
@@ -184,6 +196,50 @@
   <PermissionDeniedModal ref="permissionDeniedModal" />
   <NoSelectionModal ref="noSelectionModal" />
   <ErrorModal ref="errorModalRef" />
+
+  <!-- Fire Truck Edit Modal -->
+  <FireTruckEditModal
+    ref="firetruckEditModalRef"
+    :is-open="showEditFireTruckModal"
+    :truck="editingFireTruck"
+    :original-truck="originalFireTruck"
+    :can-view-fire-trucks="auth.permissions.view_fire_trucks"
+    :has-odometer="editingFireTruck ? hasOdometer(editingFireTruck.id) : false"
+    @close="closeEditFireTruckModal"
+    @save="handleFireTruckEditSave"
+    @odometer-click="openOdometerFromEdit"
+  />
+
+  <!-- Passenger Car Edit Modal -->
+  <PassengerCarEditModal
+    ref="passengerCarEditModalRef"
+    :is-open="showEditPassengerCarModal"
+    :car="editingPassengerCar"
+    :original-car="originalPassengerCar"
+    :can-view-passenger-cars="auth.permissions.view_passenger_cars"
+    :has-odometer="editingPassengerCar ? hasOdometer(editingPassengerCar.id) : false"
+    @close="closeEditPassengerCarModal"
+    @save="handlePassengerCarEditSave"
+    @odometer-click="openOdometerFromEdit"
+  />
+
+  <!-- Odometer Modal -->
+  <OdometerModal
+    :is-open="showOdometerModal"
+    :car-id="odometerData.car"
+    :car-type="carType === 'fire-truck' ? 'fire-truck' : 'passenger-car'"
+    :is-required="isOdometerRequired"
+    :title="carType === 'fire-truck' ? 'Внесение стартовых данных о пожарной машине' : 'Внесение стартовых данных о легковом автомобиле'"
+    @close="closeOdometerModal"
+    @submitted="handleOdometerSubmitted"
+    @skipped="closeOdometerModal"
+  />
+
+  <!-- Driver Edit Modal -->
+  <UserEditModal
+    ref="driverEditModalRef"
+    @user-updated="handleDriverUpdated"
+  />
 </template>
 
 <script setup>
@@ -196,6 +252,10 @@ import CrudPanel from '../components/CrudPanel.vue';
 import DataTable from '../components/ui/DataTable.vue';
 import WaybillFieldsEditModal from '../components/WaybillFieldsEditModal.vue';
 import WaybillRecordEditModal from '../components/WaybillRecordEditModal.vue';
+import FireTruckEditModal from '../components/FireTruckEditModal.vue';
+import PassengerCarEditModal from '../components/PassengerCarEditModal.vue';
+import OdometerModal from '../components/OdometerModal.vue';
+import UserEditModal from '../components/UserEditModal.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import ErrorModal from '../components/ErrorModal.vue';
@@ -226,8 +286,34 @@ const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const waybillEditModal = ref(null);
 const recordEditModal = ref(null);
+const firetruckEditModalRef = ref(null);
+const passengerCarEditModalRef = ref(null);
+const odometerModalRef = ref(null);
 
-// Computed properties
+// Fire Truck Edit
+const showEditFireTruckModal = ref(false);
+const editingFireTruck = ref(null);
+const originalFireTruck = ref(null);
+
+// Passenger Car Edit
+const showEditPassengerCarModal = ref(false);
+const editingPassengerCar = ref(null);
+const originalPassengerCar = ref(null);
+
+// Driver Edit
+const showEditDriverModal = ref(false);
+const driverEditModalRef = ref(null);
+
+// Odometer Modal
+const showOdometerModal = ref(false);
+const isOdometerRequired = ref(false);
+const odometerData = ref({
+  car: null,
+  odometer: '',
+  fuel: '',
+  date: new Date().toISOString().split('T')[0]
+});
+
 const carInfo = computed(() => {
   if (carType.value === 'fire-truck') {
     return cars.value.find(c => c.id === waybill.value.car);
@@ -310,17 +396,24 @@ const deleteRecordsLabel = computed(() => {
 
 const isDeleteDisabled = computed(() => selectedRecordIds.value.length === 0);
 
+const canViewRecords = computed(() => {
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'view_fire_truck_waybills_records'
+    : 'view_passenger_cars_waybills_records';
+  return auth.permissions[permissionKey] || false;
+});
+
 const canCreateRecords = computed(() => {
   const permissionKey = carType.value === 'fire-truck'
-    ? 'can_create_fire_truck_records'
-    : 'can_create_passenger_car_records';
+    ? 'can_create_fire_truck_waybills_records'
+    : 'can_create_passenger_cars_waybills_records';
   return auth.permissions[permissionKey] || false;
 });
 
 const canDeleteRecords = computed(() => {
   const permissionKey = carType.value === 'fire-truck'
-    ? 'can_delete_fire_truck_records'
-    : 'can_delete_passenger_car_records';
+    ? 'can_delete_fire_truck_waybills_records'
+    : 'can_delete_passenger_cars_waybills_records';
   return auth.permissions[permissionKey] || false;
 });
 
@@ -348,7 +441,7 @@ const getRecordsEndpoint = () => {
 };
 
 const getCarListEndpoint = () => {
-  return carType.value === 'fire-truck' ? 'fire-trucks/?include_odometer=false' : 'passenger-cars/?include_odometer=false';
+  return carType.value === 'fire-truck' ? 'fire-trucks/?include_odometer=true' : 'passenger-cars/?include_odometer=true';
 };
 
 const fetchWaybill = async () => {
@@ -390,6 +483,13 @@ const fetchCars = async () => {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     cars.value = response.data;
+    console.log(`[WaybillManagement] Cars loaded (type: ${carType.value}):`, cars.value);
+    // Log odometer data
+    cars.value.forEach(car => {
+      if (car.odometer_fuel_records && car.odometer_fuel_records.length > 0) {
+        console.log(`[WaybillManagement] Car ${car.number} has ${car.odometer_fuel_records.length} odometer record(s)`);
+      }
+    });
   } catch (error) {
     console.error('Error loading cars:', error);
   }
@@ -424,10 +524,138 @@ const handleEditWaybill = async (waybillData) => {
   }
 };
 
+// Fire Truck Edit Methods
+const openEditFireTruck = () => {
+  if (!auth.permissions.can_update_fire_trucks) {
+    permissionDeniedModal.value?.openModal('can_update_fire_trucks');
+    return;
+  }
+  
+  if (!carInfo.value) return;
+  
+  console.log('[WaybillManagement] Opening fire truck edit modal:', carInfo.value);
+  if (carInfo.value.odometer_fuel_records) {
+    console.log('[WaybillManagement] Loaded odometer records:', carInfo.value.odometer_fuel_records);
+  }
+  
+  originalFireTruck.value = { ...carInfo.value };
+  editingFireTruck.value = { ...carInfo.value };
+  showEditFireTruckModal.value = true;
+};
+
+const closeEditFireTruckModal = () => {
+  showEditFireTruckModal.value = false;
+  editingFireTruck.value = null;
+  originalFireTruck.value = null;
+};
+
+const handleFireTruckEditSave = async () => {
+  if (firetruckEditModalRef.value) {
+    editingFireTruck.value = firetruckEditModalRef.value.getTruck();
+  }
+  
+  await updateFireTruck();
+};
+
+const updateFireTruck = async () => {
+  if (!auth.permissions.can_update_fire_trucks) {
+    permissionDeniedModal.value?.openModal('can_update_fire_trucks');
+    return;
+  }
+  
+  if (!editingFireTruck.value) return;
+  
+  try {
+    await axios.patch(`fire-trucks/${editingFireTruck.value.id}/`, editingFireTruck.value, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    
+    console.log('[WaybillManagement] Fire truck updated successfully');
+    await fetchCars();
+    closeEditFireTruckModal();
+  } catch (error) {
+    console.error('Error updating fire truck:', error);
+    errorModalRef.value?.openModal(error);
+  }
+};
+
+// Passenger Car Edit Methods
+const openEditPassengerCar = () => {
+  if (!auth.permissions.can_update_passenger_cars) {
+    permissionDeniedModal.value?.openModal('can_update_passenger_cars');
+    return;
+  }
+  
+  if (!carInfo.value) return;
+  
+  console.log('[WaybillManagement] Opening passenger car edit modal:', carInfo.value);
+  if (carInfo.value.odometer_fuel_records) {
+    console.log('[WaybillManagement] Loaded odometer records:', carInfo.value.odometer_fuel_records);
+  }
+  
+  originalPassengerCar.value = { ...carInfo.value };
+  editingPassengerCar.value = { ...carInfo.value };
+  showEditPassengerCarModal.value = true;
+};
+
+const closeEditPassengerCarModal = () => {
+  showEditPassengerCarModal.value = false;
+  editingPassengerCar.value = null;
+  originalPassengerCar.value = null;
+};
+
+const handlePassengerCarEditSave = async () => {
+  if (passengerCarEditModalRef.value) {
+    editingPassengerCar.value = passengerCarEditModalRef.value.getCar();
+  }
+  
+  await updatePassengerCar();
+};
+
+const updatePassengerCar = async () => {
+  if (!auth.permissions.can_update_passenger_cars) {
+    permissionDeniedModal.value?.openModal('can_update_passenger_cars');
+    return;
+  }
+  
+  if (!editingPassengerCar.value) return;
+  
+  try {
+    await axios.patch(`passenger-cars/${editingPassengerCar.value.id}/`, editingPassengerCar.value, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    
+    console.log('[WaybillManagement] Passenger car updated successfully');
+    await fetchCars();
+    closeEditPassengerCarModal();
+  } catch (error) {
+    console.error('Error updating passenger car:', error);
+    errorModalRef.value?.openModal(error);
+  }
+};
+
+// Driver Edit Methods
+const openEditDriver = () => {
+  if (!auth.permissions.can_update_users) {
+    permissionDeniedModal.value?.openModal('can_update_users');
+    return;
+  }
+  
+  if (!driverInfo.value) return;
+  
+  console.log('[WaybillManagement] Opening driver edit modal:', driverInfo.value);
+  driverEditModalRef.value?.openModal(driverInfo.value);
+};
+
+const handleDriverUpdated = async () => {
+  console.log('[WaybillManagement] Driver updated successfully');
+  await fetchDrivers();
+};
+
 const openAddRecord = () => {
   const permissionKey = carType.value === 'fire-truck'
-    ? 'can_create_fire_truck_records'
-    : 'can_create_passenger_car_records';
+    ? 'can_create_fire_truck_waybills_records'
+    : 'can_create_passenger_cars_waybills_records';
   
   if (!auth.permissions[permissionKey]) {
     permissionDeniedModal.value?.openModal(permissionKey);
@@ -487,8 +715,8 @@ const openDeleteRecordsModal = () => {
     return;
   }
   const permissionKey = carType.value === 'fire-truck'
-    ? 'can_delete_fire_truck_records'
-    : 'can_delete_passenger_car_records';
+    ? 'can_delete_fire_truck_waybills_records'
+    : 'can_delete_passenger_cars_waybills_records';
   
   if (!auth.permissions[permissionKey]) {
     permissionDeniedModal.value?.openModal(permissionKey);
@@ -528,23 +756,79 @@ const goBack = () => {
   router.back();
 };
 
+const fetchRecordsWithPermissionCheck = async () => {
+  if (!canViewRecords.value) {
+    permissionDeniedModal.value?.openModal('view records');
+    return;
+  }
+  await fetchRecords();
+};
+
 const setupCrudPermissions = () => {
   auth.setCrudPermissions({
-    canCreate: carType.value === 'fire-truck'
-      ? auth.permissions.can_create_fire_truck_waybills_record || false
-      : auth.permissions.can_create_passenger_cars_waybills_record || false,
-    canDelete: carType.value === 'fire-truck'
-      ? auth.permissions.can_delete_fire_truck_waybills_record || false
-      : auth.permissions.can_delete_passenger_cars_waybills_record || false
+    canCreate: canCreateRecords.value,
+    canDelete: canDeleteRecords.value
   });
+};
+
+// Odometer Modal Methods
+const openOdometerFromEdit = () => {
+  let carId = null;
+  let carNumber = null;
+  
+  // Определяем какая машина редактируется
+  if (carType.value === 'fire-truck' && editingFireTruck.value) {
+    carId = editingFireTruck.value.id;
+    carNumber = editingFireTruck.value.number;
+    closeEditFireTruckModal();
+  } else if (carType.value === 'passenger-car' && editingPassengerCar.value) {
+    carId = editingPassengerCar.value.id;
+    carNumber = editingPassengerCar.value.number;
+    closeEditPassengerCarModal();
+  }
+  
+  if (!carId) return;
+  
+  console.log(`[WaybillManagement] Opening odometer modal for car ${carNumber} (ID: ${carId})`);
+  
+  odometerData.value = {
+    car: carId,
+    odometer: '',
+    fuel: '',
+    date: new Date().toISOString().split('T')[0]
+  };
+  showOdometerModal.value = true;
+};
+
+const closeOdometerModal = () => {
+  showOdometerModal.value = false;
+  odometerData.value = {
+    car: null,
+    odometer: '',
+    fuel: '',
+    date: new Date().toISOString().split('T')[0]
+  };
+};
+
+const handleOdometerSubmitted = async () => {
+  console.log('[WaybillManagement] Odometer data saved successfully');
+  // Перезагружаем данные машин чтобы обновить статус одометра
+  await fetchCars();
+  closeOdometerModal();
+};
+
+// Check if car has odometer
+const hasOdometer = (carId) => {
+  const car = cars.value.find(c => c.id === carId);
+  return car && car.odometer_fuel_records && car.odometer_fuel_records.length > 0;
 };
 
 // Lifecycle
 onMounted(async () => {
-  const fetchTasks = [fetchWaybill(), fetchRecords(), fetchCars(), fetchDrivers()];
+  setupCrudPermissions();
+  const fetchTasks = [fetchWaybill(), fetchRecordsWithPermissionCheck(), fetchCars(), fetchDrivers()];
   
   await Promise.all(fetchTasks);
-  setupCrudPermissions();
 });
 
 onUnmounted(() => {

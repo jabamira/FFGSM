@@ -99,13 +99,21 @@ const openModal = (error) => {
   } else if (error.response?.data) {
     const data = error.response.data;
     errorTitle.value = 'Ошибка при сохранении';
-    errorMessage.value = data.detail || data.message || 'Проверьте заполненные данные';
     
-    // Парсим field errors
-    fieldErrors.value = [];
-    if (typeof data === 'object') {
+    // Обработка ValidationError (список строк)
+    if (Array.isArray(data)) {
+      errorMessage.value = data.length > 0 ? data[0] : 'Ошибка при сохранении данных';
+      fieldErrors.value = [];
+    } 
+    // Обработка объекта ошибок
+    else if (typeof data === 'object') {
+      // Ищем основное сообщение об ошибке
+      errorMessage.value = data.detail || data.message || data.non_field_errors?.[0] || 'Проверьте заполненные данные';
+      
+      // Парсим field errors
+      fieldErrors.value = [];
       Object.entries(data).forEach(([field, messages]) => {
-        if (field !== 'detail' && field !== 'message' && messages) {
+        if (field !== 'detail' && field !== 'message' && field !== 'non_field_errors' && messages) {
           const messageText = Array.isArray(messages) 
             ? messages.join(', ') 
             : String(messages);
@@ -115,6 +123,9 @@ const openModal = (error) => {
           });
         }
       });
+    } else {
+      errorMessage.value = 'Проверьте заполненные данные';
+      fieldErrors.value = [];
     }
   } else {
     errorTitle.value = 'Произошла ошибка';

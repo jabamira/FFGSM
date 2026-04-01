@@ -81,8 +81,8 @@ const defaults = {
 };
 
 const seasonOptions = [
-  { value: 'summer', label: 'лето' },
-  { value: 'winter', label: 'зима' },
+  { value: 'summer', label: 'Лето' },
+  { value: 'winter', label: 'Зима' },
 ];
 
 const records = ref([]);

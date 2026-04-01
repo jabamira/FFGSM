@@ -293,7 +293,7 @@ const addRole = async () => {
 const onRowClick = (role) => {
   // Проверка прав доступа
   const canUpdateRoles = auth.permissions.can_update_roles;
-  const canViewPermissions = auth.permissions.can_view_permissisons;
+  const canViewPermissions = auth.permissions.view_permissisons;
 
   // Если нет прав на обновление ролей и не может просматривать разрешения
   if (!canUpdateRoles && !canViewPermissions) {
@@ -417,11 +417,11 @@ const handleCrudDelete = () => {
 onMounted(() => {
    setupCrudPermissions();
     console.log("[Roles] User permissions:", auth.permissions); 
-   if (auth.permissions.can_view_roles) {
+   if (auth.permissions.view_roles) {
      fetchRoles();
   } else {
     console.warn("[Roles] User does not have permission to view roles.");
-    permissionDeniedModal.value?.openModal('can_view_roles');
+    permissionDeniedModal.value?.openModal('view_roles');
   }
   // Загружаем пользователей если есть право на просмотр
   if (auth.permissions.view_users) {
