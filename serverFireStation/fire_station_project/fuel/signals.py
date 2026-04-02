@@ -224,9 +224,9 @@ DEFAULT_ROLES = [
             "can_download_passenger_cars_waybills": False,
             "view_passenger_cars_waybills": True,
 
-            "can_create_passenger_cars_waybills_record": True,
-            "can_delete_passenger_cars_waybills_record": False,
-            "can_update_passenger_cars_waybills_record": False,
+            "can_create_passenger_cars_waybills_records": True,
+            "can_delete_passenger_cars_waybills_records": False,
+            "can_update_passenger_cars_waybills_records": False,
 
             "can_create_passenger_cars_norms": False,
             "can_delete_passenger_cars_norms": False,
