@@ -91,6 +91,9 @@ class Role(SoftDeleteModel):
 
     def __str__(self):
         return self.name
+    
+    class Meta:
+        db_table = 'role'
 
 
 class Permission(SoftDeleteModel):
@@ -179,6 +182,9 @@ class Permission(SoftDeleteModel):
 
     def __str__(self):
         return f"Права для роли {self.role.name}"
+    
+    class Meta:
+        db_table = 'permission'
 
 
 class User(SoftDeleteModel):
@@ -231,6 +237,9 @@ class User(SoftDeleteModel):
                 self.password = make_password(self.password)
 
         super().save(*args, **kwargs)
+    
+    class Meta:
+        db_table = 'user'
 
 
 class Season(models.TextChoices):
@@ -281,6 +290,9 @@ class PassengerCar(SoftDeleteModel):
 
     def __str__(self):
         return f"Легковой автомобиль {self.number}"
+    
+    class Meta:
+        db_table = 'passenger_car'
 
 
 class NormsPassengerCars(SoftDeleteModel):
@@ -321,6 +333,9 @@ class NormsPassengerCars(SoftDeleteModel):
 
     def __str__(self):
         return f"Норма {self.car.number} {self.season} от {self.date}"
+    
+    class Meta:
+        db_table = 'norms_passenger_cars'
 
 
 class PassengerCarWaybill(SoftDeleteModel):
@@ -421,6 +436,9 @@ class PassengerCarWaybill(SoftDeleteModel):
                 'savings',
                 'overrun',
             ])
+    
+    class Meta:
+        db_table = 'passenger_car_waybill'
 
 
 class OdometerFuelPassengerCar(SoftDeleteModel):
@@ -510,6 +528,9 @@ class OdometerFuelPassengerCar(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.car.number} {self.date}: {self.odometer} км, {self.fuel} л"
+    
+    class Meta:
+        db_table = 'odometer_fuel_passenger_car'
 
 
 class PassengerCarWaybillRecord(SoftDeleteModel):
@@ -633,6 +654,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
 
     class Meta:
         ordering = ["id"]
+        db_table = 'passenger_car_waybill_record'
 
     def _fill_start_values(self):
         wb = self.passenger_car_waybill
@@ -781,6 +803,9 @@ class FireTruck(SoftDeleteModel):
 
     def __str__(self):
         return f"Пожарный автомобиль с гос. номером {self.number}"
+    
+    class Meta:
+        db_table = 'fire_truck'
 
 
 class NormsFireTruck(SoftDeleteModel):
@@ -826,6 +851,9 @@ class NormsFireTruck(SoftDeleteModel):
 
     def __str__(self):
         return f"Норма {self.car.number} {self.season} от {self.date}"
+    
+    class Meta:
+        db_table = 'norms_fire_truck'
 
 
 class FireTruckWaybill(SoftDeleteModel):
@@ -921,6 +949,9 @@ class FireTruckWaybill(SoftDeleteModel):
                 'required_by_norm', 'availability_upon_delivery',
                 'savings', 'overrun'
             ])
+    
+    class Meta:
+        db_table = 'fire_truck_waybill'
 
 
 class OdometerFuelFireTruck(SoftDeleteModel):
@@ -1000,6 +1031,9 @@ class OdometerFuelFireTruck(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.car.number} {self.date}: {self.odometer} км, {self.fuel} л"
+    
+    class Meta:
+        db_table = 'odometer_fuel_fire_truck'
 
 
 class FireTruckWaybillRecord(SoftDeleteModel):
@@ -1138,6 +1172,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
 
     class Meta:
         ordering = ["id"]
+        db_table = 'fire_truck_waybill_record'
 
     def _fill_start_values(self):
         wb = self.fire_truck_waybill
@@ -1210,8 +1245,8 @@ class FireTruckWaybillRecord(SoftDeleteModel):
 
         increment = (
             Decimal(self.distance_km) * norm.km_norm +
-            Decimal(self.time_with_pump) * norm.with_pump_norm +
-            Decimal(self.time_without_pump) * norm.without_pump_norm
+            Decimal(self.time_with_pump / 60.0) * norm.with_pump_norm +
+            Decimal(self.time_without_pump / 60.0)
         )
 
         last_hours = (
@@ -1351,6 +1386,9 @@ class TechnicalMaintenance(SoftDeleteModel):
 
     def __str__(self):
         return f"{self.number} - {self.date} - {self.maintenance_type} - {self.car_type}"
+    
+    class Meta:
+        db_table = 'technical_maintenance'
 
 
 class NormsOperatingHoursFireTruck(SoftDeleteModel):
@@ -1382,6 +1420,9 @@ class NormsOperatingHoursFireTruck(SoftDeleteModel):
 
     def __str__(self):
         return f"Норма моточасов {self.car.number} от {self.date}"
+    
+    class Meta:
+        db_table = 'norms_operating_hours_fire_truck'
 
 
 class NormsOperatingHoursPassengerCar(SoftDeleteModel):
@@ -1415,6 +1456,9 @@ class NormsOperatingHoursPassengerCar(SoftDeleteModel):
 
     def __str__(self):
         return f"Норма моточасов {self.car.number} от {self.date}"
+    
+    class Meta:
+        db_table = 'norms_operating_hours_passenger_car'
 
 
 class NormsTechnicalMaintenance(SoftDeleteModel):
@@ -1449,6 +1493,9 @@ class NormsTechnicalMaintenance(SoftDeleteModel):
             raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
         if self.passenger_car and self.fire_truck:
             raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
+        
+    class Meta:
+        db_table = 'norms_technical_maintenance'
 
 
 class OperatingHoursCars(SoftDeleteModel):
@@ -1476,3 +1523,6 @@ class OperatingHoursCars(SoftDeleteModel):
             raise ValidationError("Нужно указать либо легковой, либо пожарный автомобиль.")
         if self.passenger_car and self.fire_truck:
             raise ValidationError("Нельзя указывать оба типа автомобиля одновременно.")
+        
+    class Meta:
+        db_table = 'operating_hours_cars'
