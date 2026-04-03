@@ -50,10 +50,14 @@
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="newUser.name" 
           :label="fieldDefinitions.userCreate.name.label" 
           :hint="fieldDefinitions.userCreate.name.hint"
+          :error="addFormErrors.name"
           placeholder="Введите имя"
           :required="fieldDefinitions.userCreate.name.required"
         />
@@ -61,6 +65,7 @@
           v-model="newUser.surname" 
           :label="fieldDefinitions.userCreate.surname.label" 
           :hint="fieldDefinitions.userCreate.surname.hint"
+          :error="addFormErrors.surname"
           placeholder="Введите фамилию"
           :required="fieldDefinitions.userCreate.surname.required"
         />
@@ -68,6 +73,7 @@
           v-model="newUser.last_name" 
           :label="fieldDefinitions.userCreate.last_name.label" 
           :hint="fieldDefinitions.userCreate.last_name.hint"
+          :error="addFormErrors.last_name"
           placeholder="Введите отчество"
           :required="fieldDefinitions.userCreate.last_name.required"
         />
@@ -75,6 +81,7 @@
           v-model="newUser.login" 
           :label="fieldDefinitions.userCreate.login.label" 
           :hint="fieldDefinitions.userCreate.login.hint"
+          :error="addFormErrors.login"
           placeholder="Введите логин"
           :required="fieldDefinitions.userCreate.login.required"
         />
@@ -82,6 +89,7 @@
           v-model="newUser.password" 
           :label="fieldDefinitions.userCreate.password.label" 
           :hint="fieldDefinitions.userCreate.password.hint"
+          :error="addFormErrors.password"
           placeholder="Введите пароль"
           type="password"
           :required="fieldDefinitions.userCreate.password.required"
@@ -90,6 +98,7 @@
           v-model="newUser.phone" 
           :label="fieldDefinitions.userCreate.phone.label" 
           :hint="fieldDefinitions.userCreate.phone.hint"
+          :error="addFormErrors.phone"
           placeholder="Введите телефон"
           :required="fieldDefinitions.userCreate.phone.required"
         />
@@ -97,6 +106,7 @@
           v-model="newUser.driver_license" 
           :label="fieldDefinitions.userCreate.driver_license.label" 
           :hint="fieldDefinitions.userCreate.driver_license.hint"
+          :error="addFormErrors.driver_license"
           placeholder="Введите номер удостоверения (опционально)"
           :required="fieldDefinitions.userCreate.driver_license.required"
         />
@@ -105,6 +115,8 @@
           v-model="newUser.role" 
           :label="fieldDefinitions.userCreate.role.label"
           :hint="fieldDefinitions.userCreate.role.hint"
+          :required="fieldDefinitions.userCreate.role.required"
+          :error="addFormErrors.role"
           :options="roleOptions"
         />
       </div>
@@ -222,6 +234,9 @@ const newUser = ref({
   role: null,
 });
 
+const addFormErrors = ref({});
+const addFormGeneralError = ref('');
+
 
 
 const roleOptions = computed(() => {
@@ -303,6 +318,8 @@ const openAddModal = () => {
 const closeAddModal = () => {
   showAddModal.value = false;
   resetNewUser();
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
 };
 
 const resetNewUser = () => {
@@ -319,6 +336,9 @@ const resetNewUser = () => {
 };
 
 const addUser = async () => {
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+
   if (!auth.permissions.can_create_users) {
     console.warn('Нет разрешения на создание пользователей.');
     return;
@@ -327,8 +347,8 @@ const addUser = async () => {
   // Полная валидация по field definitions
   const validationErrors = validateFormFields(newUser.value, fieldDefinitions.userCreate);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 

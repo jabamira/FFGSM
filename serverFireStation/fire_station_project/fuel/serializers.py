@@ -139,6 +139,37 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
             'overrun',
         ]
 
+    def validate(self, data):
+        """
+        Проверяем, что нет уже существующего путевого листа 
+        для этой машины, водителя и даты
+        """
+        car = data.get('car')
+        driver = data.get('driver')
+        date = data.get('date')
+        
+        if car and driver and date:
+            # Для обновления исключаем текущий объект
+            query = PassengerCarWaybill.objects.filter(
+                car=car,
+                driver=driver,
+                date=date,
+                deleted_at__isnull=True
+            )
+            
+            if self.instance:
+                query = query.exclude(pk=self.instance.pk)
+            
+            if query.exists():
+                driver_full_name = f"{driver.surname} {driver.name} {driver.last_name}".strip()
+                raise serializers.ValidationError(
+                    f"Путевой лист для машины {car.number}, "
+                    f"водителя {driver_full_name} "
+                    f"и даты {date.strftime('%d.%m.%Y')} уже существует."
+                )
+        
+        return data
+
 
 class PassengerCarWaybillRecordSerializer(FriendlyModelSerializer):
     class Meta:
@@ -199,6 +230,37 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
             'savings',
             'overrun',
         ]
+
+    def validate(self, data):
+        """
+        Проверяем, что нет уже существующего путевого листа 
+        для этой машины, водителя и даты
+        """
+        car = data.get('car')
+        driver = data.get('driver')
+        date = data.get('date')
+        
+        if car and driver and date:
+            # Для обновления исключаем текущий объект
+            query = FireTruckWaybill.objects.filter(
+                car=car,
+                driver=driver,
+                date=date,
+                deleted_at__isnull=True
+            )
+            
+            if self.instance:
+                query = query.exclude(pk=self.instance.pk)
+            
+            if query.exists():
+                driver_full_name = f"{driver.surname} {driver.name} {driver.last_name}".strip()
+                raise serializers.ValidationError(
+                    f"Путевой лист для машины {car.number}, "
+                    f"водителя {driver_full_name} "
+                    f"и даты {date.strftime('%d.%m.%Y')} уже существует."
+                )
+        
+        return data
 
 
 class FireTruckWaybillRecordSerializer(FriendlyModelSerializer):

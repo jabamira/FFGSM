@@ -62,10 +62,11 @@
         <DataTable
           :columns="columns"
           :data="filteredWaybills"
-          :selectedIds="selectedWaybillIds"
-          @select="(ids) => selectedWaybillIds = ids"
+          :selectable="true"
+          :show-select-all="false"
+          :selected-rows="getSelectedIndexes()"
+          @row-selected="onRowsSelected"
           @row-click="(waybill) => navigateToWaybill(waybill)"
-          :hideActions="false"
         >
           <template #cell-car="{ row }">
             {{ getCar(row.car)?.number || '-' }} ({{ getCar(row.car)?.brand }} {{ getCar(row.car)?.model }})
@@ -282,6 +283,16 @@ const openAddWaybillModal = () => {
   waybillModal.value?.openAddModal();
 };
 
+const getSelectedIndexes = () => {
+  return filteredWaybills.value
+    .map((waybill, index) => selectedWaybillIds.value.includes(waybill.id) ? index : -1)
+    .filter(idx => idx !== -1);
+};
+
+const onRowsSelected = (selectedIndexes) => {
+  selectedWaybillIds.value = selectedIndexes.map(idx => filteredWaybills.value[idx].id);
+};
+
 const openDeleteWaybillModal = () => {
   if (selectedWaybillIds.value.length === 0) {
     noSelectionModal.value?.openModal();
@@ -336,8 +347,19 @@ const handleAddWaybill = async (waybillData) => {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     await fetchWaybills();
+    waybillModal.value?.closeAddModal?.();
   } catch (error) {
-    errorModalRef.value?.openModal(error);
+    const response = error.response?.data;
+    
+    // Проверяем, есть ли сообщение об ошибке (включая дубликаты)
+    if (response?.detail) {
+      // Ошибка дубликата - показываем в форме, модал остаётся открыт
+      waybillModal.value?.setErrors({}, response.detail);
+    } else if (response?.non_field_errors?.[0]) {
+      waybillModal.value?.setErrors({}, response.non_field_errors[0]);
+    } else {
+      errorModalRef.value?.openModal(error);
+    }
   }
 };
 

@@ -50,10 +50,14 @@
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="newRole.name" 
           :label="fieldDefinitions.role.name.label" 
           :hint="fieldDefinitions.role.name.hint"
+          :error="addFormErrors.name"
           placeholder="Введите название роли"
           :required="fieldDefinitions.role.name.required"
         />
@@ -166,6 +170,9 @@ const newRole = ref({
   name: ''
 });
 
+const addFormErrors = ref({});
+const addFormGeneralError = ref('');
+
 const fetchRoles = async () => {
   try {
     const response = await axios.get('/roles/', { headers: { Authorization: `Bearer ${auth.access}` } });
@@ -251,10 +258,15 @@ const openAddModal = () => {
 const closeAddModal = () => {
   showAddModal.value = false;
   newRole.value = { name: '' };
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
 };
 
 // Создание роли с автоматическим созданием Permission
 const addRole = async () => {
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+
   if (!auth.permissions.can_create_roles) {
     console.warn('Нет разрешения на создание ролей.');
     return;
@@ -263,8 +275,8 @@ const addRole = async () => {
   // Полная валидация по field definitions
   const validationErrors = validateFormFields(newRole.value, fieldDefinitions.role);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 

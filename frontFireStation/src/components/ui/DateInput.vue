@@ -9,8 +9,9 @@
         ref="dateInput"
         type="text"
         class="w-full px-3 py-2 border rounded text-sm cursor-pointer"
+        :class="{ 'border-red-500 border-2': error }"
         :style="{ 
-          borderColor: palette.light, 
+          borderColor: error ? '#ef4444' : palette.light, 
           color: palette.dark,
           backgroundColor: 'white'
         }"
@@ -28,6 +29,9 @@
     </div>
     <div v-if="formattedDate" class="text-xs mt-1" :style="{ color: palette.medium }">
       Выбранная дата: {{ formattedDate }}
+    </div>
+    <div v-if="error" class="text-xs text-red-500 mt-1">
+      {{ error }}
     </div>
   </div>
 </template>
@@ -54,6 +58,10 @@ const props = defineProps({
   required: {
     type: Boolean,
     default: false
+  },
+  error: {
+    type: String,
+    default: ''
   }
 });
 

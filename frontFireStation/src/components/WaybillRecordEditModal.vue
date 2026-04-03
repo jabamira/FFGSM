@@ -7,83 +7,127 @@
       @close="closeModal"
     >
       <div class="space-y-4">
+        <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+        </div>
         <TextInput
           v-model="form.target"
-          label="Цель выезда"
+          :label="fieldDefinitions.waybillRecord.target.label"
+          :hint="fieldDefinitions.waybillRecord.target.hint"
           placeholder="Введите цель выезда"
-          :required="true"
-          :error="errors.target"
+          :required="fieldDefinitions.waybillRecord.target.required"
+          :error="formErrors.target"
         />
 
         <div class="time-input-full-width">
           <TimeInput
             v-model="form.departure_time"
-            label="Выезд"
-            :required="true"
-            :error="errors.departure_time"
+            :label="fieldDefinitions.waybillRecord.departure_time.label"
+            :hint="fieldDefinitions.waybillRecord.departure_time.hint"
+            :required="fieldDefinitions.waybillRecord.departure_time.required"
+            :error="formErrors.departure_time"
           />
         </div>
 
         <div class="time-input-full-width">
           <TimeInput
             v-model="form.arrival_time"
-            label="Прибытие"
-            :required="true"
-            :error="errors.arrival_time"
+            :label="fieldDefinitions.waybillRecord.arrival_time.label"
+            :hint="fieldDefinitions.waybillRecord.arrival_time.hint"
+            :required="fieldDefinitions.waybillRecord.arrival_time.required"
+            :error="formErrors.arrival_time"
           />
         </div>
 
         <TextInput
           v-model.number="form.distance_city_km"
-          label="Км по городу"
+          :label="fieldDefinitions.waybillRecord.distance_city_km.label"
+          :hint="fieldDefinitions.waybillRecord.distance_city_km.hint"
           type="number"
           placeholder="0"
           min="0"
-          :required="true"
-          :error="errors.distance_city_km"
+          :required="fieldDefinitions.waybillRecord.distance_city_km.required"
+          :error="formErrors.distance_city_km"
         />
 
         <TextInput
           v-model.number="form.distance_area_km"
-          label="Км по области"
+          :label="fieldDefinitions.waybillRecord.distance_area_km.label"
+          :hint="fieldDefinitions.waybillRecord.distance_area_km.hint"
           type="number"
           placeholder="0"
           min="0"
-          :required="true"
-          :error="errors.distance_area_km"
+          :required="fieldDefinitions.waybillRecord.distance_area_km.required"
+          :error="formErrors.distance_area_km"
         />
 
         <TextInput
           v-model.number="form.fuel_refueled"
-          label="Заправлено (л)"
+          :label="fieldDefinitions.waybillRecord.fuel_refueled.label"
+          :hint="fieldDefinitions.waybillRecord.fuel_refueled.hint"
           type="number"
           placeholder="0"
-          step="0.1"
+          step="0.001"
           min="0"
-          :error="errors.fuel_refueled"
+          :required="fieldDefinitions.waybillRecord.fuel_refueled.required"
+          :error="formErrors.fuel_refueled"
         />
 
         <TextInput
           v-model.number="form.fuel_used"
-          label="Израсходовано (л)"
+          :label="fieldDefinitions.waybillRecord.fuel_used.label"
+          :hint="fieldDefinitions.waybillRecord.fuel_used.hint"
           type="number"
           placeholder="0"
-          step="0.1"          min="0"          :required="true"
-          :error="errors.fuel_used"
+          step="0.001"
+          min="0"
+          :required="fieldDefinitions.waybillRecord.fuel_used.required"
+          :error="formErrors.fuel_used"
         />
 
-        <div v-if="generalError" class="text-sm text-red-600 bg-red-50 p-3 rounded">
-          {{ generalError }}
-        </div>
+        <!-- Fire Truck specific fields -->
+        <TextInput
+          v-if="isFireTruck"
+          v-model.number="form.odometer_after"
+          :label="fieldDefinitions.waybillRecord.odometer_after.label"
+          :hint="fieldDefinitions.waybillRecord.odometer_after.hint"
+          type="number"
+          placeholder="0"
+          min="0"
+          :required="fieldDefinitions.waybillRecord.odometer_after.required"
+          :error="formErrors.odometer_after"
+        />
+
+        <TextInput
+          v-if="isFireTruck"
+          v-model.number="form.time_with_pump"
+          :label="fieldDefinitions.waybillRecord.time_with_pump.label"
+          :hint="fieldDefinitions.waybillRecord.time_with_pump.hint"
+          type="number"
+          placeholder="0"
+          min="0"
+          :required="fieldDefinitions.waybillRecord.time_with_pump.required"
+          :error="formErrors.time_with_pump"
+        />
+
+        <TextInput
+          v-if="isFireTruck"
+          v-model.number="form.time_without_pump"
+          :label="fieldDefinitions.waybillRecord.time_without_pump.label"
+          :hint="fieldDefinitions.waybillRecord.time_without_pump.hint"
+          type="number"
+          placeholder="0"
+          min="0"
+          :required="fieldDefinitions.waybillRecord.time_without_pump.required"
+          :error="formErrors.time_without_pump"
+        />
+
+        
       </div>
 
       <template #footer>
         <Button @click="closeModal" variant="secondary">Отмена</Button>
-        <Button 
-          @click="submitForm" 
-          variant="primary"
-          :disabled="!isFormValid"
-        >
+        <Button @click="submitForm" variant="primary">
           {{ isEditMode ? 'Сохранить' : 'Добавить' }}
         </Button>
       </template>
@@ -94,8 +138,16 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput, TimeInput } from './ui/importUi';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields } from '../utils/errorUtils';
 
 const emit = defineEmits(['add', 'edit']);
+const props = defineProps({
+  isFireTruck: {
+    type: Boolean,
+    default: false
+  }
+});
 
 // Modal state
 const showModal = ref(false);
@@ -110,118 +162,58 @@ const form = ref({
   distance_city_km: 0,
   distance_area_km: 0,
   fuel_refueled: 0,
-  fuel_used: 0
+  fuel_used: 0,
+  odometer_after: 0,
+  time_with_pump: 0,
+  time_without_pump: 0
 });
 
 // Original data for comparison (edit mode)
 const originalData = ref(null);
 
 // Errors
-const errors = ref({
+const formErrors = ref({
   target: '',
   departure_time: '',
   arrival_time: '',
   distance_city_km: '',
   distance_area_km: '',
   fuel_refueled: '',
-  fuel_used: ''
+  fuel_used: '',
+  odometer_after: '',
+  time_with_pump: '',
+  time_without_pump: ''
 });
 
 const generalError = ref('');
 
-// Computed properties
-const isFormValid = computed(() => {
-  // In edit mode: form must differ from original
-  if (isEditMode.value) {
-    return !areFormAndOriginalEqual();
-  }
-  
-  // In add mode: enable if ANY field has content (excluding fuel_refueled which is optional)
-  const hasAnyContent = 
-    form.value.target.trim() !== '' ||
-    form.value.departure_time.trim() !== '' ||
-    form.value.arrival_time.trim() !== '' ||
-    (form.value.distance_city_km !== null && form.value.distance_city_km !== '') ||
-    (form.value.distance_area_km !== null && form.value.distance_area_km !== '') ||
-    (form.value.fuel_used !== null && form.value.fuel_used !== '');
-  
-  return hasAnyContent;
-});
+// Field definitions for validation (combine with isFireTruck-specific fields)
+const getValidationDefinitions = () => {
+  const base = {
+    target: fieldDefinitions.waybillRecord.target,
+    departure_time: fieldDefinitions.waybillRecord.departure_time,
+    arrival_time: fieldDefinitions.waybillRecord.arrival_time,
+    distance_city_km: fieldDefinitions.waybillRecord.distance_city_km,
+    distance_area_km: fieldDefinitions.waybillRecord.distance_area_km,
+    fuel_refueled: fieldDefinitions.waybillRecord.fuel_refueled,
+    fuel_used: fieldDefinitions.waybillRecord.fuel_used
+  };
 
-const areFormAndOriginalEqual = () => {
-  if (!originalData.value) return false;
-  return JSON.stringify(form.value) === JSON.stringify(originalData.value);
+  if (props.isFireTruck) {
+    base.odometer_after = fieldDefinitions.waybillRecord.odometer_after;
+    base.time_with_pump = fieldDefinitions.waybillRecord.time_with_pump;
+    base.time_without_pump = fieldDefinitions.waybillRecord.time_without_pump;
+  }
+
+  return base;
 };
 
 // Methods
-const validateTime = (timeStr) => {
-  // HTML5 time input format is already validated by the browser
-  // We just need to check if it's not empty
-  return timeStr.trim() !== '';
-};
-
 const clearErrors = () => {
-  Object.keys(errors.value).forEach(key => {
-    errors.value[key] = '';
+  Object.keys(formErrors.value).forEach(key => {
+    formErrors.value[key] = '';
   });
   generalError.value = '';
-};
-
-const validateForm = () => {
-  clearErrors();
-  let isValid = true;
-
-  // Validate target (only if provided)
-  if (form.value.target.trim() && form.value.target.trim().length < 2) {
-    errors.value.target = 'Цель выезда должна быть не менее 2 символов';
-    isValid = false;
-  }
-
-  // Validate departure_time (only if provided)
-  if (form.value.departure_time.trim() && !validateTime(form.value.departure_time)) {
-    errors.value.departure_time = 'Некорректное время выезда';
-    isValid = false;
-  }
-
-  // Validate arrival_time (only if provided)
-  if (form.value.arrival_time.trim() && !validateTime(form.value.arrival_time)) {
-    errors.value.arrival_time = 'Некорректное время прибытия';
-    isValid = false;
-  }
-
-  // Validate distance_city_km (only if provided)
-  if (form.value.distance_city_km !== null && form.value.distance_city_km !== '') {
-    if (form.value.distance_city_km < 0) {
-      errors.value.distance_city_km = 'Значение не может быть отрицательным';
-      isValid = false;
-    }
-  }
-
-  // Validate distance_area_km (only if provided)
-  if (form.value.distance_area_km !== null && form.value.distance_area_km !== '') {
-    if (form.value.distance_area_km < 0) {
-      errors.value.distance_area_km = 'Значение не может быть отрицательным';
-      isValid = false;
-    }
-  }
-
-  // Validate fuel_refueled (only if provided)
-  if (form.value.fuel_refueled && form.value.fuel_refueled !== 0) {
-    if (form.value.fuel_refueled < 0) {
-      errors.value.fuel_refueled = 'Значение не может быть отрицательным';
-      isValid = false;
-    }
-  }
-
-  // Validate fuel_used (only if provided)
-  if (form.value.fuel_used !== null && form.value.fuel_used !== '') {
-    if (form.value.fuel_used < 0) {
-      errors.value.fuel_used = 'Значение не может быть отрицательным';
-      isValid = false;
-    }
-  }
-
-  return isValid;
 };
 
 // Получить текущее время в формате HH:MM
@@ -245,7 +237,10 @@ const openAddModal = () => {
     distance_city_km: 0,
     distance_area_km: 0,
     fuel_refueled: 0,
-    fuel_used: 0
+    fuel_used: 0,
+    odometer_after: 0,
+    time_with_pump: 0,
+    time_without_pump: 0
   };
   showModal.value = true;
 };
@@ -261,7 +256,10 @@ const openEditModal = (record) => {
     distance_city_km: record.distance_city_km || 0,
     distance_area_km: record.distance_area_km || 0,
     fuel_refueled: record.fuel_refueled || 0,
-    fuel_used: record.fuel_used || 0
+    fuel_used: record.fuel_used || 0,
+    odometer_after: record.odometer_after || 0,
+    time_with_pump: record.time_with_pump || 0,
+    time_without_pump: record.time_without_pump || 0
   };
   originalData.value = JSON.parse(JSON.stringify(form.value));
   showModal.value = true;
@@ -272,82 +270,66 @@ const closeModal = () => {
   clearErrors();
 };
 
-// Нормализовать время в формат HH:MM
-const normalizeTime = (timeStr) => {
-  if (!timeStr || typeof timeStr !== 'string') return '';
-  
-  // Убедиться что время не пустая строка
-  const trimmed = timeStr.trim();
-  if (!trimmed) return '';
-  
-  // Если время в формате HH:MM:SS или HH:MM, извлечь HH:MM
-  const parts = trimmed.split(':');
-  if (parts.length >= 2) {
-    const hours = String(parseInt(parts[0] || 0)).padStart(2, '0');
-    const minutes = String(parseInt(parts[1] || 0)).padStart(2, '0');
-    return `${hours}:${minutes}`;
-  }
-  
-  return trimmed;
-};
-
-// Преобразовать топливо в число (default 0)
-const normalizeFuelRefueled = (value) => {
-  // Если значение null, undefined или пустая строка - вернуть 0
-  if (value === null || value === undefined || value === '') {
-    return 0;
-  }
-  
-  const num = parseFloat(value);
-  // Если NaN, вернуть 0
-  if (isNaN(num)) {
-    return 0;
-  }
-  
-  // Вернуть число
-  return num;
-};
-
 const submitForm = async () => {
-  if (!validateForm()) {
-    generalError.value = 'Пожалуйста исправьте ошибки в форме';
+  clearErrors();
+
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(form.value, getValidationDefinitions());
+  if (Object.keys(validationErrors).length > 0) {
+    formErrors.value = validationErrors;
+    generalError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
-  try {
-    const departure_time = normalizeTime(form.value.departure_time);
-    const arrival_time = normalizeTime(form.value.arrival_time);
-    const fuel_refueled = normalizeFuelRefueled(form.value.fuel_refueled);
-    const fuel_used = form.value.fuel_used !== null && form.value.fuel_used !== '' 
-      ? parseFloat(form.value.fuel_used) 
-      : 0;
-    
-    if (isEditMode.value) {
-      await emit('edit', {
-        id: form.value.id,
-        target: form.value.target,
-        departure_time: departure_time,
-        arrival_time: arrival_time,
-        distance_city_km: form.value.distance_city_km,
-        distance_area_km: form.value.distance_area_km,
-        fuel_refueled: fuel_refueled,
-        fuel_used: fuel_used
-      });
-    } else {
-      await emit('add', {
-        target: form.value.target,
-        departure_time: departure_time,
-        arrival_time: arrival_time,
-        distance_city_km: form.value.distance_city_km,
-        distance_area_km: form.value.distance_area_km,
-        fuel_refueled: fuel_refueled,
-        fuel_used: fuel_used
-      });
+  // Нормализовать время
+  const normalizeTime = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return '';
+    const trimmed = timeStr.trim();
+    if (!trimmed) return '';
+    const parts = trimmed.split(':');
+    if (parts.length >= 2) {
+      const hours = String(parseInt(parts[0] || 0)).padStart(2, '0');
+      const minutes = String(parseInt(parts[1] || 0)).padStart(2, '0');
+      return `${hours}:${minutes}`;
     }
-    closeModal();
-  } catch (error) {
-    generalError.value = error.message || 'Ошибка при сохранении записи';
+    return trimmed;
+  };
+
+  const departure_time = normalizeTime(form.value.departure_time);
+  const arrival_time = normalizeTime(form.value.arrival_time);
+  const fuel_refueled = form.value.fuel_refueled !== null && form.value.fuel_refueled !== '' 
+    ? parseFloat(form.value.fuel_refueled) 
+    : 0;
+  const fuel_used = form.value.fuel_used !== null && form.value.fuel_used !== '' 
+    ? parseFloat(form.value.fuel_used) 
+    : 0;
+  
+  const baseData = {
+    target: form.value.target,
+    departure_time: departure_time,
+    arrival_time: arrival_time,
+    distance_city_km: form.value.distance_city_km,
+    distance_area_km: form.value.distance_area_km,
+    fuel_refueled: fuel_refueled,
+    fuel_used: fuel_used
+  };
+
+  // Add fire truck specific fields if applicable
+  if (props.isFireTruck) {
+    baseData.odometer_after = form.value.odometer_after;
+    baseData.time_with_pump = form.value.time_with_pump;
+    baseData.time_without_pump = form.value.time_without_pump;
   }
+  
+  if (isEditMode.value) {
+    emit('edit', {
+      id: form.value.id,
+      ...baseData
+    });
+  } else {
+    emit('add', baseData);
+  }
+  closeModal();
 };
 
 // Expose methods

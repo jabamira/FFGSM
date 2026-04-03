@@ -25,10 +25,14 @@
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="newDriver.name" 
           :label="fieldDefinitions.driverCreate.name.label" 
           :hint="fieldDefinitions.driverCreate.name.hint"
+          :error="addFormErrors.name"
           placeholder="Введите имя"
           :required="fieldDefinitions.driverCreate.name.required"
         />
@@ -36,6 +40,7 @@
           v-model="newDriver.surname" 
           :label="fieldDefinitions.driverCreate.surname.label" 
           :hint="fieldDefinitions.driverCreate.surname.hint"
+          :error="addFormErrors.surname"
           placeholder="Введите фамилию"
           :required="fieldDefinitions.driverCreate.surname.required"
         />
@@ -43,6 +48,7 @@
           v-model="newDriver.last_name" 
           :label="fieldDefinitions.driverCreate.last_name.label" 
           :hint="fieldDefinitions.driverCreate.last_name.hint"
+          :error="addFormErrors.last_name"
           placeholder="Введите отчество"
           :required="fieldDefinitions.driverCreate.last_name.required"
         />
@@ -50,6 +56,7 @@
           v-model="newDriver.login" 
           :label="fieldDefinitions.driverCreate.login.label" 
           :hint="fieldDefinitions.driverCreate.login.hint"
+          :error="addFormErrors.login"
           placeholder="Введите логин"
           :required="fieldDefinitions.driverCreate.login.required"
         />
@@ -57,6 +64,7 @@
           v-model="newDriver.password" 
           :label="fieldDefinitions.driverCreate.password.label" 
           :hint="fieldDefinitions.driverCreate.password.hint"
+          :error="addFormErrors.password"
           placeholder="Введите пароль"
           type="password"
           :required="fieldDefinitions.driverCreate.password.required"
@@ -65,6 +73,7 @@
           v-model="newDriver.phone" 
           :label="fieldDefinitions.driverCreate.phone.label" 
           :hint="fieldDefinitions.driverCreate.phone.hint"
+          :error="addFormErrors.phone"
           placeholder="Введите телефон"
           :required="fieldDefinitions.driverCreate.phone.required"
         />
@@ -72,6 +81,7 @@
           v-model="newDriver.driver_license" 
           :label="fieldDefinitions.driverCreate.driver_license.label" 
           :hint="fieldDefinitions.driverCreate.driver_license.hint"
+          :error="addFormErrors.driver_license"
           placeholder="Введите номер удостоверения"
           :required="fieldDefinitions.driverCreate.driver_license.required"
         />
@@ -111,10 +121,14 @@
       @close="closeEditModal"
     >
       <div v-if="editingDriver" class="space-y-4 min-w-96">
+        <div v-if="editFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ editFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="editingDriver.name" 
           :label="fieldDefinitions.driverEdit.name.label" 
           :hint="fieldDefinitions.driverEdit.name.hint"
+          :error="editFormErrors.name"
           placeholder="Введите имя"
           :required="fieldDefinitions.driverEdit.name.required"
         />
@@ -122,6 +136,7 @@
           v-model="editingDriver.surname" 
           :label="fieldDefinitions.driverEdit.surname.label" 
           :hint="fieldDefinitions.driverEdit.surname.hint"
+          :error="editFormErrors.surname"
           placeholder="Введите фамилию"
           :required="fieldDefinitions.driverEdit.surname.required"
         />
@@ -129,6 +144,7 @@
           v-model="editingDriver.last_name" 
           :label="fieldDefinitions.driverEdit.last_name.label" 
           :hint="fieldDefinitions.driverEdit.last_name.hint"
+          :error="editFormErrors.last_name"
           placeholder="Введите отчество"
           :required="fieldDefinitions.driverEdit.last_name.required"
         />
@@ -136,6 +152,7 @@
           v-model="editingDriver.login" 
           :label="fieldDefinitions.driverEdit.login.label" 
           :hint="fieldDefinitions.driverEdit.login.hint"
+          :error="editFormErrors.login"
           placeholder="Введите логин"
           :required="fieldDefinitions.driverEdit.login.required"
         />
@@ -143,6 +160,7 @@
           v-model="editingDriver.password" 
           :label="fieldDefinitions.driverEdit.password.label" 
           :hint="fieldDefinitions.driverEdit.password.hint"
+          :error="editFormErrors.password"
           placeholder="Введите пароль (оставьте пустым, чтобы не менять)"
           type="password"
           :required="fieldDefinitions.driverEdit.password.required"
@@ -151,6 +169,7 @@
           v-model="editingDriver.phone" 
           :label="fieldDefinitions.driverEdit.phone.label" 
           :hint="fieldDefinitions.driverEdit.phone.hint"
+          :error="editFormErrors.phone"
           placeholder="Введите телефон"
           :required="fieldDefinitions.driverEdit.phone.required"
         />
@@ -158,6 +177,7 @@
           v-model="editingDriver.driver_license" 
           :label="fieldDefinitions.driverEdit.driver_license.label" 
           :hint="fieldDefinitions.driverEdit.driver_license.hint"
+          :error="editFormErrors.driver_license"
           placeholder="Введите номер удостоверения"
           :required="fieldDefinitions.driverEdit.driver_license.required"
         />
@@ -234,6 +254,11 @@ const newDriver = ref({
   role: 3,
 });
 
+const addFormErrors = ref({});
+const editFormErrors = ref({});
+const addFormGeneralError = ref('');
+const editFormGeneralError = ref('');
+
 const fetchDrivers = async () => {
   // Проверяем разрешение view_drivers
   if (!auth.permissions.view_drivers) {
@@ -274,6 +299,8 @@ const openAddModal = () => {
 const closeAddModal = () => {
   showAddModal.value = false;
   resetNewDriver();
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
 };
 
 const resetNewDriver = () => {
@@ -290,6 +317,9 @@ const resetNewDriver = () => {
 };
 
 const addDriver = async () => {
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+
   if (!auth.permissions.can_create_users) {
     console.warn('Нет разрешения на создание водителей.');
     return;
@@ -298,8 +328,8 @@ const addDriver = async () => {
   // Валидация полей на клиенте
   const validationErrors = validateFormFields(newDriver.value, fieldDefinitions.driverCreate);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
@@ -346,6 +376,8 @@ const closeEditModal = () => {
   showEditModal.value = false;
   editingDriver.value = null;
   originalDriver.value = null;
+  editFormErrors.value = {};
+  editFormGeneralError.value = '';
 };
 
 const hasDriverChanged = () => {
@@ -354,6 +386,9 @@ const hasDriverChanged = () => {
 };
 
 const updateDriver = async () => {
+  editFormGeneralError.value = '';
+  editFormErrors.value = {};
+
   if (!auth.permissions.can_update_users) {
     console.warn('Нет разрешения на редактирование водителей.');
     return;
@@ -371,8 +406,8 @@ const updateDriver = async () => {
   // Валидация полей на клиенте
   const validationErrors = validateFormFields(editingDriver.value, fieldDefinitions.driverEdit);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    editFormErrors.value = validationErrors;
+    editFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 

@@ -45,8 +45,9 @@
               v-if="selectable"
               type="checkbox"
               :checked="selectedRows.includes(idx)"
-              @change="toggleRow(idx)"
-              @click.stop
+              @mousedown.stop.prevent="onCheckboxMouseDown(idx)"
+              @mouseover="onCheckboxMouseOver(idx)"
+              @click.stop.prevent
               class="w-4 h-4 cursor-pointer"
             />
           </td>
@@ -116,7 +117,7 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { palette } from './theme';
 
 export default {
@@ -159,6 +160,10 @@ export default {
     const sortKey = ref(null);
     const sortOrder = ref('asc');
     const selectedRows = ref([]);
+    const isDragging = ref(false);
+    const dragStartIdx = ref(null);
+    const dragMode = ref(null); // 'select' или 'unselect'
+    const selectedRowsBeforeDrag = ref([]); // Состояние до начала drag
 
     const sortedData = computed(() => {
       if (!sortKey.value) return [...props.data];
@@ -244,6 +249,80 @@ export default {
       return value || '-';
     };
 
+    const onCheckboxMouseDown = (idx) => {
+      // Определяем режим только один раз при mousedown
+      const isSelected = selectedRows.value.includes(idx);
+      dragMode.value = isSelected ? 'unselect' : 'select';
+      
+      // Сохраняем состояние ДО начала drag
+      selectedRowsBeforeDrag.value = [...selectedRows.value];
+      
+      isDragging.value = true;
+      dragStartIdx.value = idx;
+      
+      // Применяем режим к стартовой строке
+      if (dragMode.value === 'select') {
+        if (!selectedRows.value.includes(idx)) {
+          selectedRows.value.push(idx);
+        }
+      } else {
+        const index = selectedRows.value.indexOf(idx);
+        if (index > -1) {
+          selectedRows.value.splice(index, 1);
+        }
+      }
+    };
+
+    const onCheckboxMouseOver = (idx) => {
+      if (!isDragging.value || dragStartIdx.value === null || !dragMode.value) return;
+
+      // Восстанавливаем состояние ДО drag
+      selectedRows.value = [...selectedRowsBeforeDrag.value];
+
+      const start = Math.min(dragStartIdx.value, idx);
+      const end = Math.max(dragStartIdx.value, idx);
+
+      if (dragMode.value === 'select') {
+        // Выбираем все строки от start до end
+        for (let i = start; i <= end; i++) {
+          if (!selectedRows.value.includes(i)) {
+            selectedRows.value.push(i);
+          }
+        }
+      } else {
+        // Удаляем все строки от start до end
+        for (let i = start; i <= end; i++) {
+          const index = selectedRows.value.indexOf(i);
+          if (index > -1) {
+            selectedRows.value.splice(index, 1);
+          }
+        }
+      }
+    };
+
+    // Завершить drag на mouseup
+    const handleMouseUp = () => {
+      if (isDragging.value) {
+        isDragging.value = false;
+        dragStartIdx.value = null;
+        dragMode.value = null;
+        selectedRowsBeforeDrag.value = [];
+        emit('row-selected', selectedRows.value);
+      }
+    };
+
+    // Добавить listener для mouseup на document
+    if (typeof window !== 'undefined') {
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    // Очистить listener при unmount
+    onUnmounted(() => {
+      if (typeof window !== 'undefined') {
+        document.removeEventListener('mouseup', handleMouseUp);
+      }
+    });
+
     return {
       palette,
       currentPage,
@@ -259,6 +338,8 @@ export default {
       prevPage,
       nextPage,
       formatValue,
+      onCheckboxMouseDown,
+      onCheckboxMouseOver,
     };
   },
 };

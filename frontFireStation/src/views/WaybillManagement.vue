@@ -52,15 +52,24 @@
           </div>
         </div>
 
-        <!-- Edit Button -->
+        <!-- Edit and Delete Buttons -->
         <div class="mt-4 pt-4 border-t" :style="{ borderColor: palette.light }">
-          <Button
-            @click="openEditModal"
-            variant="primary"
-            size="md"
-          >
-            Редактировать путевой лист
-          </Button>
+          <div class="flex gap-3">
+            <Button
+              @click="openEditModal"
+              variant="primary"
+              size="md"
+            >
+              Редактировать путевой лист
+            </Button>
+            <Button
+              @click="openDeleteWaybillModal"
+              variant="danger"
+              size="md"
+            >
+              Удалить путевой лист
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -168,6 +177,7 @@
   <!-- Add/Edit Record Modal -->
   <WaybillRecordEditModal
     ref="recordEditModal"
+    :is-fire-truck="carType === 'fire-truck'"
     @add="handleAddRecord"
     @edit="handleEditRecord"
   />
@@ -189,6 +199,24 @@
     <template #footer>
       <Button variant="secondary" size="md" @click="closeDeleteRecordsModal">Отмена</Button>
       <Button variant="danger" size="md" @click="confirmDeleteRecords">Удалить</Button>
+    </template>
+  </Modal>
+
+  <!-- Delete Waybill Modal -->
+  <Modal
+    :isOpen="showDeleteWaybillModal"
+    title="Подтверждение удаления"
+    @close="closeDeleteWaybillModal"
+  >
+    <p :style="{ color: palette.dark }">Вы уверены что хотите удалить путевой лист №{{ waybill.number }}?</p>
+    <div class="bg-red-50 border border-red-200 rounded p-4 mt-4">
+      <p :style="{ color: palette.dark }">
+        Это действие удалит путевой лист и все его записи. Отменить это действие невозможно.
+      </p>
+    </div>
+    <template #footer>
+      <Button variant="secondary" size="md" @click="closeDeleteWaybillModal">Отмена</Button>
+      <Button variant="danger" size="md" @click="confirmDeleteWaybill">Удалить</Button>
     </template>
   </Modal>
 
@@ -240,6 +268,17 @@
     ref="driverEditModalRef"
     @user-updated="handleDriverUpdated"
   />
+
+  <!-- Fire Truck Norm Modal -->
+  <FireTruckNormModal
+    ref="firetruckNormModalRef"
+    :is-open="showFireTruckNormModal"
+    :car-id="normData.carId"
+    :car-number="normData.carNumber"
+    :season="normData.season"
+    @close="showFireTruckNormModal = false"
+    @success="handleNormAddSuccess"
+  />
 </template>
 
 <script setup>
@@ -259,6 +298,7 @@ import UserEditModal from '../components/UserEditModal.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import NoSelectionModal from '../components/NoSelectionModal.vue';
 import ErrorModal from '../components/ErrorModal.vue';
+import FireTruckNormModal from '../components/FireTruckNormModal.vue';
 import axios from 'axios';
 
 const auth = useAuthStore();
@@ -281,6 +321,7 @@ const carType = computed(() => {
 // Selection and Modals
 const selectedRecordIds = ref([]);
 const showDeleteRecordsModal = ref(false);
+const showDeleteWaybillModal = ref(false);
 const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
@@ -312,6 +353,16 @@ const odometerData = ref({
   odometer: '',
   fuel: '',
   date: new Date().toISOString().split('T')[0]
+});
+
+// Fire Truck Norm Modal
+const showFireTruckNormModal = ref(false);
+const firetruckNormModalRef = ref(null);
+const pendingRecordData = ref(null);
+const normData = ref({
+  carId: null,
+  carNumber: '',
+  season: ''
 });
 
 const carInfo = computed(() => {
@@ -478,6 +529,13 @@ const fetchRecords = async () => {
 };
 
 const fetchCars = async () => {
+  // Check permissions before fetching
+  const viewPermission = carType.value === 'fire-truck' ? 'view_fire_trucks' : 'view_passenger_cars';
+  if (!auth.permissions[viewPermission]) {
+    console.warn(`No permission to view ${carType.value === 'fire-truck' ? 'fire trucks' : 'passenger cars'}`);
+    return;
+  }
+  
   try {
     const response = await axios.get(getCarListEndpoint(), {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -496,6 +554,12 @@ const fetchCars = async () => {
 };
 
 const fetchDrivers = async () => {
+  // Check permissions before fetching
+  if (!auth.permissions.view_drivers && !auth.permissions.view_users) {
+    console.warn('No permission to view drivers or users');
+    return;
+  }
+  
   try {
     const response = await axios.get('users/drivers/', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -508,10 +572,30 @@ const fetchDrivers = async () => {
 };
 
 const openEditModal = () => {
+  // Check permissions before opening edit modal
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_update_fire_truck_waybills'
+    : 'can_update_passenger_cars_waybills';
+  
+  if (!auth.permissions[permissionKey]) {
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
+  
   waybillEditModal.value?.openEditModal(waybill.value);
 };
 
 const handleEditWaybill = async (waybillData) => {
+  // Check permissions before editing
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_update_fire_truck_waybills'
+    : 'can_update_passenger_cars_waybills';
+  
+  if (!auth.permissions[permissionKey]) {
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
+
   try {
     await axios.patch(getEndpoint(), waybillData, {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -636,7 +720,8 @@ const updatePassengerCar = async () => {
 
 // Driver Edit Methods
 const openEditDriver = () => {
-  if (!auth.permissions.can_update_users) {
+  // Check permissions - need to be able to view drivers/users and update users
+  if ((!auth.permissions.view_drivers && !auth.permissions.view_users) || !auth.permissions.can_update_users) {
     permissionDeniedModal.value?.openModal('can_update_users');
     return;
   }
@@ -669,6 +754,16 @@ const openEditRecord = (record) => {
 };
 
 const handleAddRecord = async (recordData) => {
+  // Check permissions before adding
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_create_fire_truck_waybills_records'
+    : 'can_create_passenger_cars_waybills_records';
+  
+  if (!auth.permissions[permissionKey]) {
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
+
   try {
     const endpoint = carType.value === 'fire-truck'
       ? 'fire-truck-records/'
@@ -687,11 +782,48 @@ const handleAddRecord = async (recordData) => {
     await fetchRecords();
   } catch (error) {
     console.error('Error adding record:', error);
+    
+    // Check if this is a missing norm error for fire truck
+    if (carType.value === 'fire-truck' && error.response?.data?.non_field_errors) {
+      const errorMsg = error.response.data.non_field_errors[0];
+      if (errorMsg && typeof errorMsg === 'string' && errorMsg.includes('Не найдена норма')) {
+        // Extract car number and season from error message
+        const match = errorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
+        if (match) {
+          const carNumber = match[1];
+          const seasonDisplay = match[2];
+          const season = seasonDisplay === 'Лето' ? 'summer' : 'winter';
+          
+          // Store the pending record data
+          pendingRecordData.value = recordData;
+          
+          // Show the norm modal
+          normData.value = {
+            carId: waybill.value.car,
+            carNumber: carNumber,
+            season: season
+          };
+          showFireTruckNormModal.value = true;
+          return;
+        }
+      }
+    }
+    
     errorModalRef.value?.openModal(error);
   }
 };
 
 const handleEditRecord = async (recordData) => {
+  // Check permissions before editing
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_update_fire_truck_waybills_records'
+    : 'can_update_passenger_cars_waybills_records';
+  
+  if (!auth.permissions[permissionKey]) {
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
+
   try {
     const endpoint = carType.value === 'fire-truck'
       ? `fire-truck-records/${recordData.id}/`
@@ -705,6 +837,33 @@ const handleEditRecord = async (recordData) => {
     await fetchRecords();
   } catch (error) {
     console.error('Error updating record:', error);
+    
+    // Check if this is a missing norm error for fire truck
+    if (carType.value === 'fire-truck' && error.response?.data?.non_field_errors) {
+      const errorMsg = error.response.data.non_field_errors[0];
+      if (errorMsg && typeof errorMsg === 'string' && errorMsg.includes('Не найдена норма')) {
+        // Extract car number and season from error message
+        const match = errorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
+        if (match) {
+          const carNumber = match[1];
+          const seasonDisplay = match[2];
+          const season = seasonDisplay === 'Лето' ? 'summer' : 'winter';
+          
+          // Store the pending record data
+          pendingRecordData.value = recordData;
+          
+          // Show the norm modal
+          normData.value = {
+            carId: waybill.value.car,
+            carNumber: carNumber,
+            season: season
+          };
+          showFireTruckNormModal.value = true;
+          return;
+        }
+      }
+    }
+    
     errorModalRef.value?.openModal(error);
   }
 };
@@ -749,6 +908,38 @@ const confirmDeleteRecords = async () => {
     console.error('Error deleting records:', error);
     errorModalRef.value?.openModal(error);
     closeDeleteRecordsModal();
+  }
+};
+
+const openDeleteWaybillModal = () => {
+  if (!auth.permissions.can_delete_fire_truck_waybills && !auth.permissions.can_delete_passenger_cars_waybills) {
+    permissionDeniedModal.value?.openModal('can_delete_waybills');
+    return;
+  }
+  showDeleteWaybillModal.value = true;
+};
+
+const closeDeleteWaybillModal = () => {
+  showDeleteWaybillModal.value = false;
+};
+
+const confirmDeleteWaybill = async () => {
+  try {
+    const endpoint = carType.value === 'fire-truck'
+      ? `fire-truck-waybills/${waybill.value.id}/`
+      : `passenger-car-waybills/${waybill.value.id}/`;
+    
+    await axios.delete(endpoint, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    
+    console.log('[WaybillManagement] Waybill deleted successfully');
+    closeDeleteWaybillModal();
+    goBack();
+  } catch (error) {
+    console.error('Error deleting waybill:', error);
+    errorModalRef.value?.openModal(error);
+    closeDeleteWaybillModal();
   }
 };
 
@@ -821,6 +1012,26 @@ const handleOdometerSubmitted = async () => {
 const hasOdometer = (carId) => {
   const car = cars.value.find(c => c.id === carId);
   return car && car.odometer_fuel_records && car.odometer_fuel_records.length > 0;
+};
+
+// Fire Truck Norm Handle
+const handleNormAddSuccess = async () => {
+  console.log('[WaybillManagement] Norm added successfully, retrying record save');
+  showFireTruckNormModal.value = false;
+  
+  // Retry saving the pending record after a short delay
+  setTimeout(async () => {
+    if (recordEditModal.value && pendingRecordData.value) {
+      if (pendingRecordData.value.id) {
+        // It was an edit
+        await handleEditRecord(pendingRecordData.value);
+      } else {
+        // It was an add
+        await handleAddRecord(pendingRecordData.value);
+      }
+      pendingRecordData.value = null;
+    }
+  }, 500);
 };
 
 // Lifecycle

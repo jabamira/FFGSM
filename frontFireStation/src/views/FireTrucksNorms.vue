@@ -119,7 +119,7 @@
           </div>
           <div class="flex gap-2 mb-4">
             <Button
-              v-if="auth.permissions.can_view_operating_hours"
+              v-if="auth.permissions.view_operating_hours"
               variant="primary"
               size="sm"
               @click="openCreateOperatingHoursModal"
@@ -127,7 +127,7 @@
               + Создать коэффициент
             </Button>
             <Button
-              v-if="auth.permissions.can_view_operating_hours"
+              v-if="auth.permissions.view_operating_hours"
               variant="danger"
               size="sm"
               @click="openDeleteOperatingHoursModal"
@@ -480,8 +480,8 @@ const fetchFuelNorms = async () => {
 };
 
 const fetchOperatingHoursNorms = async () => {
-  if (!auth.permissions.can_view_operating_hours) {
-    permissionDeniedModal.value?.openModal('can_view_operating_hours');
+  if (!auth.permissions.view_operating_hours) {
+    permissionDeniedModal.value?.openModal('view_operating_hours');
     return;
   }
   try {
@@ -551,8 +551,8 @@ const openDeleteOperatingHoursModal = () => {
   if (selectedOperatingHourIds.value.length === 0) {
     return;
   }
-  if (!auth.permissions.can_view_operating_hours) {
-    permissionDeniedModal.value?.openModal('can_view_operating_hours');
+  if (!auth.permissions.view_operating_hours) {
+    permissionDeniedModal.value?.openModal('view_operating_hours');
     return;
   }
   showDeleteOperatingHoursModal.value = true;

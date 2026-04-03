@@ -22,7 +22,7 @@ export const fieldDefinitions = {
     },
     last_name: {
       label: "Отчество",
-      required: false,
+      required: true,
       maxLength: 40,
       hint: "До 40 символов",
     },
@@ -43,7 +43,7 @@ export const fieldDefinitions = {
     },
     phone: {
       label: "Телефон",
-      required: false,
+      required: true,
       minLength: 11,
       maxLength: 11,
       unique: true,
@@ -61,7 +61,7 @@ export const fieldDefinitions = {
     },
     role: {
       label: "Роль",
-      required: false,
+      required: true,
       hint: "Выберите роль пользователя",
     },
   },
@@ -82,7 +82,7 @@ export const fieldDefinitions = {
     },
     last_name: {
       label: "Отчество",
-      required: false,
+      required: true,
       maxLength: 40,
       hint: "До 40 символов",
     },
@@ -102,7 +102,7 @@ export const fieldDefinitions = {
     },
     phone: {
       label: "Телефон",
-      required: false,
+      required: true,
       minLength: 11,
       maxLength: 11,
       unique: true,
@@ -120,7 +120,7 @@ export const fieldDefinitions = {
     },
     role: {
       label: "Роль",
-      required: false,
+      required: true,
       hint: "Выберите роль пользователя",
     },
   },
@@ -139,7 +139,7 @@ export const fieldDefinitions = {
     },
     last_name: {
       label: "Отчество",
-      required: false,
+      required: true,
       maxLength: 40,
       hint: "До 40 символов",
     },
@@ -160,7 +160,7 @@ export const fieldDefinitions = {
     },
     phone: {
       label: "Телефон",
-      required: false,
+      required: true,
       minLength: 11,
       maxLength: 11,
       unique: true,
@@ -178,7 +178,7 @@ export const fieldDefinitions = {
     },
     role: {
       label: "Роль",
-      required: false,
+      required: true,
       hint: "Выберите роль пользователя",
     },
   },
@@ -198,7 +198,7 @@ export const fieldDefinitions = {
     },
     last_name: {
       label: "Отчество",
-      required: false,
+      required: true,
       maxLength: 40,
       hint: "До 40 символов",
     },
@@ -219,7 +219,7 @@ export const fieldDefinitions = {
     },
     phone: {
       label: "Телефон",
-      required: false,
+      required: true,
       minLength: 11,
       maxLength: 11,
       unique: true,
@@ -237,7 +237,7 @@ export const fieldDefinitions = {
     },
     role: {
       label: "Роль",
-      required: false,
+      required: true,
       hint: "Выберите роль пользователя",
     },
   },
@@ -361,7 +361,7 @@ export const fieldDefinitions = {
     },
     with_pump_norm: {
       label: "Норма с насосом (л/мин)",
-      required: false,
+      required: true,
       type: "decimal",
       minValue: 0,
       maxDigits: 4,
@@ -370,7 +370,7 @@ export const fieldDefinitions = {
     },
     without_pump_norm: {
       label: "Норма без насоса (л/мин)",
-      required: false,
+      required: true,
       type: "decimal",
       minValue: 0,
       maxDigits: 4,
@@ -379,7 +379,7 @@ export const fieldDefinitions = {
     },
     km_norm: {
       label: "Норма по пробегу (л/км)",
-      required: false,
+      required: true,
       type: "decimal",
       minValue: 0,
       maxDigits: 4,
@@ -450,6 +450,33 @@ export const fieldDefinitions = {
       decimalPlaces: 3,
       hint: "Минимум 0, до 3 знаков после запятой/точки",
     },
+    odometer_after: {
+      label: "Одометр после возвращения (км)",
+      required: true,
+      type: "integer",
+      minValue: 0,
+      maxValue: 999999,
+      onlyDigits: true,
+      hint: "Только цифры, максимум 999999 (обязательно для пожарной машины)",
+    },
+    time_with_pump: {
+      label: "Время работы с насосом (мин)",
+      required: true,
+      type: "integer",
+      minValue: 0,
+      maxValue: 999999,
+      onlyDigits: true,
+      hint: "Только цифры, максимум 999999 (обязательно для пожарной машины)",
+    },
+    time_without_pump: {
+      label: "Время работы без насоса (мин)",
+      required: true,
+      type: "integer",
+      minValue: 0,
+      maxValue: 999999,
+      onlyDigits: true,
+      hint: "Только цифры, максимум 999999 (обязательно для пожарной машины)",
+    },
   },
 
   // Waybill fields (путевой лист)
@@ -483,6 +510,61 @@ export const fieldDefinitions = {
       label: "Сезон нормы",
       required: true,
       hint: "Выберите зиму или лето",
+    },
+    fuel_type: {
+      label: "Тип топлива",
+      required: true,
+      hint: "Выберите тип топлива",
+    },
+  },
+
+  // Waybill Edit fields (редактирование основных полей путевого листа)
+  waybillEdit: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите автомобиль для маршрута",
+    },
+    driver: {
+      label: "Водитель",
+      required: true,
+      hint: "Выберите водителя",
+    },
+    date: {
+      label: "Дата",
+      required: true,
+      type: "date",
+      hint: "Укажите дату путевого листа",
+    },
+    norm_season: {
+      label: "Сезон",
+      required: true,
+      hint: "Выберите зиму или лето для расчета норм",
+    },
+  },
+
+  // Waybill Create fields (создание путевого листа)
+  waybillCreate: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите автомобиль для маршрута",
+    },
+    driver: {
+      label: "Водитель",
+      required: true,
+      hint: "Выберите водителя",
+    },
+    date: {
+      label: "Дата путевого листа",
+      required: true,
+      type: "date",
+      hint: "Укажите дату путевого листа",
+    },
+    norm_season: {
+      label: "Сезон",
+      required: true,
+      hint: "Выберите зиму или лето для расчета норм",
     },
     fuel_type: {
       label: "Тип топлива",

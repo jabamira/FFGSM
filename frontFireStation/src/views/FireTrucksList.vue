@@ -40,6 +40,9 @@
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="newFireTruck.number" 
           :label="fieldDefinitions.fireTruck.number.label" 
@@ -47,6 +50,7 @@
           placeholder="Введите гос. номер"
           :required="fieldDefinitions.fireTruck.number.required"
           :uppercase="fieldDefinitions.fireTruck.number.uppercase"
+          :error="addFormErrors.number"
         />
         <TextInput 
           v-model="newFireTruck.brand" 
@@ -54,6 +58,7 @@
           :hint="fieldDefinitions.fireTruck.brand.hint"
           placeholder="Введите марку"
           :required="fieldDefinitions.fireTruck.brand.required"
+          :error="addFormErrors.brand"
         />
         <TextInput 
           v-model="newFireTruck.model" 
@@ -61,6 +66,7 @@
           :hint="fieldDefinitions.fireTruck.model.hint"
           placeholder="Введите модель"
           :required="fieldDefinitions.fireTruck.model.required"
+          :error="addFormErrors.model"
         />
         <TextInput 
           v-model="newFireTruck.type" 
@@ -68,6 +74,7 @@
           :hint="fieldDefinitions.fireTruck.type.hint"
           placeholder="Введите тип"
           :required="fieldDefinitions.fireTruck.type.required"
+          :error="addFormErrors.type"
         />
         <SelectInput 
           v-model="newFireTruck.fuel_type" 
@@ -76,6 +83,7 @@
           :options="fuelTypeOptions"
           placeholder="Выберите тип топлива"
           :required="fieldDefinitions.fireTruck.fuel_type.required"
+          :error="addFormErrors.fuel_type"
         />
       </div>
       <template #footer>
@@ -207,6 +215,11 @@ const newFireTruck = ref({
   fuel_type: '',
 });
 
+const addFormErrors = ref({});
+const editFormErrors = ref({});
+const addFormGeneralError = ref('');
+const editFormGeneralError = ref('');
+
 const showOdometerModal = ref(false);
 const isOdometerRequired = ref(true);
 const odometerData = ref({
@@ -260,6 +273,8 @@ const openAddModal = () => {
 
 const closeAddModal = () => {
   showAddModal.value = false;
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
   resetNewFireTruck();
 };
 
@@ -274,16 +289,18 @@ const resetNewFireTruck = () => {
 };
 
 const addFireTruck = async () => {
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+  
   if (!auth.permissions.can_create_fire_trucks) {
     permissionDeniedModal.value?.openModal('can_create_fire_trucks');
-    closeAddModal();
     return;
   }
 
   const validationErrors = validateFormFields(newFireTruck.value, fieldDefinitions.fireTruck);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
@@ -303,6 +320,7 @@ const addFireTruck = async () => {
     showOdometerModal.value = true;
   } catch (error) {
     console.error('Ошибка при добавлении пожарного автомобиля:', error);
+    addFormGeneralError.value = error.response?.data?.detail || error.message || 'Ошибка при добавлении пожарного автомобиля';
     errorModalRef.value?.openModal(error);
   }
 };
@@ -338,6 +356,7 @@ const closeEditModal = () => {
   showEditModal.value = false;
   editingFireTruck.value = null;
   originalFireTruck.value = null;
+  firetruckEditModalRef.value?.clearErrors();
 };
 
 const hasFireTruckChanged = () => {
@@ -346,9 +365,10 @@ const hasFireTruckChanged = () => {
 };
 
 const updateFireTruck = async () => {
+  firetruckEditModalRef.value?.clearErrors();
+  
   if (!auth.permissions.can_update_fire_trucks) {
     permissionDeniedModal.value?.openModal('can_update_fire_trucks');
-    closeEditModal();
     return;
   }
 
@@ -362,8 +382,7 @@ const updateFireTruck = async () => {
 
   const validationErrors = validateFormFields(editingFireTruck.value, fieldDefinitions.fireTruck);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    firetruckEditModalRef.value?.setErrors(validationErrors, 'Пожалуйста, проверьте заполненные поля');
     return;
   }
 
@@ -382,6 +401,7 @@ const updateFireTruck = async () => {
     closeEditModal();
   } catch (error) {
     console.error('Ошибка при обновлении пожарного автомобиля:', error);
+    editFormGeneralError.value = error.response?.data?.detail || error.message || 'Ошибка при обновлении пожарного автомобиля';
     errorModalRef.value?.openModal(error);
   }
 };

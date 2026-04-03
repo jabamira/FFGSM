@@ -5,10 +5,14 @@
     @close="$emit('close')"
   >
     <div v-if="passengerCar" class="space-y-4 min-w-96">
+      <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+        <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+      </div>
       <TextInput 
         v-model="passengerCar.number" 
         :label="fieldDefinitions.passengerCar.number.label" 
         :hint="fieldDefinitions.passengerCar.number.hint"
+        :error="formErrors.number"
         placeholder="Введите гос. номер"
         :required="fieldDefinitions.passengerCar.number.required"
         :uppercase="fieldDefinitions.passengerCar.number.uppercase"
@@ -17,6 +21,7 @@
         v-model="passengerCar.brand" 
         :label="fieldDefinitions.passengerCar.brand.label" 
         :hint="fieldDefinitions.passengerCar.brand.hint"
+        :error="formErrors.brand"
         placeholder="Введите марку"
         :required="fieldDefinitions.passengerCar.brand.required"
       />
@@ -24,6 +29,7 @@
         v-model="passengerCar.model" 
         :label="fieldDefinitions.passengerCar.model.label" 
         :hint="fieldDefinitions.passengerCar.model.hint"
+        :error="formErrors.model"
         placeholder="Введите модель"
         :required="fieldDefinitions.passengerCar.model.required"
       />
@@ -31,6 +37,7 @@
         v-model="passengerCar.fuel_type" 
         :label="fieldDefinitions.passengerCar.fuel_type.label" 
         :hint="fieldDefinitions.passengerCar.fuel_type.hint"
+        :error="formErrors.fuel_type"
         :options="fuelTypeOptions"
         placeholder="Выберите тип топлива"
         :required="fieldDefinitions.passengerCar.fuel_type.required"
@@ -83,6 +90,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save', 'odometer-click']);
 
 const passengerCar = ref(null);
+const formErrors = ref({});
+const generalError = ref('');
 
 watch(
   () => props.car,
@@ -104,13 +113,27 @@ watch(
   (isOpen) => {
     if (isOpen && props.car) {
       passengerCar.value = { ...props.car };
+      formErrors.value = {};
+      generalError.value = '';
     }
   }
 );
 
 const getCar = () => passengerCar.value;
 
+const clearErrors = () => {
+  formErrors.value = {};
+  generalError.value = '';
+};
+
+const setErrors = (errors, message = '') => {
+  formErrors.value = errors;
+  generalError.value = message;
+};
+
 defineExpose({
   getCar,
+  clearErrors,
+  setErrors,
 });
 </script>

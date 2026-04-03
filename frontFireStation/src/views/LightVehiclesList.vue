@@ -40,10 +40,14 @@
       @close="closeAddModal"
     >
       <div class="space-y-4 min-w-96">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <TextInput 
           v-model="newPassengerCar.number" 
           :label="fieldDefinitions.passengerCar.number.label" 
           :hint="fieldDefinitions.passengerCar.number.hint"
+          :error="addFormErrors.number"
           placeholder="Введите гос. номер"
           :required="fieldDefinitions.passengerCar.number.required"
           :uppercase="fieldDefinitions.passengerCar.number.uppercase"
@@ -52,6 +56,7 @@
           v-model="newPassengerCar.brand" 
           :label="fieldDefinitions.passengerCar.brand.label" 
           :hint="fieldDefinitions.passengerCar.brand.hint"
+          :error="addFormErrors.brand"
           placeholder="Введите марку"
           :required="fieldDefinitions.passengerCar.brand.required"
         />
@@ -59,6 +64,7 @@
           v-model="newPassengerCar.model" 
           :label="fieldDefinitions.passengerCar.model.label" 
           :hint="fieldDefinitions.passengerCar.model.hint"
+          :error="addFormErrors.model"
           placeholder="Введите модель"
           :required="fieldDefinitions.passengerCar.model.required"
         />
@@ -66,6 +72,7 @@
           v-model="newPassengerCar.fuel_type" 
           :label="fieldDefinitions.passengerCar.fuel_type.label" 
           :hint="fieldDefinitions.passengerCar.fuel_type.hint"
+          :error="addFormErrors.fuel_type"
           :options="fuelTypeOptions"
           placeholder="Выберите тип топлива"
           :required="fieldDefinitions.passengerCar.fuel_type.required"
@@ -198,6 +205,11 @@ const newPassengerCar = ref({
   fuel_type: '',
 });
 
+const addFormErrors = ref({});
+const editFormErrors = ref({});
+const addFormGeneralError = ref('');
+const editFormGeneralError = ref('');
+
 const showOdometerModal = ref(false);
 const isOdometerRequired = ref(true);
 const odometerData = ref({
@@ -252,6 +264,8 @@ const openAddModal = () => {
 const closeAddModal = () => {
   showAddModal.value = false;
   resetNewPassengerCar();
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
 };
 
 const resetNewPassengerCar = () => {
@@ -264,6 +278,9 @@ const resetNewPassengerCar = () => {
 };
 
 const addPassengerCar = async () => {
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+
   if (!auth.permissions.can_create_passenger_cars) {
     permissionDeniedModal.value?.openModal('can_create_passenger_cars');
     closeAddModal();
@@ -272,8 +289,8 @@ const addPassengerCar = async () => {
 
   const validationErrors = validateFormFields(newPassengerCar.value, fieldDefinitions.passengerCar);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
@@ -328,6 +345,7 @@ const closeEditModal = () => {
   showEditModal.value = false;
   editingPassengerCar.value = null;
   originalPassengerCar.value = null;
+  passengerCarEditModalRef.value?.clearErrors();
 };
 
 const hasPassengerCarChanged = () => {
@@ -336,6 +354,8 @@ const hasPassengerCarChanged = () => {
 };
 
 const updatePassengerCar = async () => {
+  passengerCarEditModalRef.value?.clearErrors();
+
   if (!auth.permissions.can_update_passenger_cars) {
     permissionDeniedModal.value?.openModal('can_update_passenger_cars');
     closeEditModal();
@@ -352,8 +372,7 @@ const updatePassengerCar = async () => {
 
   const validationErrors = validateFormFields(editingPassengerCar.value, fieldDefinitions.passengerCar);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    passengerCarEditModalRef.value?.setErrors(validationErrors, 'Пожалуйста, проверьте заполненные поля');
     return;
   }
 

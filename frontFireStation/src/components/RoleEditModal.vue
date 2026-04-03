@@ -9,10 +9,14 @@
     <div v-if="editingRole" class="space-y-4 min-w-96">
       <!-- Поле для редактирования названия роли -->
       <div>
+        <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500 mb-4">
+          <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+        </div>
         <TextInput 
           v-model="editingRole.name" 
           :label="fieldDefinitions.role.name.label" 
           :hint="fieldDefinitions.role.name.hint"
+          :error="formErrors.name"
           placeholder="Введите название роли"
           :disabled="!auth.permissions.can_update_roles"
           :required="fieldDefinitions.role.name.required"
@@ -20,7 +24,7 @@
       </div>
       
       <!-- Раздел разрешений (пермишны) - видимо только если есть право на просмотр разрешений -->
-      <div v-if="auth.permissions.can_view_permissisons && auth.permissions.can_update_permissisons" class="border-t pt-4">
+      <div v-if="auth.permissions.view_permissisons && auth.permissions.can_update_permissisons" class="border-t pt-4">
         <p :style="{ color: palette.dark }" class="font-semibold mb-4">Разрешения</p>
         <div class="space-y-3 mb-4">
           <SelectInput 
@@ -91,6 +95,8 @@ const originalRolePermissions = ref({});
 const permissionFields = ref([]);
 const permissionSearchQuery = ref('');
 const selectedPermissionGroup = ref('all');
+const formErrors = ref({});
+const generalError = ref('');
 
 const permissionsMap = {
   'can_use_mobile_booking': 'Может использовать мобильное приложение',
@@ -102,11 +108,11 @@ const permissionsMap = {
   'can_create_roles': 'Может создавать роли',
   'can_delete_roles': 'Может удалять роли',
   'can_update_roles': 'Может обновлять роли',
-  'can_view_roles': 'Может просматривать роли',
+  'view_roles': 'Может просматривать роли',
   'can_create_permissions': 'Может создавать разрешения',
   'can_delete_permissisons': 'Может удалять разрешения',
   'can_update_permissisons': 'Может обновлять разрешения',
-  'can_view_permissisons': 'Может просматривать разрешения',
+  'view_permissisons': 'Может просматривать разрешения',
   'can_create_fire_trucks': 'Может создавать пожарные машины',
   'can_delete_fire_trucks': 'Может удалять пожарные машины',
   'can_update_fire_trucks': 'Может обновлять пожарные машины',
@@ -119,6 +125,10 @@ const permissionsMap = {
   'can_create_fire_truck_waybills_record': 'Может создавать записи путевых листов пожарных машин',
   'can_delete_fire_truck_waybills_record': 'Может удалять записи путевых листов пожарных машин',
   'can_update_fire_truck_waybills_record': 'Может обновлять записи путевых листов пожарных машин',
+  'can_create_fire_truck_waybills_records': 'Может создавать записи путевых листов пожарных машин',
+  'can_delete_fire_truck_waybills_records': 'Может удалять записи путевых листов пожарных машин',
+  'can_update_fire_truck_waybills_records': 'Может обновлять записи путевых листов пожарных машин',
+  'view_fire_truck_waybills_records': 'Может просматривать записи путевых листов пожарных машин',
   'can_create_fire_truck_norms': 'Может создавать нормы пожарных машин',
   'can_delete_fire_truck_norms': 'Может удалять нормы пожарных машин',
   'can_update_fire_truck_norms': 'Может обновлять нормы пожарных машин',
@@ -137,6 +147,10 @@ const permissionsMap = {
   'can_create_passenger_cars_waybills_record': 'Может создавать записи путевых листов легковых машин',
   'can_delete_passenger_cars_waybills_record': 'Может удалять записи путевых листов легковых машин',
   'can_update_passenger_cars_waybills_record': 'Может обновлять записи путевых листов легковых машин',
+  'can_create_passenger_cars_waybills_records': 'Может создавать записи путевых листов легковых машин',
+  'can_delete_passenger_cars_waybills_records': 'Может удалять записи путевых листов легковых машин',
+  'can_update_passenger_cars_waybills_records': 'Может обновлять записи путевых листов легковых машин',
+  'view_passenger_cars_waybills_records': 'Может просматривать записи путевых листов легковых машин',
   'can_create_passenger_cars_norms': 'Может создавать нормы легковых машин',
   'can_delete_passenger_cars_norms': 'Может удалять нормы легковых машин',
   'can_update_passenger_cars_norms': 'Может обновлять нормы легковых машин',
@@ -149,7 +163,7 @@ const permissionsMap = {
   'can_delete_technical_maintenance': 'Может удалять техническое обслуживание',
   'can_update_technical_maintenance': 'Может обновлять техническое обслуживание',
   'view_technical_maintenance': 'Может просматривать техническое обслуживание',
-  'can_view_operating_hours': 'Может просматривать рабочие часы',
+  'view_operating_hours': 'Может просматривать рабочие часы',
 };
 
 const permissionGroups = {
@@ -159,11 +173,11 @@ const permissionGroups = {
   },
   roles: {
     label: 'Роли',
-    keys: ['can_create_roles', 'can_delete_roles', 'can_update_roles', 'can_view_roles']
+    keys: ['can_create_roles', 'can_delete_roles', 'can_update_roles', 'view_roles']
   },
   permissions: {
     label: 'Разрешения',
-    keys: ['can_create_permissions', 'can_delete_permissisons', 'can_update_permissisons', 'can_view_permissisons']
+    keys: ['can_create_permissions', 'can_delete_permissisons', 'can_update_permissisons', 'view_permissisons']
   },
   mobile: {
     label: 'Мобильное приложение',
@@ -219,7 +233,7 @@ const permissionGroups = {
   },
   operating_hours: {
     label: 'Рабочие часы',
-    keys: ['can_view_operating_hours']
+    keys: ['view_operating_hours']
   },
 };
 
@@ -268,7 +282,7 @@ const hasRoleChanged = () => {
 };
 
 const loadPermissionsForRole = async (roleId) => {
-  if (!auth.permissions.can_view_permissisons && !auth.permissions.can_update_permissisons) {
+  if (!auth.permissions.view_permissisons && !auth.permissions.can_update_permissisons) {
     return;
   }
   try {
@@ -304,9 +318,14 @@ const closeModal = () => {
   originalRolePermissions.value = {};
   permissionSearchQuery.value = '';
   selectedPermissionGroup.value = 'all';
+  formErrors.value = {};
+  generalError.value = '';
 };
 
 const updateRole = async () => {
+  formErrors.value = {};
+  generalError.value = '';
+
   if (!auth.permissions.can_update_roles) {
     console.warn('Нет разрешения на редактирование ролей.');
     return;
@@ -322,20 +341,14 @@ const updateRole = async () => {
   // Validate all role fields
   const validationErrors = validateFormFields(editingRole.value, fieldDefinitions.role);
   if (Object.keys(validationErrors).length > 0) {
-    const error = createValidationError(validationErrors, 'Пожалуйста, проверьте заполненные поля');
-    errorModalRef.value?.openModal(error);
+    formErrors.value = validationErrors;
+    generalError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
   // Проверка разрешения перед отправкой
   if (!auth.permissions.can_update_roles) {
-    errorModalRef.value?.openModal({
-      response: {
-        data: {
-          detail: 'У вас нет прав на редактирование ролей'
-        }
-      }
-    });
+    generalError.value = 'У вас нет прав на редактирование ролей';
     return;
   }
 

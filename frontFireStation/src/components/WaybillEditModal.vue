@@ -7,24 +7,33 @@
       @close="closeAddModal"
     >
       <div class="space-y-4">
+        <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+        </div>
         <SelectInput
           v-model="form.car"
           :options="carOptions"
-          label="Автомобиль"
-          :required="true"
+          :label="fieldDefinitions.waybillCreate.car.label"
+          :hint="fieldDefinitions.waybillCreate.car.hint"
+          :required="fieldDefinitions.waybillCreate.car.required"
           placeholder="Выберите автомобиль"
+          :error="formErrors.car"
         />
         <SelectInput
           v-model="form.driver"
           :options="driverOptions"
-          label="Водитель"
-          :required="true"
+          :label="fieldDefinitions.waybillCreate.driver.label"
+          :hint="fieldDefinitions.waybillCreate.driver.hint"
+          :required="fieldDefinitions.waybillCreate.driver.required"
           placeholder="Выберите водителя"
+          :error="formErrors.driver"
         />
         <DateInput
           v-model="form.date"
-          label="Дата"
-          :required="true"
+          :label="fieldDefinitions.waybillCreate.date.label"
+          :hint="fieldDefinitions.waybillCreate.date.hint"
+          :required="fieldDefinitions.waybillCreate.date.required"
+          :error="formErrors.date"
         />
         <SelectInput
           v-model="form.norm_season"
@@ -32,16 +41,19 @@
             { value: 'summer', label: 'Лето' },
             { value: 'winter', label: 'Зима' }
           ]"
-          label="Сезон"
-          :required="true"
+          :label="fieldDefinitions.waybillCreate.norm_season.label"
+          :hint="fieldDefinitions.waybillCreate.norm_season.hint"
+          :required="fieldDefinitions.waybillCreate.norm_season.required"
+          :error="formErrors.norm_season"
         />
         <SelectInput
           v-model="form.fuel_type"
           :options="fuelTypeOptions"
-          label="Тип топлива"
-          :required="true"
+          :label="fieldDefinitions.waybillCreate.fuel_type.label"
+          :hint="fieldDefinitions.waybillCreate.fuel_type.hint"
+          :required="fieldDefinitions.waybillCreate.fuel_type.required"
+          :error="formErrors.fuel_type"
         />
-        <span v-if="validationError" style="color: red; font-size: 0.875rem">{{ validationError }}</span>
       </div>
       <template #footer>
         <Button @click="closeAddModal" variant="secondary">Отмена</Button>
@@ -80,9 +92,11 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput, SelectInput, DateInput } from './ui/importUi';
+import { fieldDefinitions } from '../config/fieldDefinitions';
 import ErrorModal from './ErrorModal.vue';
 import PermissionDeniedModal from './PermissionDeniedModal.vue';
 import { fuelTypeOptions } from '../config/fuelTypes';
+import { validateFormFields } from '../utils/errorUtils';
 
 const props = defineProps({
   carOptions: {
@@ -118,14 +132,46 @@ const validationError = ref('');
 const deleteCount = ref(0);
 const permissionModal = ref(null);
 
+// Error handling
+const formErrors = ref({
+  car: '',
+  driver: '',
+  date: '',
+  norm_season: '',
+  fuel_type: ''
+});
+
+const generalError = ref('');
+
 // Methods
 const getCurrentSeason = () => {
   const month = new Date().getMonth() + 1;
   return (month >= 5 && month <= 9) ? 'summer' : 'winter';
 };
 
+const clearErrors = () => {
+  Object.keys(formErrors.value).forEach(key => {
+    formErrors.value[key] = '';
+  });
+  generalError.value = '';
+};
+
+const setErrors = (errors, message = '') => {
+  clearErrors();
+  if (typeof errors === 'object') {
+    Object.keys(errors).forEach(key => {
+      if (formErrors.value.hasOwnProperty(key)) {
+        formErrors.value[key] = errors[key];
+      }
+    });
+  }
+  if (message) {
+    generalError.value = message;
+  }
+};
+
 const openAddModal = () => {
-  validationError.value = '';
+  clearErrors();
   form.value = {
     id: null,
     car: null,
@@ -139,6 +185,7 @@ const openAddModal = () => {
 
 const closeAddModal = () => {
   showAddModal.value = false;
+  clearErrors();
 };
 
 const openDeleteModal = (count) => {
@@ -151,25 +198,24 @@ const closeDeleteModal = () => {
 };
 
 const submitAdd = async () => {
-  if (!form.value.car || !form.value.driver) {
-    validationError.value = 'Пожалуйста, выберите автомобиль и водителя';
+  generalError.value = '';
+  formErrors.value = {};
+
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(form.value, fieldDefinitions.waybillCreate);
+  if (Object.keys(validationErrors).length > 0) {
+    formErrors.value = validationErrors;
+    generalError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
-  try {
-    await emit('add', {
-      car: form.value.car,
-      driver: form.value.driver,
-      date: form.value.date,
-      norm_season: form.value.norm_season,
-      fuel_type: form.value.fuel_type
-    });
-    closeAddModal();
-  } catch (error) {
-    errorModalTitle.value = 'Ошибка создания путевого листа';
-    errorModalMessage.value = error.message || 'Произошла ошибка';
-    showErrorModal.value = true;
-  }
+  emit('add', {
+    car: form.value.car,
+    driver: form.value.driver,
+    date: form.value.date,
+    norm_season: form.value.norm_season,
+    fuel_type: form.value.fuel_type
+  });
 };
 
 const submitDelete = () => {
@@ -192,6 +238,8 @@ defineExpose({
   openAddModal,
   openDeleteModal,
   showError,
-  showPermissionError
+  showPermissionError,
+  clearErrors,
+  setErrors
 });
 </script>

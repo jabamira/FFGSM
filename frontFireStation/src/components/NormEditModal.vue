@@ -7,12 +7,16 @@
       @close="closeAddModal"
     >
       <div class="space-y-4">
+        <div v-if="addFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ addFormGeneralError }}</p>
+        </div>
         <SelectInput
           v-model="form.car"
           :options="carOptions"
           label="Автомобиль"
           :required="true"
           placeholder="Выберите автомобиль"
+          :error="addFormErrors.car"
         />
         <SelectInput
           v-model="form.season"
@@ -20,31 +24,39 @@
             { value: 'summer', label: 'Лето' },
             { value: 'winter', label: 'Зима' }
           ]"
-          label="Сезон"
-          :required="true"
+          :label="fieldDefinitions.normsPassengerCars.season.label"
+          :hint="fieldDefinitions.normsPassengerCars.season.hint"
+          :required="fieldDefinitions.normsPassengerCars.season.required"
+          :error="addFormErrors.season"
         />
         <TextInput
           v-model="form.city_norm"
           type="number"
-          step="0.01"
-          label="Норма для города (л/100км)"
-          :required="true"
-          placeholder="0.00"
+          step="0.001"
+          :label="fieldDefinitions.normsPassengerCars.city_norm.label"
+          :hint="fieldDefinitions.normsPassengerCars.city_norm.hint"
+          :required="fieldDefinitions.normsPassengerCars.city_norm.required"
+          placeholder="0.000"
+          :error="addFormErrors.city_norm"
         />
         <TextInput
           v-model="form.area_norm"
           type="number"
-          step="0.01"
-          label="Норма для трассы (л/100км)"
-          :required="true"
-          placeholder="0.00"
+          step="0.001"
+          :label="fieldDefinitions.normsPassengerCars.area_norm.label"
+          :hint="fieldDefinitions.normsPassengerCars.area_norm.hint"
+          :required="fieldDefinitions.normsPassengerCars.area_norm.required"
+          placeholder="0.000"
+          :error="addFormErrors.area_norm"
         />
         <TextInput
           v-model="form.date"
           type="date"
-          label="Дата действия"
+          :label="fieldDefinitions.normsPassengerCars.date.label"
+          :hint="fieldDefinitions.normsPassengerCars.date.hint"
+          :required="fieldDefinitions.normsPassengerCars.date.required"
+          :error="addFormErrors.date"
         />
-        <span v-if="validationError" style="color: red; font-size: 0.875rem">{{ validationError }}</span>
       </div>
       <template #footer>
         <Button @click="closeAddModal" variant="secondary">Отмена</Button>
@@ -59,11 +71,15 @@
       @close="closeEditModal"
     >
       <div class="space-y-4">
+        <div v-if="editFormGeneralError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600">{{ editFormGeneralError }}</p>
+        </div>
         <SelectInput
           v-model="form.car"
           :options="carOptions"
           label="Автомобиль"
           :required="true"
+          :error="editFormErrors.car"
         />
         <SelectInput
           v-model="form.season"
@@ -71,29 +87,37 @@
             { value: 'summer', label: 'Лето' },
             { value: 'winter', label: 'Зима' }
           ]"
-          label="Сезон"
-          :required="true"
+          :label="fieldDefinitions.normsPassengerCars.season.label"
+          :hint="fieldDefinitions.normsPassengerCars.season.hint"
+          :required="fieldDefinitions.normsPassengerCars.season.required"
+          :error="editFormErrors.season"
         />
         <TextInput
           v-model="form.city_norm"
           type="number"
-          step="0.01"
-          label="Норма для города (л/100км)"
-          :required="true"
+          step="0.001"
+          :label="fieldDefinitions.normsPassengerCars.city_norm.label"
+          :hint="fieldDefinitions.normsPassengerCars.city_norm.hint"
+          :required="fieldDefinitions.normsPassengerCars.city_norm.required"
+          :error="editFormErrors.city_norm"
         />
         <TextInput
           v-model="form.area_norm"
           type="number"
-          step="0.01"
-          label="Норма для трассы (л/100км)"
-          :required="true"
+          step="0.001"
+          :label="fieldDefinitions.normsPassengerCars.area_norm.label"
+          :hint="fieldDefinitions.normsPassengerCars.area_norm.hint"
+          :required="fieldDefinitions.normsPassengerCars.area_norm.required"
+          :error="editFormErrors.area_norm"
         />
         <TextInput
           v-model="form.date"
           type="date"
-          label="Дата действия"
+          :label="fieldDefinitions.normsPassengerCars.date.label"
+          :hint="fieldDefinitions.normsPassengerCars.date.hint"
+          :required="fieldDefinitions.normsPassengerCars.date.required"
+          :error="editFormErrors.date"
         />
-        <span v-if="validationError" style="color: red; font-size: 0.875rem">{{ validationError }}</span>
       </div>
       <template #footer>
         <Button @click="closeEditModal" variant="secondary">Отмена</Button>
@@ -132,6 +156,8 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput, SelectInput } from './ui/importUi';
+import { fieldDefinitions } from '../config/fieldDefinitions';
+import { validateFormFields } from '../utils/errorUtils';
 import ErrorModal from './ErrorModal.vue';
 import PermissionDeniedModal from './PermissionDeniedModal.vue';
 
@@ -162,8 +188,39 @@ const form = ref({
   date: ''
 });
 
-const validationError = ref('');
 const deleteCount = ref(0);
+
+// Error handling for add modal
+const addFormErrors = ref({
+  car: '',
+  season: '',
+  city_norm: '',
+  area_norm: '',
+  date: ''
+});
+
+const addFormGeneralError = ref('');
+
+// Error handling for edit modal
+const editFormErrors = ref({
+  car: '',
+  season: '',
+  city_norm: '',
+  area_norm: '',
+  date: ''
+});
+
+const editFormGeneralError = ref('');
+
+// Field definitions for norms
+const normCreateDefinitions = {
+  car: {
+    label: 'Автомобиль',
+    required: true,
+    hint: 'Выберите автомобиль'
+  },
+  ...fieldDefinitions.normsPassengerCars
+};
 const permissionModal = ref(null);
 
 // Methods
@@ -182,10 +239,13 @@ const openAddModal = () => {
 
 const closeAddModal = () => {
   showAddModal.value = false;
+  addFormErrors.value = {};
+  addFormGeneralError.value = '';
 };
 
 const openEditModal = (norm) => {
-  validationError.value = '';
+  editFormErrors.value = {};
+  editFormGeneralError.value = '';
   form.value = {
     id: norm.id,
     car: norm.car_id,
@@ -199,6 +259,8 @@ const openEditModal = (norm) => {
 
 const closeEditModal = () => {
   showEditModal.value = false;
+  editFormErrors.value = {};
+  editFormGeneralError.value = '';
 };
 
 const openDeleteModal = (count) => {
@@ -211,8 +273,14 @@ const closeDeleteModal = () => {
 };
 
 const submitAdd = async () => {
-  if (!form.value.car || !form.value.city_norm || !form.value.area_norm) {
-    validationError.value = 'Пожалуйста, заполните все необходимые поля';
+  addFormGeneralError.value = '';
+  addFormErrors.value = {};
+
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(form.value, normCreateDefinitions);
+  if (Object.keys(validationErrors).length > 0) {
+    addFormErrors.value = validationErrors;
+    addFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 
@@ -233,8 +301,14 @@ const submitAdd = async () => {
 };
 
 const submitEdit = async () => {
-  if (!form.value.car || !form.value.city_norm || !form.value.area_norm) {
-    validationError.value = 'Пожалуйста, заполните все необходимые поля';
+  editFormGeneralError.value = '';
+  editFormErrors.value = {};
+
+  // Валидация полей на клиенте
+  const validationErrors = validateFormFields(form.value, normCreateDefinitions);
+  if (Object.keys(validationErrors).length > 0) {
+    editFormErrors.value = validationErrors;
+    editFormGeneralError.value = 'Пожалуйста, проверьте заполненные поля';
     return;
   }
 

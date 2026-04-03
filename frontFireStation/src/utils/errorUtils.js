@@ -89,14 +89,18 @@ export function validateFormFields(data, definitions) {
   Object.entries(definitions).forEach(([fieldName, fieldDef]) => {
     const value = data[fieldName];
 
-    // Check required
-    if (fieldDef.required && !value) {
+    // Check required - explicitly check for null, undefined, or empty string
+    // This allows 0, false, and other falsy-but-valid values
+    if (
+      fieldDef.required &&
+      (value === null || value === undefined || value === "")
+    ) {
       errors[fieldName] = "Обязательное поле";
       return;
     }
 
     // Skip further validation if no value
-    if (!value) return;
+    if (value === null || value === undefined || value === "") return;
 
     let strValue = String(value).trim();
 

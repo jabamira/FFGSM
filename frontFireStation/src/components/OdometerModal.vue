@@ -12,26 +12,35 @@
           Пожалуйста, заполните эту информацию сейчас.
         </p>
       </div>
+      <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+        <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+      </div>
       <div class="min-w-96 space-y-4">
         <TextInput 
           v-model.number="form.odometer" 
-          label="Показания одометра (км)"
+          :label="fieldDefinitions.odometerFuel.odometer.label"
+          :hint="fieldDefinitions.odometerFuel.odometer.hint"
           placeholder="Введите показания одометра"
           type="number"
-          :required="true"
+          :required="fieldDefinitions.odometerFuel.odometer.required"
+          :error="formErrors.odometer"
         />
         <TextInput 
           v-model.number="form.fuel" 
-          label="Остаток топлива (л)"
+          :label="fieldDefinitions.odometerFuel.fuel.label"
+          :hint="fieldDefinitions.odometerFuel.fuel.hint"
           placeholder="Введите остаток топлива"
           type="number"
           step="0.001"
-          :required="true"
+          :required="fieldDefinitions.odometerFuel.fuel.required"
+          :error="formErrors.fuel"
         />
         <DateInput 
           v-model="form.date" 
-          label="Дата"
-          :required="true"
+          :label="fieldDefinitions.odometerFuel.date.label"
+          :hint="fieldDefinitions.odometerFuel.date.hint"
+          :required="fieldDefinitions.odometerFuel.date.required"
+          :error="formErrors.date"
         />
       </div>
     </div>
@@ -136,6 +145,13 @@ const form = ref({
   date: getCurrentLocalDate()
 });
 
+const formErrors = ref({
+  odometer: '',
+  fuel: '',
+  date: ''
+});
+
+const generalError = ref('');
 const showWarning = ref(false);
 
 watch(() => props.isOpen, (newVal) => {
@@ -145,6 +161,12 @@ watch(() => props.isOpen, (newVal) => {
       fuel: '',
       date: getCurrentLocalDate()
     };
+    formErrors.value = {
+      odometer: '',
+      fuel: '',
+      date: ''
+    };
+    generalError.value = '';
     showWarning.value = false;
   }
 });
@@ -168,7 +190,29 @@ const skipOdometer = () => {
   emit('skipped');
 };
 
+const closeModalDirectly = () => {
+  form.value = {
+    odometer: '',
+    fuel: '',
+    date: getCurrentLocalDate()
+  };
+  formErrors.value = {
+    odometer: '',
+    fuel: '',
+    date: ''
+  };
+  generalError.value = '';
+  emit('close');
+};
+
 const submitData = async () => {
+  generalError.value = '';
+  formErrors.value = {
+    odometer: '',
+    fuel: '',
+    date: ''
+  };
+
   try {
     // Валидация данных перед отправкой
     const validationData = {
@@ -179,18 +223,8 @@ const submitData = async () => {
 
     const errors = validateFormFields(validationData, fieldDefinitions.odometerFuel);
     if (Object.keys(errors).length > 0) {
-      // Создаем объект ошибки в формате, который понимает ErrorModal
-      const errorObj = {
-        response: {
-          data: {}
-        }
-      };
-      
-      Object.entries(errors).forEach(([field, message]) => {
-        errorObj.response.data[field] = message;
-      });
-      
-      errorModalRef.value?.openModal(errorObj);
+      formErrors.value = errors;
+      generalError.value = 'Пожалуйста, проверьте заполненные поля';
       return;
     }
 
@@ -218,6 +252,7 @@ const submitData = async () => {
 
     console.log(`[OdometerModal] Odometer data saved successfully`);
     emit('submitted');
+    closeModalDirectly();
   } catch (error) {
     console.error('[OdometerModal] Error saving odometer data:', error);
     
