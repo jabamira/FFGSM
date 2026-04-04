@@ -89,6 +89,17 @@ export function validateFormFields(data, definitions) {
   Object.entries(definitions).forEach(([fieldName, fieldDef]) => {
     const value = data[fieldName];
 
+    let strValue = String(value).trim();
+
+    // Check for minus sign in numeric fields FIRST (before required check)
+    if (
+      (fieldDef.type === "integer" || fieldDef.type === "decimal") &&
+      strValue.includes("-")
+    ) {
+      errors[fieldName] = "Минус не допускается";
+      return;
+    }
+
     // Check required - explicitly check for null, undefined, or empty string
     // This allows 0, false, and other falsy-but-valid values
     if (
@@ -101,8 +112,6 @@ export function validateFormFields(data, definitions) {
 
     // Skip further validation if no value
     if (value === null || value === undefined || value === "") return;
-
-    let strValue = String(value).trim();
 
     // Apply uppercase transformation if needed
     if (fieldDef.uppercase) {
@@ -226,6 +235,131 @@ export function validateFormFields(data, definitions) {
   });
 
   return errors;
+}
+
+/**
+ * Validate a single field in real-time
+ * @param {string} fieldName - field name to validate
+ * @param {*} value - field value to validate
+ * @param {Object} fieldDef - field definition from fieldDefinitions
+ * @returns {string} error message or empty string
+ */
+export function validateSingleField(fieldName, value, fieldDef) {
+  let strValue = String(value).trim();
+
+  // Check for minus sign in numeric fields FIRST (before required check)
+  if (
+    (fieldDef.type === "integer" || fieldDef.type === "decimal") &&
+    strValue.includes("-")
+  ) {
+    return "Минус не допускается";
+  }
+
+  // Check required - explicitly check for null, undefined, or empty string
+  if (
+    fieldDef.required &&
+    (value === null || value === undefined || value === "")
+  ) {
+    return "Обязательное поле";
+  }
+
+  // Skip further validation if no value
+  if (value === null || value === undefined || value === "") return "";
+
+  // Check onlyDigits constraint - only numbers allowed
+  if (fieldDef.onlyDigits && !/^\d+$/.test(strValue.replace(/\s/g, ""))) {
+    return "Допускаются только цифры";
+  }
+
+  // Check validRussianCar constraint
+  if (fieldDef.validRussianCar && !isValidRussianCarPlate(strValue)) {
+    return "Формат: А123ВО99 (буквы: А В Е К М Н О Р С Т У Х, цифры, 2-3 цифры)";
+  }
+
+  // Check onlyLatinAndSpecial constraint
+  if (fieldDef.onlyLatinAndSpecial && !/^[a-zA-Z0-9._-]+$/.test(strValue)) {
+    return "Допускаются латинские буквы, цифры и символы (- _ .)";
+  }
+
+  // Check noKyrillic constraint
+  if (fieldDef.noKyrillic && /[а-яА-ЯёЁ]/.test(strValue)) {
+    return "Кириллица не допускается";
+  }
+
+  // Check maxLength for strings
+  if (fieldDef.maxLength && strValue.length > fieldDef.maxLength) {
+    return `Максимум ${fieldDef.maxLength} символов (введено ${strValue.length})`;
+  }
+
+  // Check minLength for strings
+  if (fieldDef.minLength && strValue.length < fieldDef.minLength) {
+    return `Минимум ${fieldDef.minLength} символов`;
+  }
+
+  // Validate email format if type is email
+  if (fieldDef.type === "email" && !isValidEmail(strValue)) {
+    return "Некорректный формат email";
+  }
+
+  // Validate decimal number format (with . or , as separator)
+  if (fieldDef.type === "decimal" && strValue) {
+    if (!/^\d+([.,]\d+)?$/.test(strValue)) {
+      return "Используйте формат числа (точка или запятая как разделитель)";
+    }
+    const normalizedValue = strValue.replace(",", ".");
+    const numValueDecimal = Number(normalizedValue);
+    if (isNaN(numValueDecimal)) {
+      return "Должно быть числом";
+    }
+    // Check decimal places
+    if (fieldDef.decimalPlaces !== undefined) {
+      const decimalPart = normalizedValue.split(".")[1];
+      if (decimalPart && decimalPart.length > fieldDef.decimalPlaces) {
+        return `Максимум ${fieldDef.decimalPlaces} знаков после запятой`;
+      }
+    }
+  }
+
+  // Validate number ranges for integer and decimal types
+  if (fieldDef.type === "integer" || fieldDef.type === "decimal") {
+    let checkValue = Number(strValue);
+    if (fieldDef.type === "decimal" && strValue) {
+      const normalizedValue = strValue.replace(",", ".");
+      checkValue = Number(normalizedValue);
+    }
+
+    if (isNaN(checkValue)) {
+      return "Должно быть числом";
+    }
+
+    if (fieldDef.minValue !== undefined && checkValue < fieldDef.minValue) {
+      return `Минимальное значение: ${fieldDef.minValue}`;
+    }
+
+    if (fieldDef.maxValue !== undefined && checkValue > fieldDef.maxValue) {
+      return `Максимальное значение: ${fieldDef.maxValue}`;
+    }
+  }
+
+  // Check maxDigits for decimal fields
+  if (fieldDef.type === "decimal" && fieldDef.maxDigits && strValue) {
+    const normalizedValue = strValue.replace(",", ".");
+    const digitsOnly = normalizedValue.replace(/\./g, "");
+    if (digitsOnly.length > fieldDef.maxDigits) {
+      return `Максимум ${fieldDef.maxDigits} цифр`;
+    }
+  }
+
+  // Check time format (HH:MM)
+  if (
+    fieldDef.type === "time" &&
+    strValue &&
+    !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(strValue)
+  ) {
+    return "Формат должен быть HH:MM";
+  }
+
+  return "";
 }
 
 /**

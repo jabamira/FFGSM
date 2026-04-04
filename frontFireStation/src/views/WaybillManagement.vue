@@ -92,36 +92,29 @@
             :data="records"
             :selectedIds="selectedRecordIds"
             @select="(ids) => selectedRecordIds = ids"
+            @row-click="(row) => openEditRecord(row)"
             :hideActions="false"
           >
             <template #cell-target="{ value }">
               <span :style="{ color: palette.dark }">{{ value || '-' }}</span>
             </template>
             <template #cell-departure_time="{ value }">
-              <span :style="{ color: palette.dark }">{{ value || '-' }}</span>
+              <span :style="{ color: palette.dark }">{{ formatTime(value) }}</span>
             </template>
             <template #cell-arrival_time="{ value }">
-              <span :style="{ color: palette.dark }">{{ value || '-' }}</span>
+              <span :style="{ color: palette.dark }">{{ formatTime(value) }}</span>
             </template>
             <template #cell-distance_city_km="{ value }">
-              <span :style="{ color: palette.dark }">{{ value }} км</span>
+              <span :style="{ color: palette.dark }">{{ formatKilometers(value) }} км</span>
             </template>
             <template #cell-distance_area_km="{ value }">
-              <span :style="{ color: palette.dark }">{{ value }} км</span>
+              <span :style="{ color: palette.dark }">{{ formatKilometers(value) }} км</span>
             </template>
             <template #cell-fuel_refueled="{ value }">
               <span :style="{ color: palette.dark }">{{ value ? value + ' л' : '-' }}</span>
             </template>
             <template #cell-fuel_used="{ value }">
               <span :style="{ color: palette.dark }">{{ value }} л</span>
-            </template>
-            <template #actions="{ row }">
-              <button
-                @click="openEditRecord(row)"
-                class="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 mr-2"
-              >
-                Редактировать
-              </button>
             </template>
           </DataTable>
 
@@ -131,7 +124,7 @@
         <!-- Summary -->
         <div v-if="records.length > 0" class="bg-gray-50 border border-gray-200 rounded p-4">
           <p class="font-semibold mb-3" :style="{ color: palette.dark }">Итого</p>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Км по городу</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalCityKm }} км</p>
@@ -139,6 +132,10 @@
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Км по области</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalAreaKm }} км</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Время в пути</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalTravelTime }}</p>
             </div>
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Заправлено</p>
@@ -427,11 +424,57 @@ const totalAreaKm = computed(() => {
 });
 
 const totalFuelRefueled = computed(() => {
-  return records.value.reduce((sum, r) => sum + (r.fuel_refueled || 0), 0).toFixed(3);
+  const total = records.value.reduce((sum, r) => sum + (parseFloat(r.fuel_refueled) || 0), 0);
+  return parseFloat(total).toFixed(3);
 });
 
 const totalFuelUsed = computed(() => {
-  return records.value.reduce((sum, r) => sum + (r.fuel_used || 0), 0).toFixed(3);
+  const total = records.value.reduce((sum, r) => sum + (parseFloat(r.fuel_used) || 0), 0);
+  return parseFloat(total).toFixed(3);
+});
+
+// Вспомогательная функция для конвертации времени HH:MM в минуты
+const timeToMinutes = (timeStr) => {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return 0;
+  const hours = parseInt(parts[0]) || 0;
+  const minutes = parseInt(parts[1]) || 0;
+  return hours * 60 + minutes;
+};
+
+// Вспомогательная функция для конвертации минут в HH:MM или только минуты
+const minutesToTimeFormat = (totalMinutes) => {
+  if (totalMinutes < 60) {
+    return `${totalMinutes} мин`;
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return `${hours} ч`;
+  }
+  return `${hours} ч ${minutes} мин`;
+};
+
+const totalTravelTime = computed(() => {
+  let totalMinutes = 0;
+  
+  records.value.forEach(record => {
+    const departureMinutes = timeToMinutes(record.departure_time);
+    const arrivalMinutes = timeToMinutes(record.arrival_time);
+    
+    let duration = arrivalMinutes - departureMinutes;
+    
+    // Если время прибытия раньше времени убытия, это означает пересечение дня
+    // (например, выезд в 23:00, приезд в 01:00)
+    if (duration < 0) {
+      duration += 24 * 60; // Добавляем 24 часа в минутах
+    }
+    
+    totalMinutes += duration;
+  });
+  
+  return minutesToTimeFormat(totalMinutes);
 });
 
 const recordsToDelete = computed(() => {
@@ -471,6 +514,17 @@ const canDeleteRecords = computed(() => {
 // Methods
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('ru-RU');
+};
+
+const formatTime = (timeString) => {
+  if (!timeString) return '-';
+  // Обрезать секунды если они есть (HH:MM:SS -> HH:MM)
+  return timeString.split(':').slice(0, 2).join(':');
+};
+
+const formatKilometers = (value) => {
+  // Показывать даже 0
+  return value ?? 0;
 };
 
 const getEndpoint = () => {
@@ -750,7 +804,26 @@ const openAddRecord = () => {
 };
 
 const openEditRecord = (record) => {
-  recordEditModal.value?.openEditModal(record);
+  console.log('[WaybillManagement] openEditRecord called with:', record);
+  
+  // Check permissions before editing
+  const permissionKey = carType.value === 'fire-truck'
+    ? 'can_update_fire_truck_waybills_records'
+    : 'can_update_passenger_cars_waybills_records';
+  
+  if (!auth.permissions[permissionKey]) {
+    console.warn('[WaybillManagement] Permission denied for:', permissionKey);
+    permissionDeniedModal.value?.openModal(permissionKey);
+    return;
+  }
+  
+  if (!recordEditModal.value) {
+    console.error('[WaybillManagement] recordEditModal.value is null or undefined!');
+    return;
+  }
+  
+  console.log('[WaybillManagement] Opening edit modal with record:', record);
+  recordEditModal.value.openEditModal(record);
 };
 
 const handleAddRecord = async (recordData) => {
@@ -774,6 +847,25 @@ const handleAddRecord = async (recordData) => {
       [carType.value === 'fire-truck' ? 'fire_truck_waybill' : 'passenger_car_waybill']: waybillId.value
     };
     
+    console.log('[WaybillManagement] Adding record with payload:', {
+      endpoint,
+      payload: JSON.parse(JSON.stringify(payload)), // Deep copy to avoid mutation logging
+      carType: carType.value,
+      waybillId: waybillId.value,
+      payloadTypes: {
+        target: typeof payload.target,
+        departure_time: typeof payload.departure_time,
+        arrival_time: typeof payload.arrival_time,
+        distance_city_km: typeof payload.distance_city_km,
+        distance_area_km: typeof payload.distance_area_km,
+        fuel_refueled: typeof payload.fuel_refueled,
+        fuel_used: typeof payload.fuel_used,
+        odometer_after: typeof payload.odometer_after,
+        time_with_pump: typeof payload.time_with_pump,
+        time_without_pump: typeof payload.time_without_pump
+      }
+    });
+    
     await axios.post(endpoint, payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
@@ -781,7 +873,17 @@ const handleAddRecord = async (recordData) => {
     console.log('[WaybillManagement] Record added successfully');
     await fetchRecords();
   } catch (error) {
-    console.error('Error adding record:', error);
+    console.error('[WaybillManagement] Error adding record:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message,
+      config: {
+        method: error.config?.method,
+        url: error.config?.url,
+        data: error.config?.data ? JSON.parse(error.config.data) : null
+      }
+    });
     
     // Check if this is a missing norm error for fire truck
     if (carType.value === 'fire-truck' && error.response?.data?.non_field_errors) {

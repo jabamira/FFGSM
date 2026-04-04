@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <NavigationMenu />
-    <div class="p-6 max-w-[95%] mx-auto pb-24">
+    <div class="p-6 max-w-[80%] mx-auto pb-24">
       <h2 class="text-2xl font-semibold mb-4" :style="{ color: palette.dark }">Нормы для пожарных автомобилей</h2>
       
       <!-- Filters Section -->

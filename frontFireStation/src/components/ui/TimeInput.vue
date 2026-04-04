@@ -84,24 +84,6 @@ export default {
     const timeInputRef = ref(null);
     let flatpickrInstance = null;
 
-    const displayValue = ref(props.modelValue);
-
-    watch(() => props.modelValue, (newVal) => {
-      displayValue.value = newVal;
-    });
-
-    const inputStyle = computed(() => {
-      return {
-        color: palette.dark,
-        borderColor: props.error ? palette.error : palette.light,
-        boxShadow: props.error 
-          ? `0 0 0 3px ${palette.error}20` 
-          : `0 0 0 0 transparent`,
-        backgroundColor: props.disabled ? `${palette.light}20` : 'white',
-        border: `1px solid ${props.error ? palette.error : palette.light}`,
-      };
-    });
-
     // Получить текущее время в формате HH:MM
     const getCurrentTime = () => {
       const now = new Date();
@@ -110,26 +92,6 @@ export default {
       return `${hours}:${minutes}`;
     };
 
-    // Форматировать время с маской HH:MM всегда с нулями
-    const formatTimeInput = (input) => {
-      // Оставить только цифры
-      const digits = input.replace(/\D/g, '');
-      
-      // Если длина меньше или равна 2, просто возвращаем цифры
-      if (digits.length <= 2) {
-        return digits;
-      }
-      
-      // Если больше 2, добавляем двоеточие
-      if (digits.length >= 3) {
-        const hours = String(parseInt(digits.slice(0, 2))).padStart(2, '0');
-        const minutes = digits.slice(2, 4);
-        return `${hours}:${minutes}`;
-      }
-      
-      return digits;
-    };
-    
     // Преобразовать время из любого формата в HH:MM с нулями
     const normalizeTimeFormat = (timeStr) => {
       if (!timeStr || typeof timeStr !== 'string') return '';
@@ -160,6 +122,52 @@ export default {
       return trimmed;
     };
 
+    const displayValue = ref(props.modelValue);
+
+    watch(() => props.modelValue, (newVal) => {
+      console.log('[TimeInput] modelValue changed:', { oldValue: displayValue.value, newValue: newVal });
+      const normalized = normalizeTimeFormat(newVal);
+      displayValue.value = normalized || newVal;
+      
+      // Обновить flatpickr instance если он существует
+      if (flatpickrInstance && normalized) {
+        console.log('[TimeInput] Updating flatpickr value to:', normalized);
+        flatpickrInstance.setDate(normalized, true);
+      }
+    }, { immediate: true, deep: true });
+
+    const inputStyle = computed(() => {
+      return {
+        color: palette.dark,
+        borderColor: props.error ? palette.error : palette.light,
+        boxShadow: props.error 
+          ? `0 0 0 3px ${palette.error}20` 
+          : `0 0 0 0 transparent`,
+        backgroundColor: props.disabled ? `${palette.light}20` : 'white',
+        border: `1px solid ${props.error ? palette.error : palette.light}`,
+      };
+    });
+
+    // Форматировать время с маской HH:MM всегда с нулями
+    const formatTimeInput = (input) => {
+      // Оставить только цифры
+      const digits = input.replace(/\D/g, '');
+      
+      // Если длина меньше или равна 2, просто возвращаем цифры
+      if (digits.length <= 2) {
+        return digits;
+      }
+      
+      // Если больше 2, добавляем двоеточие
+      if (digits.length >= 3) {
+        const hours = String(parseInt(digits.slice(0, 2))).padStart(2, '0');
+        const minutes = digits.slice(2, 4);
+        return `${hours}:${minutes}`;
+      }
+      
+      return digits;
+    };
+    
     const handleManualInput = (event) => {
       const input = event.target.value;
       const formatted = formatTimeInput(input);

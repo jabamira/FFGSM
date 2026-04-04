@@ -16,6 +16,7 @@
       :style="inputStyle"
       class="w-full px-4 py-2 rounded-lg outline-none transition"
       @input="handleInput($event)"
+      @keydown="handleKeyDown($event)"
       @blur="$emit('blur')"
       @focus="$emit('focus')"
     />
@@ -67,6 +68,10 @@ export default {
       type: Boolean,
       default: false,
     },
+    disallowMinus: {
+      type: Boolean,
+      default: false,
+    },
     min: {
       type: [String, Number],
       default: undefined,
@@ -102,13 +107,27 @@ export default {
 
     const handleInput = (event) => {
       let value = event.target.value;
+      
+      // Remove minus signs if disallowMinus is true
+      if (props.disallowMinus && value.includes('-')) {
+        value = value.replace(/-/g, '');
+        event.target.value = value;
+      }
+      
       if (props.uppercase) {
         value = value.toUpperCase();
       }
       emit('update:modelValue', value);
     };
 
-    return { palette, inputStyle, handleInput };
+    const handleKeyDown = (event) => {
+      // Block minus key if disallowMinus is true
+      if (props.disallowMinus && (event.key === '-' || event.code === 'Minus')) {
+        event.preventDefault();
+      }
+    };
+
+    return { palette, inputStyle, handleInput, handleKeyDown };
   },
 };
 </script>
