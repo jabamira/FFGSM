@@ -604,6 +604,16 @@ class PassengerCarWaybillRecordViewSet(SoftDeleteModelViewSet):
     queryset = PassengerCarWaybillRecord.objects.select_related('passenger_car_waybill')
     serializer_class = PassengerCarWaybillRecordSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by passenger_car_waybill if provided in query params
+        waybill_id = self.request.query_params.get('passenger_car_waybill')
+        if waybill_id:
+            queryset = queryset.filter(passenger_car_waybill_id=waybill_id)
+        
+        return queryset
+
     def get_permissions(self):
         base = [IsAuthenticated()]
         if self.action in ['list', 'retrieve']:
@@ -921,6 +931,16 @@ class FireTruckWaybillRecordViewSet(SoftDeleteModelViewSet):
     queryset = FireTruckWaybillRecord.objects.select_related('fire_truck_waybill')
     serializer_class = FireTruckWaybillRecordSerializer
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by fire_truck_waybill if provided in query params
+        waybill_id = self.request.query_params.get('fire_truck_waybill')
+        if waybill_id:
+            queryset = queryset.filter(fire_truck_waybill_id=waybill_id)
+        
+        return queryset
+
     def get_permissions(self):
         base = [IsAuthenticated()]
         if self.action in ['list', 'retrieve']:
@@ -1012,12 +1032,30 @@ class NormsTechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
         qs = NormsTechnicalMaintenance.objects.all()
 
         if can_passenger and can_fire:
-            return qs
+            # User can see both, but still apply query filters if provided
+            pass
         elif can_passenger:
-            return qs.filter(fire_truck__isnull=True)
+            qs = qs.filter(fire_truck__isnull=True)
         elif can_fire:
-            return qs.filter(passenger_car__isnull=True)
-        return qs.none()
+            qs = qs.filter(passenger_car__isnull=True)
+        else:
+            return qs.none()
+
+        # Apply query parameter filters
+        fire_truck_isnull = self.request.query_params.get('fire_truck__isnull')
+        passenger_car_isnull = self.request.query_params.get('passenger_car__isnull')
+
+        if fire_truck_isnull is not None:
+            # fire_truck__isnull=false means show only fire trucks
+            # fire_truck__isnull=true means show only passenger cars
+            qs = qs.filter(fire_truck__isnull=fire_truck_isnull.lower() == 'true')
+
+        if passenger_car_isnull is not None:
+            # passenger_car__isnull=false means show only passenger cars
+            # passenger_car__isnull=true means show only fire trucks
+            qs = qs.filter(passenger_car__isnull=passenger_car_isnull.lower() == 'true')
+
+        return qs
 
     def get_permissions(self):
         return [IsAuthenticated()]

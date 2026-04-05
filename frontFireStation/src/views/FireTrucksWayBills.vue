@@ -347,7 +347,7 @@ const handleAddWaybill = async (waybillData) => {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     await fetchWaybills();
-    waybillModal.value?.closeAddModal?.();
+    waybillModal.value?.closeAddModal();
   } catch (error) {
     const response = error.response?.data;
     

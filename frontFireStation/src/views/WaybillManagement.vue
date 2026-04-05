@@ -504,6 +504,8 @@ const canCreateRecords = computed(() => {
   return auth.permissions[permissionKey] || false;
 });
 
+
+
 const canDeleteRecords = computed(() => {
   const permissionKey = carType.value === 'fire-truck'
     ? 'can_delete_fire_truck_waybills_records'
@@ -574,6 +576,12 @@ const fetchRecords = async () => {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     records.value = response.data;
+    console.log('[WaybillManagement] Records fetched from server:', {
+      endpoint: getRecordsEndpoint(),
+      totalCount: response.data?.length || 0,
+      data: response.data,
+      firstRecord: response.data?.[0] || null
+    });
   } catch (error) {
     console.error('Error loading records:', error);
     records.value = [];
@@ -826,6 +834,16 @@ const openEditRecord = (record) => {
   recordEditModal.value.openEditModal(record);
 };
 
+// Форматировать decimal число: заменить запятую на точку и округлить до 3 знаков
+const formatDecimalForSubmit = (value) => {
+  if (value === null || value === '' || isNaN(value)) return 0;
+  // Заменить запятую на точку
+  const normalized = String(value).replace(',', '.');
+  const num = parseFloat(normalized);
+  // Округлить до 3 знаков после запятой
+  return parseFloat(num.toFixed(3));
+};
+
 const handleAddRecord = async (recordData) => {
   // Check permissions before adding
   const permissionKey = carType.value === 'fire-truck'
@@ -842,29 +860,22 @@ const handleAddRecord = async (recordData) => {
       ? 'fire-truck-records/'
       : 'passenger-car-records/';
     
+    // Форматировать decimal поля перед отправкой
+    const fuel_refueled = formatDecimalForSubmit(recordData.fuel_refueled);
+    const fuel_used = formatDecimalForSubmit(recordData.fuel_used);
+    
     const payload = {
       ...recordData,
+      fuel_refueled: fuel_refueled,
+      fuel_used: fuel_used,
       [carType.value === 'fire-truck' ? 'fire_truck_waybill' : 'passenger_car_waybill']: waybillId.value
     };
     
-    console.log('[WaybillManagement] Adding record with payload:', {
-      endpoint,
-      payload: JSON.parse(JSON.stringify(payload)), // Deep copy to avoid mutation logging
-      carType: carType.value,
-      waybillId: waybillId.value,
-      payloadTypes: {
-        target: typeof payload.target,
-        departure_time: typeof payload.departure_time,
-        arrival_time: typeof payload.arrival_time,
-        distance_city_km: typeof payload.distance_city_km,
-        distance_area_km: typeof payload.distance_area_km,
-        fuel_refueled: typeof payload.fuel_refueled,
-        fuel_used: typeof payload.fuel_used,
-        odometer_after: typeof payload.odometer_after,
-        time_with_pump: typeof payload.time_with_pump,
-        time_without_pump: typeof payload.time_without_pump
-      }
-    });
+    console.log('\n========== ОТПРАВЛЯЮ НОВУЮ ЗАПИСЬ ==========');
+    console.log('Endpoint:', endpoint);
+    console.log('Полный payload:');
+    console.log(JSON.stringify(payload, null, 2));
+    console.log('==========================================\n');
     
     await axios.post(endpoint, payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -872,34 +883,49 @@ const handleAddRecord = async (recordData) => {
     
     console.log('[WaybillManagement] Record added successfully');
     await fetchRecords();
+    recordEditModal.value?.closeModal();
   } catch (error) {
-    console.error('[WaybillManagement] Error adding record:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message,
-      config: {
-        method: error.config?.method,
-        url: error.config?.url,
-        data: error.config?.data ? JSON.parse(error.config.data) : null
+    const errorData = error.response?.data;
+    
+    // Распарсим ошибку независимо от формата
+    let errorMsg = '';
+    if (Array.isArray(errorData) && errorData.length > 0) {
+      // Если это массив, возьмём первый элемент
+      const firstError = errorData[0];
+      if (typeof firstError === 'string') {
+        errorMsg = firstError;
+      } else if (firstError.non_field_errors && Array.isArray(firstError.non_field_errors)) {
+        errorMsg = firstError.non_field_errors[0] || '';
+      } else if (typeof firstError === 'object') {
+        errorMsg = JSON.stringify(firstError);
       }
-    });
+    } else if (typeof errorData === 'string') {
+      errorMsg = errorData;
+    } else if (errorData && errorData.non_field_errors) {
+      errorMsg = Array.isArray(errorData.non_field_errors) 
+        ? errorData.non_field_errors[0] 
+        : errorData.non_field_errors;
+    }
+    
+    console.log('[DEBUG] errorMsg preview:', errorMsg.substring(0, 200));
+    
+    // Проверка на ошибку валидации одометра
+    if (errorMsg.includes('одометр') && errorMsg.includes('не может быть меньше')) {
+      recordEditModal.value?.setValidationError(errorMsg);
+      return;
+    }
     
     // Check if this is a missing norm error for fire truck
     if (carType.value === 'fire-truck' && error.response?.data?.non_field_errors) {
-      const errorMsg = error.response.data.non_field_errors[0];
-      if (errorMsg && typeof errorMsg === 'string' && errorMsg.includes('Не найдена норма')) {
-        // Extract car number and season from error message
-        const match = errorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
+      const normErrorMsg = error.response.data.non_field_errors[0];
+      if (normErrorMsg && typeof normErrorMsg === 'string' && normErrorMsg.includes('Не найдена норма')) {
+        const match = normErrorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
         if (match) {
           const carNumber = match[1];
           const seasonDisplay = match[2];
           const season = seasonDisplay === 'Лето' ? 'summer' : 'winter';
           
-          // Store the pending record data
           pendingRecordData.value = recordData;
-          
-          // Show the norm modal
           normData.value = {
             carId: waybill.value.car,
             carNumber: carNumber,
@@ -911,7 +937,9 @@ const handleAddRecord = async (recordData) => {
       }
     }
     
-    errorModalRef.value?.openModal(error);
+    // Для всех остальных ошибок - показать в модали с автоскроллом
+    const errorText = errorMsg || 'Произошла ошибка при сохранении записи';
+    recordEditModal.value?.setValidationError(errorText);
   }
 };
 
@@ -927,34 +955,82 @@ const handleEditRecord = async (recordData) => {
   }
 
   try {
+    // Форматировать decimal поля перед отправкой
+    const fuel_refueled = formatDecimalForSubmit(recordData.fuel_refueled);
+    const fuel_used = formatDecimalForSubmit(recordData.fuel_used);
+    
     const endpoint = carType.value === 'fire-truck'
       ? `fire-truck-records/${recordData.id}/`
       : `passenger-car-records/${recordData.id}/`;
     
-    await axios.patch(endpoint, recordData, {
+    const payload = {
+      ...recordData,
+      fuel_refueled: fuel_refueled,
+      fuel_used: fuel_used
+    };
+    
+    console.log('\n========== РЕДАКТИРУЮ ЗАПИСЬ ==========');
+    console.log('Endpoint:', endpoint);
+    console.log('ID:', recordData.id);
+    console.log('Полный payload:');
+    console.log(JSON.stringify(payload, null, 2));
+    console.log('======================================\n');
+    
+    await axios.patch(endpoint, payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     
     console.log('[WaybillManagement] Record updated successfully');
     await fetchRecords();
+    recordEditModal.value?.closeModal();
   } catch (error) {
+    const errorData = error.response?.data;
+    
+    // Распарсим ошибку независимо от формата
+    let errorMsg = '';
+    if (Array.isArray(errorData) && errorData.length > 0) {
+      // Если это массив, возьмём первый элемент
+      const firstError = errorData[0];
+      if (typeof firstError === 'string') {
+        errorMsg = firstError;
+      } else if (firstError.non_field_errors && Array.isArray(firstError.non_field_errors)) {
+        errorMsg = firstError.non_field_errors[0] || '';
+      } else if (typeof firstError === 'object') {
+        errorMsg = JSON.stringify(firstError);
+      }
+    } else if (typeof errorData === 'string') {
+      errorMsg = errorData;
+    } else if (errorData && errorData.non_field_errors) {
+      errorMsg = Array.isArray(errorData.non_field_errors) 
+        ? errorData.non_field_errors[0] 
+        : errorData.non_field_errors;
+    }
+    
     console.error('Error updating record:', error);
+    
+    // DEBUG: Выведем тип и содержание errorData
+    console.log('[DEBUG] errorData type:', typeof errorData);
+    console.log('[DEBUG] isArray:', Array.isArray(errorData));
+    console.log('[DEBUG] errorMsg includes "одометр":', errorMsg.includes('одометр'));
+    console.log('[DEBUG] errorMsg preview:', errorMsg.substring(0, 200));
+    
+    // Проверка на ошибку валидации одометра
+    if (errorMsg.includes('одометр') && errorMsg.includes('не может быть меньше')) {
+      recordEditModal.value?.setValidationError(errorMsg);
+      return;
+    }
     
     // Check if this is a missing norm error for fire truck
     if (carType.value === 'fire-truck' && error.response?.data?.non_field_errors) {
-      const errorMsg = error.response.data.non_field_errors[0];
-      if (errorMsg && typeof errorMsg === 'string' && errorMsg.includes('Не найдена норма')) {
-        // Extract car number and season from error message
-        const match = errorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
+      const normErrorMsg = error.response.data.non_field_errors[0];
+      if (normErrorMsg && typeof normErrorMsg === 'string' && normErrorMsg.includes('Не найдена норма')) {
+        const match = normErrorMsg.match(/Не найдена норма для (.+?), сезон=(.+?)$/);
         if (match) {
           const carNumber = match[1];
           const seasonDisplay = match[2];
           const season = seasonDisplay === 'Лето' ? 'summer' : 'winter';
           
-          // Store the pending record data
           pendingRecordData.value = recordData;
-          
-          // Show the norm modal
           normData.value = {
             carId: waybill.value.car,
             carNumber: carNumber,
@@ -966,7 +1042,9 @@ const handleEditRecord = async (recordData) => {
       }
     }
     
-    errorModalRef.value?.openModal(error);
+    // Для всех остальных ошибок - показать в модали с автоскроллом
+    const errorText = errorMsg || 'Произошла ошибка при обновлении записи';
+    recordEditModal.value?.setValidationError(errorText);
   }
 };
 

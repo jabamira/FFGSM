@@ -321,6 +321,11 @@ export const fieldDefinitions = {
 
   // NormsPassengerCars fields
   normsPassengerCars: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите легковой автомобиль",
+    },
     season: {
       label: "Сезон",
       required: true,
@@ -331,18 +336,20 @@ export const fieldDefinitions = {
       required: true,
       type: "decimal",
       minValue: 0,
+      maxValue: 9.999,
       maxDigits: 4,
       decimalPlaces: 3,
-      hint: "Минимум 0, до 3 знаков после запятой/точки",
+      hint: "От 0 до 9.999, до 3 знаков после запятой/точки",
     },
     area_norm: {
       label: "Норма по области (л/км)",
       required: true,
       type: "decimal",
       minValue: 0,
+      maxValue: 9.999,
       maxDigits: 4,
       decimalPlaces: 3,
-      hint: "Минимум 0, до 3 знаков после запятой/точки",
+      hint: "От 0 до 9.999, до 3 знаков после запятой/точки",
     },
     date: {
       label: "Дата утверждения",
@@ -352,8 +359,78 @@ export const fieldDefinitions = {
     },
   },
 
-  // NormsFireTrucks fields
+  // NormsOperatingHoursPassengerCar fields
+  normsOperatingHoursPassengerCar: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите легковой автомобиль",
+    },
+    city_norm: {
+      label: "Норма по городу",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 99.9999,
+      maxDigits: 5,
+      decimalPlaces: 4,
+      hint: "От 0 до 99.9999 ч/км",
+    },
+    area_norm: {
+      label: "Норма по области",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 99.9999,
+      maxDigits: 5,
+      decimalPlaces: 4,
+      hint: "От 0 до 99.9999 ч/км",
+    },
+    date: {
+      label: "Дата утверждения",
+      required: true,
+      type: "date",
+      hint: "Укажите дату утверждения нормы",
+    },
+  },
+
+  // NormsTechnicalMaintenance fields (Passenger Cars)
+  normsTechnicalMaintenancePassengerCar: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите легковой автомобиль",
+    },
+    maintenance_type: {
+      label: "Вид ТО",
+      required: true,
+      hint: "Выберите вид технического обслуживания",
+    },
+    norm: {
+      label: "Норма",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 999999.999,
+      maxDigits: 9,
+      decimalPlaces: 3,
+      hint: "От 0 до 999999.999, до 3 знаков после запятой/точки",
+    },
+    date: {
+      label: "Дата утверждения",
+      required: true,
+      type: "date",
+      hint: "Укажите дату утверждения нормы",
+    },
+  },
+
+  // NormsFireTrucks fields (fuel norms)
   normsFireTrucks: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите пожарный автомобиль",
+    },
     season: {
       label: "Сезон",
       required: true,
@@ -364,27 +441,95 @@ export const fieldDefinitions = {
       required: true,
       type: "decimal",
       minValue: 0,
+      maxValue: 9.999,
       maxDigits: 4,
       decimalPlaces: 3,
-      hint: "Минимум 0, до 3 знаков после запятой/точки",
+      hint: "От 0 до 9.999, до 3 знаков после запятой/точки",
     },
     without_pump_norm: {
       label: "Норма без насоса (л/мин)",
       required: true,
       type: "decimal",
       minValue: 0,
+      maxValue: 9.999,
       maxDigits: 4,
       decimalPlaces: 3,
-      hint: "Минимум 0, до 3 знаков после запятой/точки",
+      hint: "От 0 до 9.999, до 3 знаков после запятой/точки",
     },
     km_norm: {
       label: "Норма по пробегу (л/км)",
       required: true,
       type: "decimal",
       minValue: 0,
+      maxValue: 9.999,
       maxDigits: 4,
       decimalPlaces: 3,
-      hint: "Минимум 0, до 3 знаков после запятой/точки",
+      hint: "От 0 до 9.999, до 3 знаков после запятой/точки",
+    },
+    date: {
+      label: "Дата утверждения",
+      required: true,
+      type: "date",
+      hint: "Укажите дату утверждения нормы",
+    },
+  },
+
+  // NormsOperatingHoursFireTruck fields
+  normsOperatingHoursFireTruck: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите пожарный автомобиль",
+    },
+    km_norm: {
+      label: "Норма км (ч/км)",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 99.9999,
+      maxDigits: 5,
+      decimalPlaces: 4,
+      hint: "От 0 до 99.9999, до 4 знаков после запятой/точки",
+    },
+    with_pump_norm: {
+      label: "Норма с насосом (коэффициент)",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 99.9999,
+      maxDigits: 6,
+      decimalPlaces: 4,
+      hint: "От 0 до 99.9999, до 4 знаков после запятой/точки",
+    },
+    date: {
+      label: "Дата утверждения",
+      required: true,
+      type: "date",
+      hint: "Укажите дату утверждения нормы",
+    },
+  },
+
+  // NormsTechnicalMaintenance fields (Fire Trucks)
+  normsTechnicalMaintenanceFireTruck: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите пожарный автомобиль",
+    },
+    maintenance_type: {
+      label: "Вид ТО",
+      required: true,
+      hint: "Выберите вид технического обслуживания",
+    },
+    norm: {
+      label: "Норма",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxValue: 999999.999,
+      maxDigits: 9,
+      decimalPlaces: 3,
+      hint: "От 0 до 999999.999, до 3 знаков после запятой/точки",
     },
     date: {
       label: "Дата утверждения",
@@ -454,7 +599,7 @@ export const fieldDefinitions = {
       label: "Одометр после возвращения (км)",
       required: true,
       type: "integer",
-      minValue: 0,
+      minValue: 1,
       maxValue: 999999,
       onlyDigits: true,
       hint: "Только цифры, максимум 999999 (обязательно для пожарной машины)",
@@ -601,8 +746,42 @@ export const fieldDefinitions = {
     },
   },
 
-  // Technical Maintenance fields
+  // Technical Maintenance Norms fields
+  normsTechnicalMaintenance: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите машину",
+    },
+    maintenance_type: {
+      label: "Вид ТО",
+      required: true,
+      hint: "Выберите вид технического обслуживания",
+    },
+    norm: {
+      label: "Норма",
+      required: true,
+      type: "decimal",
+      minValue: 0,
+      maxDigits: 9,
+      decimalPlaces: 3,
+      hint: "Минимум 0, до 3 знаков после запятой/точки",
+    },
+    date: {
+      label: "Дата утверждения",
+      required: true,
+      type: "date",
+      hint: "Укажите дату утверждения нормы",
+    },
+  },
+
+  // Technical Maintenance records fields
   technicalMaintenance: {
+    car: {
+      label: "Автомобиль",
+      required: true,
+      hint: "Выберите машину",
+    },
     date: {
       label: "Дата",
       required: true,

@@ -216,6 +216,7 @@ const submitAdd = async () => {
     norm_season: form.value.norm_season,
     fuel_type: form.value.fuel_type
   });
+
 };
 
 const submitDelete = () => {
@@ -233,10 +234,19 @@ const showPermissionError = () => {
   permissionModal.value?.openModal();
 };
 
+// Stub for edit modal - editing is handled by WaybillFieldsEditModal component
+const openEditModal = (waybill) => {
+  // This is a placeholder - actual editing is handled by parent component
+  // using WaybillFieldsEditModal
+  console.warn('openEditModal called on WaybillEditModal - should use WaybillFieldsEditModal instead');
+};
+
 // Expose methods
 defineExpose({
   openAddModal,
   openDeleteModal,
+  openEditModal,
+  closeAddModal,
   showError,
   showPermissionError,
   clearErrors,

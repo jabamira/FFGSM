@@ -133,7 +133,7 @@ class Command(BaseCommand):
                 "surname": "Иванов",
                 "last_name": "Сергеевич",
                 "phone": "+70000000003",
-                "driver_license": "AA1234567",
+                "driver_license": "001234567",
                 "role": driver_role,
             },
             {
@@ -143,7 +143,7 @@ class Command(BaseCommand):
                 "surname": "Пожарный",
                 "last_name": "Иванович",
                 "phone": "+70000000004",
-                "driver_license": "BB7654321",
+                "driver_license": "347654321",
                 "role": driver_role,
             },
         ]

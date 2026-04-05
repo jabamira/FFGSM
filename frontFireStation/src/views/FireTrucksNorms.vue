@@ -97,6 +97,7 @@
             :show-select-all="false"
             :selected-rows="getSelectedFuelNormIndexes()"
             @row-selected="onFuelNormsSelected"
+            @row-click="editFuelNorm"
           >
             <template #cell-car="{ value }">
               {{ getCar(value)?.number }}
@@ -143,6 +144,7 @@
             :show-select-all="false"
             :selected-rows="getSelectedOperatingHourIndexes()"
             @row-selected="onOperatingHoursSelected"
+            @row-click="editOperatingHoursNorm"
           >
             <template #cell-car="{ value }">
               {{ getCar(value)?.number }}
@@ -189,6 +191,7 @@
             :show-select-all="false"
             :selected-rows="getSelectedTechnicalNormIndexes()"
             @row-selected="onTechnicalNormsSelected"
+            @row-click="editTechnicalNorm"
           >
             <template #cell-fire_truck="{ value }">
               {{ getCar(value)?.number }}
@@ -270,6 +273,34 @@
       <Button variant="danger" size="md" @click="confirmDeleteTechnicalNorms">Удалить</Button>
     </template>
   </Modal>
+
+  <!-- Edit Modals for Norms -->
+  <FireTruckNormEditModal
+    ref="fuelNormEditModal"
+    :fire-trucks="fireTrucks"
+    :auth="auth"
+    @norm-added="handleFuelNormAdded"
+    @norm-updated="handleFuelNormUpdated"
+    @error="(error) => errorModalRef?.openModal(error)"
+  />
+  
+  <FireTruckOperatingHoursNormEditModal
+    ref="operatingHoursNormEditModal"
+    :fire-trucks="fireTrucks"
+    :auth="auth"
+    @norm-added="handleOperatingHoursNormAdded"
+    @norm-updated="handleOperatingHoursNormUpdated"
+    @error="(error) => errorModalRef?.openModal(error)"
+  />
+  
+  <FireTruckTechnicalMaintenanceNormEditModal
+    ref="technicalNormEditModal"
+    :fire-trucks="fireTrucks"
+    :auth="auth"
+    @norm-added="handleTechnicalNormAdded"
+    @norm-updated="handleTechnicalNormUpdated"
+    @error="(error) => errorModalRef?.openModal(error)"
+  />
 </template>
 
 <script setup>
@@ -279,11 +310,17 @@ import { palette, SelectInput, Button, DataTable, Modal } from '../components/ui
 import NavigationMenu from '../components/NavigationMenu.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import ErrorModal from '../components/ErrorModal.vue';
+import FireTruckNormEditModal from '../components/FireTruckNormEditModal.vue';
+import FireTruckOperatingHoursNormEditModal from '../components/FireTruckOperatingHoursNormEditModal.vue';
+import FireTruckTechnicalMaintenanceNormEditModal from '../components/FireTruckTechnicalMaintenanceNormEditModal.vue';
 import axios from 'axios';
 
 const auth = useAuthStore();
 const permissionDeniedModal = ref(null);
 const errorModalRef = ref(null);
+const fuelNormEditModal = ref(null);
+const operatingHoursNormEditModal = ref(null);
+const technicalNormEditModal = ref(null);
 
 // Modal states
 const showDeleteFuelNormsModal = ref(false);
@@ -619,15 +656,64 @@ const confirmDeleteTechnicalNorms = async () => {
 
 // Placeholder methods for create modals (can be implemented later)
 const openCreateFuelNormModal = () => {
-  console.log('Create fuel norm modal - to be implemented');
+  fuelNormEditModal.value?.openAddModal();
 };
 
 const openCreateOperatingHoursModal = () => {
-  console.log('Create operating hours modal - to be implemented');
+  operatingHoursNormEditModal.value?.openAddModal();
 };
 
 const openCreateTechnicalNormModal = () => {
-  console.log('Create technical norm modal - to be implemented');
+  technicalNormEditModal.value?.openAddModal();
+};
+
+// Handlers for modal events - Fuel Norms
+const handleFuelNormAdded = (norm) => {
+  fuelNorms.value.push(norm);
+};
+
+const handleFuelNormUpdated = (updatedNorm) => {
+  const idx = fuelNorms.value.findIndex(n => n.id === updatedNorm.id);
+  if (idx !== -1) {
+    fuelNorms.value[idx] = updatedNorm;
+  }
+};
+
+// Handlers for modal events - Operating Hours Norms
+const handleOperatingHoursNormAdded = (norm) => {
+  operatingHoursNorms.value.push(norm);
+};
+
+const handleOperatingHoursNormUpdated = (updatedNorm) => {
+  const idx = operatingHoursNorms.value.findIndex(n => n.id === updatedNorm.id);
+  if (idx !== -1) {
+    operatingHoursNorms.value[idx] = updatedNorm;
+  }
+};
+
+// Handlers for modal events - Technical Norms
+const handleTechnicalNormAdded = (norm) => {
+  technicalNorms.value.push(norm);
+};
+
+const handleTechnicalNormUpdated = (updatedNorm) => {
+  const idx = technicalNorms.value.findIndex(n => n.id === updatedNorm.id);
+  if (idx !== -1) {
+    technicalNorms.value[idx] = updatedNorm;
+  }
+};
+
+// Method to open edit modal for norms
+const editFuelNorm = (norm) => {
+  fuelNormEditModal.value?.openEditModal(norm);
+};
+
+const editOperatingHoursNorm = (norm) => {
+  operatingHoursNormEditModal.value?.openEditModal(norm);
+};
+
+const editTechnicalNorm = (norm) => {
+  technicalNormEditModal.value?.openEditModal(norm);
 };
 
 onMounted(async () => {

@@ -1260,11 +1260,46 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         return prev_total + increment
 
     def save(self, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
+        
         with transaction.atomic():
             self._fill_start_values()
+            
+            # Валидация: одометр не может идти назад!
+            if self.odometer_after < self.odometer_before:
+                raise ValidationError(
+                    f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть меньше чем одометр перед поездкой ({self.odometer_before}). "
+                    f"Проверьте значение одометра после поездки (odometer_after)."
+                )
+            
             self._apply_norms()
             self._calc_fuel_on_return()
-            super().save(*args, **kwargs)
+            
+            # Логирование всех полей перед сохранением
+            logger.warning(f'\n\n========== ПЕРЕД СОХРАНЕНИЕМ В БД ==========')
+            logger.warning(f'odometer_before: {self.odometer_before} (type: {type(self.odometer_before).__name__})')
+            logger.warning(f'odometer_after: {self.odometer_after} (type: {type(self.odometer_after).__name__})')
+            logger.warning(f'distance_km: {self.distance_km} (type: {type(self.distance_km).__name__})')
+            logger.warning(f'fuel_before_departure: {self.fuel_before_departure} (type: {type(self.fuel_before_departure).__name__})')
+            logger.warning(f'fuel_refueled: {self.fuel_refueled} (type: {type(self.fuel_refueled).__name__})')
+            logger.warning(f'fuel_used: {self.fuel_used} (type: {type(self.fuel_used).__name__})')
+            logger.warning(f'fuel_used_by_distance: {self.fuel_used_by_distance} (type: {type(self.fuel_used_by_distance).__name__})')
+            logger.warning(f'fuel_used_with_pump: {self.fuel_used_with_pump} (type: {type(self.fuel_used_with_pump).__name__})')
+            logger.warning(f'fuel_used_without_pump: {self.fuel_used_without_pump} (type: {type(self.fuel_used_without_pump).__name__})')
+            logger.warning(f'fuel_used_normal: {self.fuel_used_normal} (type: {type(self.fuel_used_normal).__name__})')
+            logger.warning(f'fuel_on_return: {self.fuel_on_return} (type: {type(self.fuel_on_return).__name__})')
+            logger.warning(f'time_with_pump: {self.time_with_pump} (type: {type(self.time_with_pump).__name__})')
+            logger.warning(f'time_without_pump: {self.time_without_pump} (type: {type(self.time_without_pump).__name__})')
+            logger.warning(f'==========================================\n')
+            
+            try:
+                super().save(*args, **kwargs)
+                logger.warning('[save] УСПЕШНО СОХРАНЕНО В БД')
+            except Exception as e:
+                logger.error(f'[save] ОШИБКА ПРИ СОХРАНЕНИИ: {str(e)}')
+                logger.error(f'[save] Тип ошибки: {type(e).__name__}')
+                raise
 
             OdometerFuelFireTruck.objects.create(
                 car=self.fire_truck_waybill.car,

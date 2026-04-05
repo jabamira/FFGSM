@@ -7,8 +7,8 @@
       @close="closeModal"
     >
       <div class="space-y-4" ref="formContainer">
-        <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
-          <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>
+        <div v-if="generalError" role="alert" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
+          <p class="text-sm font-semibold text-red-600 whitespace-pre-line">{{ generalError }}</p>
         </div>
         <TextInput
           v-model="form.target"
@@ -44,13 +44,11 @@
 
         <TextInput
           v-model.number="form.distance_city_km"
-          :disallowMinus="true"
+          :positiveIntegerOnly="true"
           @change="validateNumberField('distance_city_km')"
           :label="fieldDefinitions.waybillRecord.distance_city_km.label"
           :hint="fieldDefinitions.waybillRecord.distance_city_km.hint"
-          type="number"
           placeholder="0"
-          min="0"
           :required="fieldDefinitions.waybillRecord.distance_city_km.required"
           :error="formErrors.distance_city_km"
           :data-error="formErrors.distance_city_km ? 'distance_city_km' : null"
@@ -58,13 +56,11 @@
 
         <TextInput
           v-model.number="form.distance_area_km"
-          :disallowMinus="true"
+          :positiveIntegerOnly="true"
           @change="validateNumberField('distance_area_km')"
           :label="fieldDefinitions.waybillRecord.distance_area_km.label"
           :hint="fieldDefinitions.waybillRecord.distance_area_km.hint"
-          type="number"
           placeholder="0"
-          min="0"
           :required="fieldDefinitions.waybillRecord.distance_area_km.required"
           :error="formErrors.distance_area_km"
           :data-error="formErrors.distance_area_km ? 'distance_area_km' : null"
@@ -104,13 +100,11 @@
         <TextInput
           v-if="isFireTruck"
           v-model.number="form.odometer_after"
-          :disallowMinus="true"
+          :positiveIntegerOnly="true"
           @change="validateNumberField('odometer_after')"
           :label="fieldDefinitions.waybillRecord.odometer_after.label"
           :hint="fieldDefinitions.waybillRecord.odometer_after.hint"
-          type="number"
           placeholder="0"
-          min="0"
           :required="fieldDefinitions.waybillRecord.odometer_after.required"
           :error="formErrors.odometer_after"
           :data-error="formErrors.odometer_after ? 'odometer_after' : null"
@@ -119,13 +113,11 @@
         <TextInput
           v-if="isFireTruck"
           v-model.number="form.time_with_pump"
-          :disallowMinus="true"
+          :positiveIntegerOnly="true"
           @change="validateNumberField('time_with_pump')"
           :label="fieldDefinitions.waybillRecord.time_with_pump.label"
           :hint="fieldDefinitions.waybillRecord.time_with_pump.hint"
-          type="number"
           placeholder="0"
-          min="0"
           :required="fieldDefinitions.waybillRecord.time_with_pump.required"
           :error="formErrors.time_with_pump"
           :data-error="formErrors.time_with_pump ? 'time_with_pump' : null"
@@ -134,13 +126,11 @@
         <TextInput
           v-if="isFireTruck"
           v-model.number="form.time_without_pump"
-          :disallowMinus="true"
+          :positiveIntegerOnly="true"
           @change="validateNumberField('time_without_pump')"
           :label="fieldDefinitions.waybillRecord.time_without_pump.label"
           :hint="fieldDefinitions.waybillRecord.time_without_pump.hint"
-          type="number"
           placeholder="0"
-          min="0"
           :required="fieldDefinitions.waybillRecord.time_without_pump.required"
           :error="formErrors.time_without_pump"
           :data-error="formErrors.time_without_pump ? 'time_without_pump' : null"
@@ -287,6 +277,61 @@ const validateNumberField = (fieldName) => {
   } else {
     formErrors.value[fieldName] = '';
   }
+  
+  // Очистить общую ошибку валидации при изменении одометра
+  if (fieldName === 'odometer_after' && generalError.value) {
+    generalError.value = '';
+  }
+};
+
+// Метод для отображения ошибки валидации от сервера внутри модали
+const setValidationError = (errorMessage, fieldName = null) => {
+  // Попытаемся улучшить сообщение об ошибке одометра
+  let displayError = errorMessage;
+  
+  // Если это ошибка одометра - распарсим и переформатируем сообщение
+  if (errorMessage.includes('одометр') && errorMessage.includes('не может быть меньше')) {
+    const match = errorMessage.match(/одометр после поездки \((\d+)\).*?одометр перед поездкой \((\d+)\)/);
+    if (match) {
+      const inputValue = match[1];
+      const dbValue = match[2];
+      displayError = `Ошибка: Одометр после поездки\n\nВы ввели: ${inputValue} км\nТекущее значение в БД: ${dbValue} км\n\nЗначение одометра может только увеличиваться. Пожалуйста, введите значение больше чем ${dbValue}.`;
+    }
+  }
+  
+  generalError.value = displayError;
+  
+  // Прокрутить форму вверх чтобы увидеть ошибку
+  nextTick(() => {
+    // Сначала попробуем найти элемент ошибки
+    const errorElement = formContainer.value?.querySelector('[role="alert"]') 
+      || formContainer.value?.querySelector('.bg-red-50');
+    
+    if (errorElement) {
+      console.log('[setValidationError] Скроллим к элементу ошибки');
+      errorElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    
+    // Если fieldName указан, пытаемся найти поле с ошибкой
+    if (fieldName && formContainer.value) {
+      const fieldElement = formContainer.value.querySelector(`[data-error="${fieldName}"]`)
+        || formContainer.value.querySelector(`input[data-testid="${fieldName}"]`)
+        || formContainer.value.querySelector(`[name="${fieldName}"]`);
+      
+      if (fieldElement) {
+        console.log(`[setValidationError] Скроллим к полю ${fieldName}`);
+        fieldElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+    
+    // По умолчанию скроллим к верху контейнера
+    if (formContainer.value) {
+      console.log('[setValidationError] Скроллим к верху формы');
+      formContainer.value.scrollTop = 0;
+    }
+  });
 };
 
 // Получить текущее время в формате HH:MM
@@ -442,6 +487,13 @@ const submitForm = async () => {
     return trimmed;
   };
 
+  // Форматировать decimal число с 3 знаками после запятой
+  const formatDecimal = (value) => {
+    if (value === null || value === '' || isNaN(value)) return 0;
+    const num = parseFloat(value);
+    return parseFloat(num.toFixed(3));
+  };
+
   // Валидация полей на клиенте
   const departure_time = normalizeTime(form.value.departure_time);
   const arrival_time = normalizeTime(form.value.arrival_time);
@@ -459,20 +511,14 @@ const submitForm = async () => {
     return;
   }
 
-  const fuel_refueled = form.value.fuel_refueled !== null && form.value.fuel_refueled !== '' 
-    ? parseFloat(form.value.fuel_refueled) 
-    : 0;
-  const fuel_used = form.value.fuel_used !== null && form.value.fuel_used !== '' 
-    ? parseFloat(form.value.fuel_used) 
-    : 0;
+  const fuel_refueled = formatDecimal(form.value.fuel_refueled);
+  const fuel_used = formatDecimal(form.value.fuel_used);
   
-  console.log('[WaybillRecordEditModal] Parsed fuel values:', {
+  console.log('[WaybillRecordEditModal] Formatted fuel values for submission:', {
     fuel_refueled_raw: form.value.fuel_refueled,
-    fuel_refueled_parsed: fuel_refueled,
-    fuel_refueled_type: typeof fuel_refueled,
+    fuel_refueled_formatted: fuel_refueled,
     fuel_used_raw: form.value.fuel_used,
-    fuel_used_parsed: fuel_used,
-    fuel_used_type: typeof fuel_used
+    fuel_used_formatted: fuel_used
   });
   
   const baseData = {
@@ -515,14 +561,16 @@ const submitForm = async () => {
   } else {
     emit('add', baseData);
   }
-  closeModal();
+  // НЕ закрываем модаль здесь! Она закроется после успешного сохранения в родителе
+  // closeModal() будет вызвана из handleAddRecord/handleEditRecord в WaybillManagement.vue
 };
 
 // Expose methods
 defineExpose({
   openAddModal,
   openEditModal,
-  closeModal
+  closeModal,
+  setValidationError
 });
 </script>
 

@@ -277,6 +277,24 @@ class FireTruckWaybillRecordSerializer(FriendlyModelSerializer):
             'fuel_used_without_pump',
             'fuel_used_normal',
         ]
+    
+    def create(self, validated_data):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f'\n\n========== [Serializer] CREATE validated_data ==========')
+        for key, value in validated_data.items():
+            logger.warning(f'{key}: {value} (type: {type(value).__name__})')
+        logger.warning(f'=============================================\n')
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f'\n\n========== [Serializer] UPDATE validated_data ==========')
+        for key, value in validated_data.items():
+            logger.warning(f'{key}: {value} (type: {type(value).__name__})')
+        logger.warning(f'=============================================\n')
+        return super().update(instance, validated_data)
 
 
 # ---------- МОТОЧАСЫ / ТО ----------
