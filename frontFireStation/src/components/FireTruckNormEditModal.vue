@@ -69,9 +69,8 @@
           :min="fieldDefinitions.normsFireTrucks.km_norm.minValue"
           :max="fieldDefinitions.normsFireTrucks.km_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsFireTrucks.date.label"
           :hint="fieldDefinitions.normsFireTrucks.date.hint"
           :required="fieldDefinitions.normsFireTrucks.date.required"
@@ -121,6 +120,9 @@
           :hint="fieldDefinitions.normsFireTrucks.with_pump_norm.hint"
           :required="fieldDefinitions.normsFireTrucks.with_pump_norm.required"
           :error="editFormErrors.with_pump_norm"
+          disallowMinus
+          :min="fieldDefinitions.normsFireTrucks.with_pump_norm.minValue"
+          :max="fieldDefinitions.normsFireTrucks.with_pump_norm.maxValue"
         />
         <TextInput
           v-model="form.without_pump_norm"
@@ -130,6 +132,9 @@
           :hint="fieldDefinitions.normsFireTrucks.without_pump_norm.hint"
           :required="fieldDefinitions.normsFireTrucks.without_pump_norm.required"
           :error="editFormErrors.without_pump_norm"
+          disallowMinus
+          :min="fieldDefinitions.normsFireTrucks.without_pump_norm.minValue"
+          :max="fieldDefinitions.normsFireTrucks.without_pump_norm.maxValue"
         />
         <TextInput
           v-model="form.km_norm"
@@ -139,10 +144,12 @@
           :hint="fieldDefinitions.normsFireTrucks.km_norm.hint"
           :required="fieldDefinitions.normsFireTrucks.km_norm.required"
           :error="editFormErrors.km_norm"
+          disallowMinus
+          :min="fieldDefinitions.normsFireTrucks.km_norm.minValue"
+          :max="fieldDefinitions.normsFireTrucks.km_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsFireTrucks.date.label"
           :hint="fieldDefinitions.normsFireTrucks.date.hint"
           :required="fieldDefinitions.normsFireTrucks.date.required"
@@ -159,7 +166,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Modal, TextInput, SelectInput, Button } from './ui/importUi';
+import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
 import { formatDateToRussian } from '../utils/dateUtils';

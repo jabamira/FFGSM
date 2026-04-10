@@ -56,9 +56,8 @@
           :min="fieldDefinitions.normsPassengerCars.area_norm.minValue"
           :max="fieldDefinitions.normsPassengerCars.area_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsPassengerCars.date.label"
           :hint="fieldDefinitions.normsPassengerCars.date.hint"
           :required="fieldDefinitions.normsPassengerCars.date.required"
@@ -124,9 +123,8 @@
           :min="fieldDefinitions.normsPassengerCars.area_norm.minValue"
           :max="fieldDefinitions.normsPassengerCars.area_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsPassengerCars.date.label"
           :hint="fieldDefinitions.normsPassengerCars.date.hint"
           :required="fieldDefinitions.normsPassengerCars.date.required"
@@ -143,7 +141,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Modal, TextInput, SelectInput, Button } from './ui/importUi';
+import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
 import { formatDateToRussian } from '../utils/dateUtils';
@@ -282,7 +280,7 @@ const submitAdd = async () => {
 
   try {
     const payload = {
-      car_id: parseInt(form.value.car),
+      car: parseInt(form.value.car),
       season: form.value.season,
       city_norm: parseFloat(form.value.city_norm),
       area_norm: parseFloat(form.value.area_norm),
@@ -322,7 +320,7 @@ const submitEdit = async () => {
 
   try {
     const payload = {
-      car_id: parseInt(form.value.car),
+      car: parseInt(form.value.car),
       season: form.value.season,
       city_norm: parseFloat(form.value.city_norm),
       area_norm: parseFloat(form.value.area_norm),

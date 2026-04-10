@@ -104,11 +104,20 @@
             <template #cell-arrival_time="{ value }">
               <span :style="{ color: palette.dark }">{{ formatTime(value) }}</span>
             </template>
+            <template #cell-driving_route="{ value }">
+              <span :style="{ color: palette.dark }">{{ value || '-' }}</span>
+            </template>
+            <template #cell-distance_km="{ value }">
+              <span :style="{ color: palette.dark }">{{ formatKilometers(value) }} км</span>
+            </template>
             <template #cell-distance_city_km="{ value }">
               <span :style="{ color: palette.dark }">{{ formatKilometers(value) }} км</span>
             </template>
             <template #cell-distance_area_km="{ value }">
               <span :style="{ color: palette.dark }">{{ formatKilometers(value) }} км</span>
+            </template>
+            <template #cell-time_with_pump="{ value }">
+              <span :style="{ color: palette.dark }">{{ value }} мин</span>
             </template>
             <template #cell-fuel_refueled="{ value }">
               <span :style="{ color: palette.dark }">{{ value ? value + ' л' : '-' }}</span>
@@ -124,7 +133,8 @@
         <!-- Summary -->
         <div v-if="records.length > 0" class="bg-gray-50 border border-gray-200 rounded p-4">
           <p class="font-semibold mb-3" :style="{ color: palette.dark }">Итого</p>
-          <div class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <!-- For Passenger Cars -->
+          <div v-if="carType === 'passenger-car'" class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Км по городу</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalCityKm }} км</p>
@@ -135,6 +145,29 @@
             </div>
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Время в пути</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalTravelTime }}</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Заправлено</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalFuelRefueled }} л</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Израсходовано</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalFuelUsed }} л</p>
+            </div>
+          </div>
+          <!-- For Fire Trucks -->
+          <div v-else class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Километры</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalDistance }} км</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Работа с насосом (мин)</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalTimeWithPump }} мин</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Продолжительность</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalTravelTime }}</p>
             </div>
             <div>
@@ -405,22 +438,51 @@ const driverOptions = computed(() => {
   }));
 });
 
-const recordsColumns = [
-  { key: 'target', label: 'Цель выезда', sortable: false },
-  { key: 'departure_time', label: 'Выезд', sortable: false },
-  { key: 'arrival_time', label: 'Прибытие', sortable: false },
-  { key: 'distance_city_km', label: 'По городу (км)', sortable: false },
-  { key: 'distance_area_km', label: 'По области (км)', sortable: false },
-  { key: 'fuel_refueled', label: 'Заправка (л)', sortable: false },
-  { key: 'fuel_used', label: 'Израсходовано (л)', sortable: false }
-];
+const recordsColumns = computed(() => {
+  if (carType.value === 'fire-truck') {
+    // Columns for fire truck records
+    return [
+      { key: 'target', label: 'Цель выезда', sortable: false },
+      { key: 'departure_time', label: 'Выезд', sortable: false },
+      { key: 'arrival_time', label: 'Прибытие', sortable: false },
+      { key: 'driving_route', label: 'Маршрут движения', sortable: false },
+      { key: 'distance_km', label: 'Пробег (км)', sortable: false },
+      { key: 'time_with_pump', label: 'Насос (мин)', sortable: false },
+      { key: 'fuel_refueled', label: 'Заправка (л)', sortable: false },
+      { key: 'fuel_used', label: 'Израсходовано (л)', sortable: false }
+    ];
+  } else {
+    // Columns for passenger car records
+    return [
+      { key: 'target', label: 'Цель выезда', sortable: false },
+      { key: 'departure_time', label: 'Выезд', sortable: false },
+      { key: 'arrival_time', label: 'Прибытие', sortable: false },
+      { key: 'distance_city_km', label: 'По городу (км)', sortable: false },
+      { key: 'distance_area_km', label: 'По области (км)', sortable: false },
+      { key: 'fuel_refueled', label: 'Заправка (л)', sortable: false },
+      { key: 'fuel_used', label: 'Израсходовано (л)', sortable: false }
+    ];
+  }
+});
 
 const totalCityKm = computed(() => {
+  if (carType.value === 'fire-truck') return 0;
   return records.value.reduce((sum, r) => sum + (r.distance_city_km || 0), 0);
 });
 
 const totalAreaKm = computed(() => {
+  if (carType.value === 'fire-truck') return 0;
   return records.value.reduce((sum, r) => sum + (r.distance_area_km || 0), 0);
+});
+
+const totalDistance = computed(() => {
+  if (carType.value !== 'fire-truck') return 0;
+  return records.value.reduce((sum, r) => sum + (r.distance_km || 0), 0);
+});
+
+const totalTimeWithPump = computed(() => {
+  if (carType.value !== 'fire-truck') return 0;
+  return records.value.reduce((sum, r) => sum + (r.time_with_pump || 0), 0);
 });
 
 const totalFuelRefueled = computed(() => {

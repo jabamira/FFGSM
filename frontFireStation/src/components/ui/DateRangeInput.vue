@@ -3,7 +3,7 @@
     <label class="block text-sm font-medium" :style="{ color: palette.dark }">
       {{ label }}
     </label>
-    <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-end">
+    <div class="flex flex-col lg:flex-row gap-3 items-stretch lg:items-end ">
       <!-- Start Date Picker -->
       <div class="flex-1">
         <div class="relative">
@@ -35,7 +35,7 @@
       <div class="text-center lg:hidden text-xs" :style="{ color: palette.medium }">по</div>
 
       <!-- End Date Picker -->
-      <div class="flex-1">
+      <div class="flex-1 relative ">
         <div class="relative">
           <input
             ref="endDateInput"
@@ -58,16 +58,16 @@
           </div>
         </div>
         <div class="text-xs mt-1" :style="{ color: palette.medium }">{{ endLabel }}</div>
+        <!-- Clear Button - positioned absolutely over top-right corner -->
+        <Button
+          v-if="showClear && (modelValue.start || modelValue.end)"
+          @click="clearDates"
+          label="Очистить"
+          :style="{ minWidth: '80px', padding: '0.375rem 0.75rem', fontSize: '0.875rem' }"
+          variant="secondary"
+          class="absolute top-[-35px] right-0"
+        />
       </div>
-
-      <!-- Clear Button -->
-      <Button
-        v-if="showClear && (modelValue.start || modelValue.end)"
-        @click="clearDates"
-        label="Очистить"
-        :style="{ minWidth: '120px' }"
-        variant="secondary"
-      />
     </div>
   </div>
 </template>

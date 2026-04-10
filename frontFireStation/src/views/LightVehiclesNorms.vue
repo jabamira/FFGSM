@@ -6,38 +6,43 @@
       
       <!-- Filters Section -->
       <div class="bg-white rounded shadow p-6 mb-6">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-end">
           <div>
-            <SelectInput
-              v-model="filterCar"
-              label="Фильтр по автомобилю"
-              :options="carsFilterOptions"
-              placeholder="Все автомобили"
+            <TextInput
+              v-model="filterSearch"
+              label="Поиск"
+              placeholder="Введите текст..."
+              type="text"
             />
           </div>
           <div>
             <SelectInput
-              v-model="filterSeason"
-              label="Фильтр по сезону"
-              :options="[
-                { value: '', label: 'Все сезоны' },
-                { value: 'summer', label: 'Лето' },
-                { value: 'winter', label: 'Зима' }
-              ]"
-              placeholder="Все сезоны"
+              v-model="filterCar"
+              label="Автомобиль"
+              :options="carsFilterOptions"
+              placeholder="Все"
+            />
+          </div>
+          <div>
+            <DateRangeInput
+              v-model="filterDateRange"
+              label="Период"
+              :startLabel="'От'"
+              :endLabel="'До'"
+              :showClear="true"
             />
           </div>
         </div>
 
         <!-- Table Toggle Controls -->
-        <div class="flex gap-4 mt-6 pt-6 border-t">
+        <div class="flex gap-4 mt-2 flex-wrap">
           <label class="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               v-model="showFuelNormsTable"
               class="w-4 h-4"
             />
-            <span :style="{ color: palette.dark }">Нормы расхода топлива</span>
+            <span :style="{ color: palette.dark }">Нормы расхода</span>
           </label>
           <label class="flex items-center gap-2 cursor-pointer">
             <input
@@ -306,7 +311,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { palette, SelectInput, Button, DataTable, Modal } from '../components/ui/importUi';
+import { palette, SelectInput, Button, DataTable, Modal, DateRangeInput, TextInput } from '../components/ui/importUi';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
 import ErrorModal from '../components/ErrorModal.vue';
@@ -345,7 +350,8 @@ const selectedTechnicalNormIds = ref([]);
 
 // Filters
 const filterCar = ref('');
-const filterSeason = ref('');
+const filterSearch = ref('');
+const filterDateRange = ref({ start: '', end: '' });
 
 // Computed - Filter Options
 const carsFilterOptions = computed(() => {
@@ -366,8 +372,24 @@ const filteredFuelNorms = computed(() => {
     filtered = filtered.filter(n => n.car === parseInt(filterCar.value));
   }
 
-  if (filterSeason.value) {
-    filtered = filtered.filter(n => n.season === filterSeason.value);
+  if (filterSearch.value) {
+    const search = filterSearch.value.toLowerCase();
+    filtered = filtered.filter(n => {
+      const car = getCar(n.car);
+      const carNumber = car?.number?.toString().toLowerCase() || '';
+      const carBrand = car?.brand?.toLowerCase() || '';
+      const carModel = car?.model?.toLowerCase() || '';
+      return carNumber.includes(search) || carBrand.includes(search) || carModel.includes(search);
+    });
+  }
+
+  if (filterDateRange.value.start || filterDateRange.value.end) {
+    filtered = filtered.filter(n => {
+      const normDate = n.date;
+      if (filterDateRange.value.start && normDate < filterDateRange.value.start) return false;
+      if (filterDateRange.value.end && normDate > filterDateRange.value.end) return false;
+      return true;
+    });
   }
 
   return filtered;
@@ -380,14 +402,58 @@ const filteredOperatingHoursNorms = computed(() => {
     filtered = filtered.filter(n => n.car === parseInt(filterCar.value));
   }
 
+  if (filterSearch.value) {
+    const search = filterSearch.value.toLowerCase();
+    filtered = filtered.filter(n => {
+      const car = getCar(n.car);
+      const carNumber = car?.number?.toString().toLowerCase() || '';
+      const carBrand = car?.brand?.toLowerCase() || '';
+      const carModel = car?.model?.toLowerCase() || '';
+      return carNumber.includes(search) || carBrand.includes(search) || carModel.includes(search);
+    });
+  }
+
+  if (filterDateRange.value.start || filterDateRange.value.end) {
+    filtered = filtered.filter(n => {
+      const normDate = n.date;
+      if (filterDateRange.value.start && normDate < filterDateRange.value.start) return false;
+      if (filterDateRange.value.end && normDate > filterDateRange.value.end) return false;
+      return true;
+    });
+  }
+
   return filtered;
 });
 
 const filteredTechnicalNorms = computed(() => {
-  let filtered = technicalNorms.value;
+  let filtered = technicalNorms.value.map(norm => ({
+    ...norm,
+    maintenance_type_label: getMaintenanceTypeLabel(norm.maintenance_type)
+  }));
 
   if (filterCar.value) {
     filtered = filtered.filter(n => n.passenger_car === parseInt(filterCar.value));
+  }
+
+  if (filterSearch.value) {
+    const search = filterSearch.value.toLowerCase();
+    filtered = filtered.filter(n => {
+      const car = getCar(n.passenger_car);
+      const carNumber = car?.number?.toString().toLowerCase() || '';
+      const carBrand = car?.brand?.toLowerCase() || '';
+      const carModel = car?.model?.toLowerCase() || '';
+      const maintenanceLabel = n.maintenance_type_label?.toLowerCase() || '';
+      return carNumber.includes(search) || carBrand.includes(search) || carModel.includes(search) || maintenanceLabel.includes(search);
+    });
+  }
+
+  if (filterDateRange.value.start || filterDateRange.value.end) {
+    filtered = filtered.filter(n => {
+      const normDate = n.date;
+      if (filterDateRange.value.start && normDate < filterDateRange.value.start) return false;
+      if (filterDateRange.value.end && normDate > filterDateRange.value.end) return false;
+      return true;
+    });
   }
 
   return filtered;
@@ -443,13 +509,24 @@ const operatingHoursColumns = [
 
 const technicalNormsColumns = [
   { key: 'passenger_car', label: 'Машина' },
-  { key: 'maintenance_type', label: 'Вид ТО' },
+  { key: 'maintenance_type_label', label: 'Вид ТО' },
   { key: 'norm', label: 'Норма' }
 ];
 
 // Methods - Helpers
+const MAINTENANCE_TYPES = {
+  'engine_oil': 'Замена моторного масла и фильтра',
+  'air_filter': 'Замена воздушного фильтра',
+  'cabine_filter': 'Замена салонного фильтра',
+  'antifreeze': 'Замена антифриза'
+};
+
 const getCar = (carId) => {
   return passengerCars.value.find(c => c.id === carId);
+};
+
+const getMaintenanceTypeLabel = (type) => {
+  return MAINTENANCE_TYPES[type] || type;
 };
 
 // Get selected indexes for DataTable

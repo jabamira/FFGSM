@@ -45,10 +45,10 @@ export const fieldDefinitions = {
       label: "Телефон",
       required: true,
       minLength: 11,
-      maxLength: 11,
+      maxLength: 12,
       unique: true,
       onlyDigits: true,
-      hint: "11 цифр, уникальный",
+      hint: "11-12 цифр, уникальный",
     },
     driver_license: {
       label: "Водительское удостоверение",
@@ -104,10 +104,10 @@ export const fieldDefinitions = {
       label: "Телефон",
       required: true,
       minLength: 11,
-      maxLength: 11,
+      maxLength: 12,
       unique: true,
       onlyDigits: true,
-      hint: "11 цифр, уникальный",
+      hint: "11-12 цифр, уникальный",
     },
     driver_license: {
       label: "Водительское удостоверение",
@@ -371,20 +371,20 @@ export const fieldDefinitions = {
       required: true,
       type: "decimal",
       minValue: 0,
-      maxValue: 99.9999,
+      maxValue: 9.9999,
       maxDigits: 5,
       decimalPlaces: 4,
-      hint: "От 0 до 99.9999 ч/км",
+      hint: "От 0 до 9.9999 ч/км",
     },
     area_norm: {
       label: "Норма по области",
       required: true,
       type: "decimal",
       minValue: 0,
-      maxValue: 99.9999,
+      maxValue: 9.9999,
       maxDigits: 5,
       decimalPlaces: 4,
-      hint: "От 0 до 99.9999 ч/км",
+      hint: "От 0 до 9.9999 ч/км",
     },
     date: {
       label: "Дата утверждения",
@@ -486,20 +486,20 @@ export const fieldDefinitions = {
       required: true,
       type: "decimal",
       minValue: 0,
-      maxValue: 99.9999,
+      maxValue: 9.9999,
       maxDigits: 5,
       decimalPlaces: 4,
-      hint: "От 0 до 99.9999, до 4 знаков после запятой/точки",
+      hint: "От 0 до 9.9999, до 4 знаков после запятой/точки",
     },
     with_pump_norm: {
       label: "Норма с насосом (коэффициент)",
       required: true,
       type: "decimal",
       minValue: 0,
-      maxValue: 99.9999,
+      maxValue: 9999.9999,
       maxDigits: 6,
       decimalPlaces: 4,
-      hint: "От 0 до 99.9999, до 4 знаков после запятой/точки",
+      hint: "От 0 до 9999.9999, до 4 знаков после запятой/точки",
     },
     date: {
       label: "Дата утверждения",
@@ -511,7 +511,7 @@ export const fieldDefinitions = {
 
   // NormsTechnicalMaintenance fields (Fire Trucks)
   normsTechnicalMaintenanceFireTruck: {
-    car: {
+    fire_truck: {
       label: "Автомобиль",
       required: true,
       hint: "Выберите пожарный автомобиль",
@@ -546,6 +546,12 @@ export const fieldDefinitions = {
       required: true,
       maxLength: 255,
       hint: "До 255 символов",
+    },
+    driving_route: {
+      label: "Маршрут движения",
+      required: false,
+      maxLength: 255,
+      hint: "До 255 символов (опционально, только для пожарной машины)",
     },
     departure_time: {
       label: "Время убытия",

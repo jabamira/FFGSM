@@ -125,6 +125,8 @@ class OdometerFuelPassengerCarSerializer(FriendlyModelSerializer):
 
 
 class PassengerCarWaybillSerializer(FriendlyModelSerializer):
+    driver_full_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = PassengerCarWaybill
         fields = '__all__'
@@ -137,7 +139,13 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
             'availability_upon_delivery',
             'savings',
             'overrun',
+            'driver_full_name',
         ]
+    
+    def get_driver_full_name(self, obj):
+        if obj.driver:
+            return f"{obj.driver.surname} {obj.driver.name} {obj.driver.last_name}".strip()
+        return None
 
     def validate(self, data):
         """
@@ -217,6 +225,8 @@ class OdometerFuelFireTruckSerializer(FriendlyModelSerializer):
 
 
 class FireTruckWaybillSerializer(FriendlyModelSerializer):
+    driver_full_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = FireTruckWaybill
         fields = '__all__'
@@ -229,7 +239,13 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
             'availability_upon_delivery',
             'savings',
             'overrun',
+            'driver_full_name',
         ]
+    
+    def get_driver_full_name(self, obj):
+        if obj.driver:
+            return f"{obj.driver.surname} {obj.driver.name} {obj.driver.last_name}".strip()
+        return None
 
     def validate(self, data):
         """

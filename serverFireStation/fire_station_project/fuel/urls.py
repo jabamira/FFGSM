@@ -17,6 +17,7 @@ from .views import (
     TechnicalMaintenanceViewSet,
     NormsTechnicalMaintenanceViewSet
 )
+from .statistics import FuelStatisticsViewSet
 
 router = DefaultRouter()
 
@@ -48,6 +49,9 @@ router.register(r'passenger-car-operating-hours-norms', NormsOperatingHoursPasse
 router.register(r'fire-truck-operating-hours-norms', NormsOperatingHoursFireTruckViewSet)
 router.register(r'technical-maintenance', TechnicalMaintenanceViewSet)
 router.register(r'technical-maintenance-norms', NormsTechnicalMaintenanceViewSet)
+
+# Статистика
+router.register(r'statistics', FuelStatisticsViewSet, basename='statistics')
 
 urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),

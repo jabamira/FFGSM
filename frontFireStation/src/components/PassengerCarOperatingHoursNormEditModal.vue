@@ -45,9 +45,8 @@
           :min="fieldDefinitions.normsOperatingHoursPassengerCar.area_norm.minValue"
           :max="fieldDefinitions.normsOperatingHoursPassengerCar.area_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsOperatingHoursPassengerCar.date.label"
           :hint="fieldDefinitions.normsOperatingHoursPassengerCar.date.hint"
           :required="fieldDefinitions.normsOperatingHoursPassengerCar.date.required"
@@ -102,9 +101,8 @@
           :min="fieldDefinitions.normsOperatingHoursPassengerCar.area_norm.minValue"
           :max="fieldDefinitions.normsOperatingHoursPassengerCar.area_norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsOperatingHoursPassengerCar.date.label"
           :hint="fieldDefinitions.normsOperatingHoursPassengerCar.date.hint"
           :required="fieldDefinitions.normsOperatingHoursPassengerCar.date.required"
@@ -121,7 +119,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Modal, TextInput, SelectInput, Button } from './ui/importUi';
+import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
 import { formatDateToRussian } from '../utils/dateUtils';

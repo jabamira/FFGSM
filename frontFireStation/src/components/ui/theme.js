@@ -12,6 +12,7 @@ export const palette = {
   light: "#AFB1B4",
   white: "#FFFFFF",
   error: "#E74C3C",
+  danger: "#E74C3C", // alias for error
   success: "#27AE60",
   warning: "#F39C12",
 };

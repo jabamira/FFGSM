@@ -13,9 +13,9 @@
         <SelectInput
           v-model="form.fire_truck"
           :options="carOptions"
-          :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.label"
-          :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.hint"
-          :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.required"
+          :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.label"
+          :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.hint"
+          :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.required"
           placeholder="Выберите автомобиль"
           :error="addFormErrors.fire_truck"
         />
@@ -41,9 +41,8 @@
           :min="fieldDefinitions.normsTechnicalMaintenanceFireTruck.norm.minValue"
           :max="fieldDefinitions.normsTechnicalMaintenanceFireTruck.norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.label"
           :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.hint"
           :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.required"
@@ -69,9 +68,9 @@
         <SelectInput
           v-model="form.fire_truck"
           :options="carOptions"
-          :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.label"
-          :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.hint"
-          :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.car.required"
+          :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.label"
+          :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.hint"
+          :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.fire_truck.required"
           :error="editFormErrors.fire_truck"
         />
         <SelectInput
@@ -94,9 +93,8 @@
           :min="fieldDefinitions.normsTechnicalMaintenanceFireTruck.norm.minValue"
           :max="fieldDefinitions.normsTechnicalMaintenanceFireTruck.norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.label"
           :hint="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.hint"
           :required="fieldDefinitions.normsTechnicalMaintenanceFireTruck.date.required"
@@ -113,7 +111,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Modal, TextInput, SelectInput, Button } from './ui/importUi';
+import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
 import { formatDateToRussian } from '../utils/dateUtils';

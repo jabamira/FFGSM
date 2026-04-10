@@ -20,6 +20,18 @@
           :data-error="formErrors.target ? 'target' : null"
         />
 
+        <!-- Driving Route (Fire Truck only) -->
+        <TextInput
+          v-if="isFireTruck"
+          v-model="form.driving_route"
+          :label="fieldDefinitions.waybillRecord.driving_route.label"
+          :hint="fieldDefinitions.waybillRecord.driving_route.hint"
+          placeholder="Введите маршрут движения"
+          :required="fieldDefinitions.waybillRecord.driving_route.required"
+          :error="formErrors.driving_route"
+          :data-error="formErrors.driving_route ? 'driving_route' : null"
+        />
+
         <div class="time-input-full-width">
           <TimeInput
             v-model="form.departure_time"
@@ -42,7 +54,9 @@
           />
         </div>
 
+        <!-- Distance fields (Passenger Car only) -->
         <TextInput
+          v-if="!isFireTruck"
           v-model.number="form.distance_city_km"
           :positiveIntegerOnly="true"
           @change="validateNumberField('distance_city_km')"
@@ -55,6 +69,7 @@
         />
 
         <TextInput
+          v-if="!isFireTruck"
           v-model.number="form.distance_area_km"
           :positiveIntegerOnly="true"
           @change="validateNumberField('distance_area_km')"
@@ -174,6 +189,7 @@ const isEditMode = ref(false);
 const form = ref({
   id: null,
   target: '',
+  driving_route: '',
   departure_time: '',
   arrival_time: '',
   distance_city_km: 0,
@@ -191,6 +207,7 @@ const originalData = ref(null);
 // Errors
 const formErrors = ref({
   target: '',
+  driving_route: '',
   departure_time: '',
   arrival_time: '',
   distance_city_km: '',
@@ -210,16 +227,19 @@ const getValidationDefinitions = () => {
     target: fieldDefinitions.waybillRecord.target,
     departure_time: fieldDefinitions.waybillRecord.departure_time,
     arrival_time: fieldDefinitions.waybillRecord.arrival_time,
-    distance_city_km: fieldDefinitions.waybillRecord.distance_city_km,
-    distance_area_km: fieldDefinitions.waybillRecord.distance_area_km,
     fuel_refueled: fieldDefinitions.waybillRecord.fuel_refueled,
     fuel_used: fieldDefinitions.waybillRecord.fuel_used
   };
 
   if (props.isFireTruck) {
+    base.driving_route = fieldDefinitions.waybillRecord.driving_route;
     base.odometer_after = fieldDefinitions.waybillRecord.odometer_after;
     base.time_with_pump = fieldDefinitions.waybillRecord.time_with_pump;
     base.time_without_pump = fieldDefinitions.waybillRecord.time_without_pump;
+  } else {
+    // Passenger car fields
+    base.distance_city_km = fieldDefinitions.waybillRecord.distance_city_km;
+    base.distance_area_km = fieldDefinitions.waybillRecord.distance_area_km;
   }
 
   return base;
@@ -231,20 +251,29 @@ const formHasChanged = computed(() => {
   
   const currentForm = form.value;
   
-  return (
+  let changed = (
     currentForm.target !== originalData.value.target ||
     currentForm.departure_time !== originalData.value.departure_time ||
     currentForm.arrival_time !== originalData.value.arrival_time ||
-    currentForm.distance_city_km !== originalData.value.distance_city_km ||
-    currentForm.distance_area_km !== originalData.value.distance_area_km ||
     currentForm.fuel_refueled !== originalData.value.fuel_refueled ||
-    currentForm.fuel_used !== originalData.value.fuel_used ||
-    (props.isFireTruck && (
+    currentForm.fuel_used !== originalData.value.fuel_used
+  );
+  
+  if (props.isFireTruck) {
+    changed = changed || (
+      currentForm.driving_route !== originalData.value.driving_route ||
       currentForm.odometer_after !== originalData.value.odometer_after ||
       currentForm.time_with_pump !== originalData.value.time_with_pump ||
       currentForm.time_without_pump !== originalData.value.time_without_pump
-    ))
-  );
+    );
+  } else {
+    changed = changed || (
+      currentForm.distance_city_km !== originalData.value.distance_city_km ||
+      currentForm.distance_area_km !== originalData.value.distance_area_km
+    );
+  }
+  
+  return changed;
 });
 
 // Check if save button should be enabled
@@ -350,6 +379,7 @@ const openAddModal = () => {
   form.value = {
     id: null,
     target: '',
+    driving_route: '',
     departure_time: currentTime,
     arrival_time: currentTime,
     distance_city_km: 0,
@@ -367,6 +397,7 @@ const openEditModal = (record) => {
   console.log('[WaybillRecordEditModal] openEditModal called with record:', {
     id: record.id,
     target: record.target,
+    driving_route: record.driving_route,
     departure_time: record.departure_time,
     arrival_time: record.arrival_time,
     distance_city_km: record.distance_city_km,
@@ -383,6 +414,7 @@ const openEditModal = (record) => {
   form.value = {
     id: record.id,
     target: record.target || '',
+    driving_route: record.driving_route || '',
     departure_time: record.departure_time || '',
     arrival_time: record.arrival_time || '',
     distance_city_km: record.distance_city_km || 0,
@@ -525,17 +557,19 @@ const submitForm = async () => {
     target: form.value.target,
     departure_time: departure_time,
     arrival_time: arrival_time,
-    distance_city_km: parseInt(form.value.distance_city_km) || 0,
-    distance_area_km: parseInt(form.value.distance_area_km) || 0,
     fuel_refueled: fuel_refueled,
     fuel_used: fuel_used
   };
 
-  // Add fire truck specific fields if applicable
+  // Add vehicle type specific fields
   if (props.isFireTruck) {
+    baseData.driving_route = form.value.driving_route || '';
     baseData.odometer_after = parseInt(form.value.odometer_after) || 0;
     baseData.time_with_pump = parseInt(form.value.time_with_pump) || 0;
     baseData.time_without_pump = parseInt(form.value.time_without_pump) || 0;
+  } else {
+    baseData.distance_city_km = parseInt(form.value.distance_city_km) || 0;
+    baseData.distance_area_km = parseInt(form.value.distance_area_km) || 0;
   }
   
   console.log('[WaybillRecordEditModal] Submitting record data:', {

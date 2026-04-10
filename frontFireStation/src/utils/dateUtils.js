@@ -4,8 +4,8 @@
  * @returns {string} - Дата в русском формате (ДД.MM.YYYY)
  */
 export const formatDateToRussian = (isoDate) => {
-  if (!isoDate) return '';
-  const [year, month, day] = isoDate.split('-');
+  if (!isoDate) return "";
+  const [year, month, day] = isoDate.split("-");
   return `${day}.${month}.${year}`;
 };
 
@@ -15,7 +15,7 @@ export const formatDateToRussian = (isoDate) => {
  * @returns {string} - Дата в ISO формате (YYYY-MM-DD)
  */
 export const formatDateToISO = (russianDate) => {
-  if (!russianDate) return '';
-  const [day, month, year] = russianDate.split('.');
+  if (!russianDate) return "";
+  const [day, month, year] = russianDate.split(".");
   return `${year}-${month}-${day}`;
 };

@@ -41,9 +41,8 @@
           :min="fieldDefinitions.normsTechnicalMaintenancePassengerCar.norm.minValue"
           :max="fieldDefinitions.normsTechnicalMaintenancePassengerCar.norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.label"
           :hint="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.hint"
           :required="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.required"
@@ -94,9 +93,8 @@
           :min="fieldDefinitions.normsTechnicalMaintenancePassengerCar.norm.minValue"
           :max="fieldDefinitions.normsTechnicalMaintenancePassengerCar.norm.maxValue"
         />
-        <TextInput
+        <DateInput
           v-model="form.date"
-          type="date"
           :label="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.label"
           :hint="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.hint"
           :required="fieldDefinitions.normsTechnicalMaintenancePassengerCar.date.required"
@@ -113,7 +111,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { Modal, TextInput, SelectInput, Button } from './ui/importUi';
+import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
 import { formatDateToRussian } from '../utils/dateUtils';
@@ -261,7 +259,7 @@ const submitAdd = async () => {
 
   try {
     const payload = {
-      passenger_car: parseInt(form.value.passenger_car),
+      passenger_car: parseInt(form.value.car),
       maintenance_type: form.value.maintenance_type,
       norm: parseFloat(form.value.norm),
       date: form.value.date,
@@ -300,7 +298,7 @@ const submitEdit = async () => {
 
   try {
     const payload = {
-      passenger_car: parseInt(form.value.passenger_car),
+      passenger_car: parseInt(form.value.car),
       maintenance_type: form.value.maintenance_type,
       norm: parseFloat(form.value.norm),
       date: form.value.date,
