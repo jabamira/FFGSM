@@ -12,17 +12,45 @@ class ApiClient {
 
     // Интерцептор для добавления токена
     this.client.interceptors.request.use((config) => {
+      console.log('[API Request] Sending:', {
+        method: config.method?.toUpperCase(),
+        url: config.url,
+        baseURL: config.baseURL,
+        fullURL: config.baseURL + config.url,
+        data: config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null,
+        timeout: config.timeout,
+      })
       const token = localStorage.getItem('auth_token')
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
       return config
+    }, (error) => {
+      console.error('[API Request Interceptor Error]', error)
+      return Promise.reject(error)
     })
 
     // Интерцептор для обработки ошибок
     this.client.interceptors.response.use(
-      (response) => response,
+      (response) => {
+        console.log('[API Response] Received:', {
+          status: response.status,
+          url: response.config.url,
+          data: response.data,
+        })
+        return response
+      },
       (error) => {
+        console.error('[API Error Response]', {
+          message: error.message,
+          code: error.code,
+          status: error.response?.status,
+          data: error.response?.data,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+          },
+        })
         if (error.response?.status === 401) {
           localStorage.removeItem('auth_token')
           window.location.href = '/login'

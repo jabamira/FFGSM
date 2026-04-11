@@ -5,7 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Fire Station Mobile',
   webDir: 'dist',
   server: {
-    androidScheme: 'https'
+    androidScheme: 'http',
+    cleartext: true,
+    allowNavigation: ['192.168.1.199', 'localhost', '127.0.0.1'],
   },
   plugins: {
     SplashScreen: {
