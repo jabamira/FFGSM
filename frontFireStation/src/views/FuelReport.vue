@@ -289,7 +289,7 @@ const driverOptions = computed(() => {
     { value: '', label: 'Все водители' },
     ...drivers_data.value.map(driver => ({
       value: driver.id,
-      label: `${driver.first_name} ${driver.last_name}`
+      label: `${driver.name} ${driver.last_name}`.trim()
     }))
   ];
 });
@@ -561,7 +561,7 @@ const loadAnalytics = async () => {
         console.log(`[FuelReport] Adding driver ${driver.id} (${driver.name})`);
         driverList[driver.id] = {
           driverId: driver.id,
-          driverName: driver.name,
+          driverName: `${driver.name} ${driver.last_name}`.trim(),
           tripCount: driver.trip_count,
           distance: driver.distance,
           fuelUsed: driver.fuel_used,
@@ -676,7 +676,7 @@ const buildAnalytics = () => {
     const driverId = waybill.driver;
     // Use driver_full_name from API response, or fallback to searching in drivers_data
     const driver = drivers_data.value.find(d => d.id === driverId);
-    const driverFullName = waybill.driver_full_name || (driver ? `${driver.name} ${driver.last_name}` : `Водитель ${driverId}`);
+    const driverFullName = waybill.driver_full_name || (driver ? `${driver.name} ${driver.last_name}`.trim() : `Водитель ${driverId}`);
     
     if (!driverMap[driverId]) {
       driverMap[driverId] = {

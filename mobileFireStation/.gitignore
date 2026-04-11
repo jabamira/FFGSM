@@ -1,0 +1,18 @@
+node_modules/
+.DS_Store
+dist
+dist-ssr
+coverage
+.env.local
+.env.*.local
+android/
+ios/
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# Capacitor
+www/
+build/

@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+/* Global styles for full-height layout */
+html, body, #app {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Переменные цветов Fire Station из theme.js */
+:root {
+  /* Primary Colors */
+  --color-dark: #405267;
+  --color-medium: #7C91A6;
+  --color-primary: #3b82f6;
+  --color-secondary: #4486A5;
+  --color-light: #AFB1B4;
+  --color-white: #FFFFFF;
+  --color-error: #E74C3C;
+  --color-success: #27AE60;
+  --color-warning: #F39C12;
+
+  /* Ionic Colors */
+  --ion-color-primary: #3b82f6;
+  --ion-color-primary-rgb: 59, 130, 246;
+  --ion-color-primary-contrast: #ffffff;
+  --ion-color-primary-contrast-rgb: 255, 255, 255;
+  --ion-color-primary-shade: #1e40af;
+  --ion-color-primary-tint: #60a5fa;
+
+  --ion-color-secondary: #4486A5;
+  --ion-color-secondary-rgb: 68, 134, 165;
+  --ion-color-secondary-contrast: #ffffff;
+  --ion-color-secondary-contrast-rgb: 255, 255, 255;
+  --ion-color-secondary-shade: #3d7692;
+  --ion-color-secondary-tint: #5692ae;
+
+  --ion-color-tertiary: #5260ff;
+  --ion-color-tertiary-rgb: 82, 96, 255;
+  --ion-color-tertiary-contrast: #ffffff;
+  --ion-color-tertiary-contrast-rgb: 255, 255, 255;
+  --ion-color-tertiary-shade: #4852e0;
+  --ion-color-tertiary-tint: #6370ff;
+
+  --ion-color-success: #27AE60;
+  --ion-color-success-rgb: 39, 174, 96;
+  --ion-color-success-contrast: #ffffff;
+  --ion-color-success-contrast-rgb: 255, 255, 255;
+  --ion-color-success-shade: #229a54;
+  --ion-color-success-tint: #3fb970;
+
+  --ion-color-warning: #F39C12;
+  --ion-color-warning-rgb: 243, 156, 18;
+  --ion-color-warning-contrast: #000000;
+  --ion-color-warning-contrast-rgb: 0, 0, 0;
+  --ion-color-warning-shade: #d68910;
+  --ion-color-warning-tint: #f4a72a;
+
+  --ion-color-danger: #E74C3C;
+  --ion-color-danger-rgb: 231, 76, 60;
+  --ion-color-danger-contrast: #ffffff;
+  --ion-color-danger-contrast-rgb: 255, 255, 255;
+  --ion-color-danger-shade: #cc3d33;
+  --ion-color-danger-tint: #e95d4f;
+
+  --ion-color-dark: #405267;
+  --ion-color-dark-rgb: 64, 82, 103;
+  --ion-color-dark-contrast: #ffffff;
+  --ion-color-dark-contrast-rgb: 255, 255, 255;
+  --ion-color-dark-shade: #39495a;
+  --ion-color-dark-tint: #535d78;
+
+  --ion-color-medium: #7C91A6;
+  --ion-color-medium-rgb: 124, 145, 166;
+  --ion-color-medium-contrast: #ffffff;
+  --ion-color-medium-contrast-rgb: 255, 255, 255;
+  --ion-color-medium-shade: #6e8294;
+  --ion-color-medium-tint: #8a9db2;
+
+  --ion-color-light: #AFB1B4;
+  --ion-color-light-rgb: 175, 177, 180;
+  --ion-color-light-contrast: #000000;
+  --ion-color-light-contrast-rgb: 0, 0, 0;
+  --ion-color-light-shade: #9a9c9f;
+  --ion-color-light-tint: #b7b9bc;
+}
+
+/* Стили для элементов */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* Совместимость с Ionic компонентами */
+ion-content {
+  --padding-bottom: 0;
+}
+
+/* Убедитесь, что input элементы видны */
+input,
+textarea,
+select {
+  font: inherit;
+}

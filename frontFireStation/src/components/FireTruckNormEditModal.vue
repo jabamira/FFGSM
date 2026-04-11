@@ -169,7 +169,7 @@ import { ref, computed } from 'vue';
 import { Modal, TextInput, SelectInput, Button, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
-import { formatDateToRussian } from '../utils/dateUtils';
+import { formatDateToRussian, getNovosibirskDateISO } from '../utils/dateUtils';
 import axios from 'axios';
 
 const props = defineProps({
@@ -199,7 +199,7 @@ const form = ref({
   with_pump_norm: '',
   without_pump_norm: '',
   km_norm: '',
-  date: new Date().toISOString().split('T')[0],
+  date: getNovosibirskDateISO(),
 });
 
 const originalAddForm = ref({});
@@ -229,7 +229,7 @@ const openAddModal = () => {
     with_pump_norm: '',
     without_pump_norm: '',
     km_norm: '',
-    date: new Date().toISOString().split('T')[0],
+    date: getNovosibirskDateISO(),
   };
   originalAddForm.value = JSON.parse(JSON.stringify(form.value));
   addFormErrors.value = {};

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "a93c9a48-1a8d-496e-b1e6-eee388bf78cc"
+      }
+    },
+    "android": {
+      "package": "com.jabers_swag.firestationmobile"
+    }
+  }
+}

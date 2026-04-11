@@ -99,6 +99,10 @@ class UserSerializer(FriendlyModelSerializer):
 
 class PassengerCarSerializer(FriendlyModelSerializer):
     odometer_fuel_records = serializers.SerializerMethodField()
+    operating_hours = serializers.SerializerMethodField()
+    technical_maintenance_norm = serializers.SerializerMethodField()
+    hours_until_maintenance = serializers.SerializerMethodField()
+    maintenance_info = serializers.SerializerMethodField()
 
     class Meta:
         model = PassengerCar
@@ -110,6 +114,74 @@ class PassengerCarSerializer(FriendlyModelSerializer):
             records = obj.odometer_fuel_records.all()
             return OdometerFuelPassengerCarSerializer(records, many=True).data
         return None
+
+    def get_operating_hours(self, obj):
+        """Получить текущие операционные часы машины"""
+        operating_hours = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        if operating_hours:
+            return float(operating_hours.operating_hours)
+        return 0.0
+
+    def get_technical_maintenance_norm(self, obj):
+        """Получить норму технического обслуживания (часы)"""
+        norm = NormsTechnicalMaintenance.objects.filter(passenger_car=obj).order_by('-date').first()
+        if norm:
+            return float(norm.norm)
+        return 0.0
+
+    def get_hours_until_maintenance(self, obj):
+        """Вычислить часы до следующего ТО"""
+        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        norm_obj = NormsTechnicalMaintenance.objects.filter(passenger_car=obj).order_by('-date').first()
+        
+        if operating_hours_obj and norm_obj:
+            operating_hours = float(operating_hours_obj.operating_hours)
+            norm = float(norm_obj.norm)
+            hours_until = norm - operating_hours
+            return hours_until  # Может быть отрицательным если ТО уже должна была пройти
+        return None
+
+    def get_maintenance_info(self, obj):
+        """Получить полную информацию о техническом обслуживании"""
+        # Берем ПОСЛЕДНЮЮ СОЗДАННУЮ норму
+        norm_obj = NormsTechnicalMaintenance.objects.filter(passenger_car=obj).order_by('-date').first()
+        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        
+        # Проверяем, что норма существует и имеет положительное значение
+        if not norm_obj or norm_obj.norm <= 0:
+            return {
+                'maintenance_type': None,
+                'interval': None,
+                'norm_interval_value': None,
+                'previous_maintenance_hours': None,
+                'current_hours': float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0,
+                'next_maintenance_at': None,
+                'last_maintenance_date': None,
+                'error': 'Норма технического обслуживания не установлена для этой машины'
+            }
+        
+        last_maintenance = TechnicalMaintenance.objects.filter(
+            passenger_car=obj, 
+            maintenance_type=norm_obj.maintenance_type
+        ).order_by('-date').first()
+        
+        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
+        maintenance_at = float(norm_obj.norm)
+        interval = maintenance_at - current_hours
+        
+        # Часы проведения предыдущего ТО и интервал между ТО
+        previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
+        norm_interval_value = maintenance_at - previous_hours
+        
+        return {
+            'maintenance_type': norm_obj.maintenance_type,
+            'interval': interval,  # Часов ДО следующего ТО
+            'norm_interval_value': norm_interval_value,  # Интервал между ТО (часов в норме)
+            'previous_maintenance_hours': previous_hours,  # На каких часах было ТО
+            'current_hours': current_hours,
+            'next_maintenance_at': maintenance_at,  # Абсолютное значение часов
+            'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+        }
 
 
 class NormsPassengerCarsSerializer(FriendlyModelSerializer):
@@ -126,6 +198,11 @@ class OdometerFuelPassengerCarSerializer(FriendlyModelSerializer):
 
 class PassengerCarWaybillSerializer(FriendlyModelSerializer):
     driver_full_name = serializers.SerializerMethodField()
+    car_name = serializers.SerializerMethodField()
+    car_number = serializers.SerializerMethodField()
+    car_brand = serializers.SerializerMethodField()
+    car_model = serializers.SerializerMethodField()
+    vehicleType = serializers.SerializerMethodField()
     
     class Meta:
         model = PassengerCarWaybill
@@ -140,12 +217,59 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
             'savings',
             'overrun',
             'driver_full_name',
+            'car_name',
+            'car_number',
+            'car_brand',
+            'car_model',
+            'vehicleType',
         ]
     
     def get_driver_full_name(self, obj):
         if obj.driver:
             return f"{obj.driver.surname} {obj.driver.name} {obj.driver.last_name}".strip()
         return None
+    
+    def get_car_name(self, obj):
+        if obj.car:
+            return f"{obj.car.brand} {obj.car.model}".strip()
+        return 'Легковой автомобиль'
+    
+    def get_car_number(self, obj):
+        if obj.car:
+            return obj.car.number
+        return 'Без номера'
+    
+    def get_car_brand(self, obj):
+        if obj.car:
+            return obj.car.brand
+        return None
+    
+    def get_car_model(self, obj):
+        if obj.car:
+            return obj.car.model
+        return None
+    
+    def get_vehicleType(self, obj):
+        return 'passenger_car'
+    
+    def to_representation(self, instance):
+        """
+        Опционально инклюдить инфо о машине если проскан доп параметр
+        """
+        data = super().to_representation(instance)
+        
+        request = self.context.get('request')
+        include_car = request.query_params.get('include_car', 'false').lower() == 'true' if request else False
+        
+        if not include_car:
+            # Удаляем поля о машине если параметр не указан
+            data.pop('car_name', None)
+            data.pop('car_number', None)
+            data.pop('car_brand', None)
+            data.pop('car_model', None)
+            data.pop('vehicleType', None)
+        
+        return data
 
     def validate(self, data):
         """
@@ -199,6 +323,10 @@ class PassengerCarWaybillRecordSerializer(FriendlyModelSerializer):
 
 class FireTruckSerializer(FriendlyModelSerializer):
     odometer_fuel_records = serializers.SerializerMethodField()
+    operating_hours = serializers.SerializerMethodField()
+    technical_maintenance_norm = serializers.SerializerMethodField()
+    hours_until_maintenance = serializers.SerializerMethodField()
+    maintenance_info = serializers.SerializerMethodField()
 
     class Meta:
         model = FireTruck
@@ -210,6 +338,74 @@ class FireTruckSerializer(FriendlyModelSerializer):
             records = obj.odometer_fuel_records.all()
             return OdometerFuelFireTruckSerializer(records, many=True).data
         return None
+
+    def get_operating_hours(self, obj):
+        """Получить текущие операционные часы машины"""
+        operating_hours = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        if operating_hours:
+            return float(operating_hours.operating_hours)
+        return 0.0
+
+    def get_technical_maintenance_norm(self, obj):
+        """Получить норму технического обслуживания (часы)"""
+        norm = NormsTechnicalMaintenance.objects.filter(fire_truck=obj).order_by('-date').first()
+        if norm:
+            return float(norm.norm)
+        return 0.0
+
+    def get_hours_until_maintenance(self, obj):
+        """Вычислить часы до следующего ТО"""
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        norm_obj = NormsTechnicalMaintenance.objects.filter(fire_truck=obj).order_by('-date').first()
+        
+        if operating_hours_obj and norm_obj:
+            operating_hours = float(operating_hours_obj.operating_hours)
+            norm = float(norm_obj.norm)
+            hours_until = norm - operating_hours
+            return hours_until  # Может быть отрицательным если ТО уже должна была пройти
+        return None
+
+    def get_maintenance_info(self, obj):
+        """Получить полную информацию о техническом обслуживании"""
+        # Берем ПОСЛЕДНЮЮ СОЗДАННУЮ норму
+        norm_obj = NormsTechnicalMaintenance.objects.filter(fire_truck=obj).order_by('-date').first()
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        
+        # Проверяем, что норма существует и имеет положительное значение
+        if not norm_obj or norm_obj.norm <= 0:
+            return {
+                'maintenance_type': None,
+                'interval': None,
+                'norm_interval_value': None,
+                'previous_maintenance_hours': None,
+                'current_hours': float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0,
+                'next_maintenance_at': None,
+                'last_maintenance_date': None,
+                'error': 'Норма технического обслуживания не установлена для этой машины'
+            }
+        
+        last_maintenance = TechnicalMaintenance.objects.filter(
+            fire_truck=obj, 
+            maintenance_type=norm_obj.maintenance_type
+        ).order_by('-date').first()
+        
+        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
+        maintenance_at = float(norm_obj.norm)
+        interval = maintenance_at - current_hours
+        
+        # Часы проведения предыдущего ТО и интервал между ТО
+        previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
+        norm_interval_value = maintenance_at - previous_hours
+        
+        return {
+            'maintenance_type': norm_obj.maintenance_type,
+            'interval': interval,  # Часов ДО следующего ТО
+            'norm_interval_value': norm_interval_value,  # Интервал между ТО (часов в норме)
+            'previous_maintenance_hours': previous_hours,  # На каких часах было ТО
+            'current_hours': current_hours,
+            'next_maintenance_at': maintenance_at,  # Абсолютное значение часов
+            'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+        }
 
 
 class NormsFireTruckSerializer(FriendlyModelSerializer):
@@ -226,6 +422,11 @@ class OdometerFuelFireTruckSerializer(FriendlyModelSerializer):
 
 class FireTruckWaybillSerializer(FriendlyModelSerializer):
     driver_full_name = serializers.SerializerMethodField()
+    car_name = serializers.SerializerMethodField()
+    car_number = serializers.SerializerMethodField()
+    car_brand = serializers.SerializerMethodField()
+    car_model = serializers.SerializerMethodField()
+    vehicleType = serializers.SerializerMethodField()
     
     class Meta:
         model = FireTruckWaybill
@@ -240,12 +441,59 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
             'savings',
             'overrun',
             'driver_full_name',
+            'car_name',
+            'car_number',
+            'car_brand',
+            'car_model',
+            'vehicleType',
         ]
     
     def get_driver_full_name(self, obj):
         if obj.driver:
             return f"{obj.driver.surname} {obj.driver.name} {obj.driver.last_name}".strip()
         return None
+    
+    def get_car_name(self, obj):
+        if obj.car:
+            return f"{obj.car.brand} {obj.car.model}".strip()
+        return 'Пожарный автомобиль'
+    
+    def get_car_number(self, obj):
+        if obj.car:
+            return obj.car.number
+        return 'Без номера'
+    
+    def get_car_brand(self, obj):
+        if obj.car:
+            return obj.car.brand
+        return None
+    
+    def get_car_model(self, obj):
+        if obj.car:
+            return obj.car.model
+        return None
+    
+    def get_vehicleType(self, obj):
+        return 'fire_truck'
+    
+    def to_representation(self, instance):
+        """
+        Опционально инклюдить инфо о машине если проскан доп параметр
+        """
+        data = super().to_representation(instance)
+        
+        request = self.context.get('request')
+        include_car = request.query_params.get('include_car', 'false').lower() == 'true' if request else False
+        
+        if not include_car:
+            # Удаляем поля о машине если параметр не указан
+            data.pop('car_name', None)
+            data.pop('car_number', None)
+            data.pop('car_brand', None)
+            data.pop('car_model', None)
+            data.pop('vehicleType', None)
+        
+        return data
 
     def validate(self, data):
         """

@@ -61,6 +61,7 @@ import { ref, computed } from 'vue';
 import { Modal, Button, SelectInput, DateInput } from './ui/importUi';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields } from '../utils/errorUtils';
+import { getNovosibirskDateISO } from '../utils/dateUtils';
 
 const props = defineProps({
   carOptions: {
@@ -83,7 +84,7 @@ const form = ref({
   id: null,
   car: null,
   driver: null,
-  date: new Date().toISOString().split('T')[0],
+  date: getNovosibirskDateISO(),
   norm_season: 'summer'
 });
 
@@ -92,7 +93,7 @@ const originalData = ref({
   id: null,
   car: null,
   driver: null,
-  date: new Date().toISOString().split('T')[0],
+  date: getNovosibirskDateISO(),
   norm_season: 'summer'
 });
 

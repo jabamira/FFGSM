@@ -1214,4 +1214,128 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
             return base + [CanUpdateTechnicalMaintenance()]
         elif self.action == 'destroy':
             return base + [CanDeleteTechnicalMaintenance()]
+        elif self.action == 'perform_maintenance':
+            return base + [CanCreateTechnicalMaintenance()]
         return base
+
+    @action(detail=False, methods=['post'], url_path='perform')
+    def perform_maintenance(self, request):
+        """
+        Провести техническое обслуживание машины.
+        Создает запись ТО и обновляет норму.
+        
+        Параметры:
+        - car_id: ID легкового автомобиля (опционально)
+        - truck_id: ID пожарного автомобиля (опционально)
+        - maintenance_type: тип ТО (ТО-1, ТО-2, etc)
+        - date: дата проведения ТО
+        - operating_hours: моточасы в момент ТО (обязательно)
+        - spent: израсходовано топлива
+        - received: получено топлива
+        """
+        try:
+            from decimal import Decimal
+            from django.utils import timezone
+            from datetime import datetime
+            
+            car_id = request.data.get('car_id')
+            truck_id = request.data.get('truck_id')
+            maintenance_type = request.data.get('maintenance_type')
+            date = request.data.get('date')
+            operating_hours = request.data.get('operating_hours')
+            spent = request.data.get('spent', 0)
+            received = request.data.get('received', 0)
+            
+            # Валидация обязательных полей
+            if not maintenance_type:
+                return Response({'error': 'maintenance_type обязателен'}, status=400)
+            
+            if not date:
+                return Response({'error': 'date обязателена'}, status=400)
+            
+            if operating_hours is None or operating_hours == '':
+                return Response({'error': 'operating_hours обязательна'}, status=400)
+            
+            # Валидация на отрицательные значения
+            try:
+                operating_hours_val = float(operating_hours)
+                spent_val = float(spent) if spent else 0
+                received_val = float(received) if received else 0
+                
+                if operating_hours_val < 0:
+                    return Response({'error': 'operating_hours не может быть отрицательной'}, status=400)
+                if spent_val < 0:
+                    return Response({'error': 'spent не может быть отрицательным'}, status=400)
+                if received_val < 0:
+                    return Response({'error': 'received не может быть отрицательным'}, status=400)
+            except (ValueError, TypeError):
+                return Response({'error': 'Неверный формат числовых значений'}, status=400)
+            
+            if not car_id and not truck_id:
+                return Response({'error': 'Необходимо указать car_id или truck_id'}, status=400)
+            
+            # Получить машину
+            passenger_car = None
+            fire_truck = None
+            if car_id:
+                passenger_car = PassengerCar.objects.get(id=car_id)
+            else:
+                fire_truck = FireTruck.objects.get(id=truck_id)
+            
+            # Получить норму ТО (интервал)
+            if passenger_car:
+                norm_obj = NormsTechnicalMaintenance.objects.filter(
+                    passenger_car=passenger_car,
+                    maintenance_type=maintenance_type
+                ).order_by('-date').first()
+            else:
+                norm_obj = NormsTechnicalMaintenance.objects.filter(
+                    fire_truck=fire_truck,
+                    maintenance_type=maintenance_type
+                ).order_by('-date').first()
+            
+            if not norm_obj:
+                return Response(
+                    {'error': f'Норма ТО для {maintenance_type} не найдена'}, 
+                    status=400
+                )
+            
+            interval = float(norm_obj.norm)
+            
+            # Парсить дату
+            try:
+                maintenance_date = datetime.strptime(date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Неверный формат даты (используйте YYYY-MM-DD)'}, status=400)
+            
+            # Создать запись о проведении ТО
+            maintenance = TechnicalMaintenance.objects.create(
+                date=maintenance_date,
+                car_type='passenger' if passenger_car else 'fire_truck',
+                passenger_car=passenger_car,
+                fire_truck=fire_truck,
+                maintenance_type=maintenance_type,
+                spent=Decimal(str(spent_val)),
+                received=Decimal(str(received_val)),
+                operating_hours=Decimal(str(operating_hours_val))
+            )
+            
+            # Обновить норму: новая норма = operating_hours + интервал
+            new_norm_value = Decimal(str(operating_hours_val + interval))
+            norm_obj.norm = new_norm_value
+            norm_obj.date = timezone.now().date()
+            norm_obj.save()
+            
+            serializer = TechnicalMaintenanceSerializer(maintenance)
+            return Response({
+                'success': True,
+                'maintenance': serializer.data,
+                'new_norm': float(new_norm_value)
+            }, status=201)
+        
+        except PassengerCar.DoesNotExist:
+            return Response({'error': 'Легковой автомобиль не найден'}, status=404)
+        except FireTruck.DoesNotExist:
+            return Response({'error': 'Пожарный автомобиль не найден'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=400)

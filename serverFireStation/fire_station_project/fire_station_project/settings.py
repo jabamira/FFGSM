@@ -25,7 +25,20 @@ SECRET_KEY = 'django-insecure-)wme!l88sb5n!)by)xx*9w4g1&@izri%qvid27nx_lz6!0&1t*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:5174',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:5173',
+    'http://192.168.1.199:5173',
+    'http://192.168.1.199:5174',
+]
+
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Application definition
@@ -37,12 +50,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'rest_framework',
     'fuel.apps.FuelConfig',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -95,6 +110,19 @@ REST_FRAMEWORK = {
         #'rest_framework.permissions.AllowAny',
     ],
 }
+
+# CORS Headers Configuration
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 
 # Password validation

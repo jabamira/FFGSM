@@ -216,13 +216,19 @@ const closeAddModal = () => {
 
 const openEditModal = (norm) => {
   editingId.value = norm.id;
+  // Используем car_id если существует, иначе пытаемся извлечь из car.id
+  const carId = norm.car_id || (norm.car ? (typeof norm.car === 'object' ? norm.car.id : norm.car) : '');
+  
   form.value = {
-    car: norm.car_id,
+    car: carId,
     season: norm.season,
     city_norm: norm.city_norm.toString(),
     area_norm: norm.area_norm.toString(),
     date: norm.date,
-  };  originalEditForm.value = JSON.parse(JSON.stringify(form.value));  editFormErrors.value = {};
+  };
+  
+  originalEditForm.value = JSON.parse(JSON.stringify(form.value));
+  editFormErrors.value = {};
   editFormGeneralError.value = '';
   showEditModal.value = true;
 };

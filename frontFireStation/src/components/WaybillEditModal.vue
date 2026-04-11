@@ -97,6 +97,7 @@ import ErrorModal from './ErrorModal.vue';
 import PermissionDeniedModal from './PermissionDeniedModal.vue';
 import { fuelTypeOptions } from '../config/fuelTypes';
 import { validateFormFields } from '../utils/errorUtils';
+import { getNovosibirskDateISO } from '../utils/dateUtils';
 
 const props = defineProps({
   carOptions: {
@@ -123,7 +124,7 @@ const form = ref({
   id: null,
   car: null,
   driver: null,
-  date: new Date().toISOString().split('T')[0],
+  date: getNovosibirskDateISO(),
   norm_season: 'summer',
   fuel_type: 'petrol95'
 });
@@ -145,7 +146,10 @@ const generalError = ref('');
 
 // Methods
 const getCurrentSeason = () => {
-  const month = new Date().getMonth() + 1;
+  const d = new Date();
+  const offset = 7 * 60 * 60 * 1000; // UTC+7 для Новосибирска
+  const novosibirskDate = new Date(d.getTime() + offset);
+  const month = novosibirskDate.getMonth() + 1;
   return (month >= 5 && month <= 9) ? 'summer' : 'winter';
 };
 
@@ -176,7 +180,7 @@ const openAddModal = () => {
     id: null,
     car: null,
     driver: null,
-    date: new Date().toISOString().split('T')[0],
+    date: getNovosibirskDateISO(),
     norm_season: getCurrentSeason(),
     fuel_type: 'petrol95'
   };

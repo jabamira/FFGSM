@@ -1,0 +1,1 @@
+{"root":["./src/constants/index.ts","./src/app.vue","./src/components/footernavigation.vue","./src/components/ui/alert.vue","./src/components/ui/button.vue","./src/components/ui/textinput.vue","./src/pages/loginpage.vue","./src/pages/settingspage.vue","./src/pages/waybilllistpage.vue"],"version":"5.8.3"}

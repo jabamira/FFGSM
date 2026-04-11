@@ -195,7 +195,7 @@ const closeAddModal = () => {
 const openEditModal = (norm) => {
   editingId.value = norm.id;
   form.value = {
-    car: norm.car,
+    car: norm.passenger_car,
     maintenance_type: norm.maintenance_type,
     norm: norm.norm.toString(),
     date: norm.date,

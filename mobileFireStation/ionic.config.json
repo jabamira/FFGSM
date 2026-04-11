@@ -1,0 +1,8 @@
+{
+  "name": "Fire Station Mobile",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue",
+  "bundler": "vite"
+}

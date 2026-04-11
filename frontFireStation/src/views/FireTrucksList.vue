@@ -29,6 +29,15 @@
           <template #cell-fuel_type="{ row }">
             {{ formatFuelType(row.fuel_type) }}
           </template>
+          <template #cell-hours_until_maintenance="{ row }">
+            <button 
+              @click.stop="openMaintenanceModal(row)"
+              :style="getMaintenanceStyle(row)"
+              class="cursor-pointer hover:opacity-80 transition-opacity w-full"
+            >
+              {{ formatMaintenanceHours(row) }}
+            </button>
+          </template>
         </DataTable>
       </div>
     </div>
@@ -148,6 +157,15 @@
     <!-- Error Modal -->
     <ErrorModal ref="errorModalRef" />
 
+    <!-- Technical Maintenance Modal -->
+    <TechnicalMaintenanceModal 
+      :is-open="showMaintenanceModal"
+      :truck="selectedMaintenanceTruck"
+      :maintenance-info="selectedMaintenanceInfo"
+      @close="closeMaintenanceModal"
+      @success="handleMaintenanceSuccess"
+    />
+
     <!-- CRUD Panel -->
     <CrudPanel 
       @create="handleCrudCreate"
@@ -175,6 +193,7 @@ import CrudPanel from '../components/CrudPanel.vue';
 import ErrorModal from '../components/ErrorModal.vue';
 import OdometerModal from '../components/OdometerModal.vue';
 import FireTruckEditModal from '../components/FireTruckEditModal.vue';
+import TechnicalMaintenanceModal from '../components/TechnicalMaintenanceModal.vue';
 
 const auth = useAuthStore();
 const fireTrucks = ref([]);
@@ -196,7 +215,14 @@ const finalFilteredFireTrucks = computed(() => {
   if (filterFuelType.value) {
     filtered = filtered.filter(truck => truck.fuel_type === filterFuelType.value);
   }
-  return filtered;
+  
+  // Убедиться что у каждой машины есть часы до ТО (вычислить если нужно)
+  return filtered.map(truck => {
+    if (!truck.hours_until_maintenance && truck.technical_maintenance_norm !== null && truck.operating_hours !== null) {
+      truck.hours_until_maintenance = truck.technical_maintenance_norm - truck.operating_hours;
+    }
+    return truck;
+  });
 });
 
 const columns = [
@@ -204,7 +230,8 @@ const columns = [
   { key: 'brand', label: 'Марка' },
   { key: 'model', label: 'Модель' },
   { key: 'type', label: 'Тип' },
-  { key: 'fuel_type', label: 'Тип топлива' }
+  { key: 'fuel_type', label: 'Тип топлива' },
+  { key: 'hours_until_maintenance', label: 'Часов до ТО' }
 ];
 
 const newFireTruck = ref({
@@ -228,6 +255,10 @@ const odometerData = ref({
   fuel: '',
   date: new Date().toISOString().split('T')[0]
 });
+
+const showMaintenanceModal = ref(false);
+const selectedMaintenanceTruck = ref(null);
+const selectedMaintenanceInfo = ref(null);
 
 const fetchFireTrucks = async () => {
   if (!auth.permissions.view_fire_trucks) {
@@ -524,6 +555,118 @@ const isDeleteDisabled = computed(() => selectedFireTruckIds.value.length === 0)
 
 const handleCrudDelete = () => {
   openDeleteModal();
+};
+
+const formatMaintenanceHours = (row) => {
+  // Проверка наличия нормы ТО
+  if (row.technical_maintenance_norm === null || row.technical_maintenance_norm === undefined) {
+    return 'нет нормы на ТО';
+  }
+  
+  const maintenanceType = row.maintenance_info?.maintenance_type || 'ТО';
+  const hours = row.hours_until_maintenance;
+  
+  if (hours === null || hours === undefined) {
+    return `${maintenanceType}: нет данных`;
+  }
+  
+  // Если ТО уже должна была пройти
+  if (hours < 0) {
+    const overdueHours = Math.abs(hours).toFixed(2);
+    return `${maintenanceType}: должно было ${overdueHours} ч назад`;
+  }
+  
+  if (hours < 10) {
+    return `${maintenanceType}: ${hours.toFixed(2)} ч ⚠️`;
+  }
+  
+  return `${maintenanceType}: ${hours.toFixed(2)} ч`;
+};
+
+const getMaintenanceStyle = (row) => {
+  // Проверка наличия нормы ТО
+  if (row.technical_maintenance_norm === null || row.technical_maintenance_norm === undefined) {
+    return {
+      color: '#666',
+      backgroundColor: '#f0f0f0',
+      padding: '6px 12px',
+      borderRadius: '4px',
+      textAlign: 'center',
+      fontSize: '0.9em',
+      border: '1px solid #ddd'
+    };
+  }
+  
+  const hours = row.hours_until_maintenance;
+  
+  if (hours === null || hours === undefined) {
+    return {
+      color: '#666',
+      backgroundColor: '#f0f0f0',
+      padding: '6px 12px',
+      borderRadius: '4px',
+      textAlign: 'center',
+      fontSize: '0.9em',
+      border: '1px solid #ddd'
+    };
+  }
+  
+  // Красная: уже должна была пройти или < 10 часов
+  if (hours < 10) {
+    return {
+      color: '#fff',
+      fontWeight: 'bold',
+      backgroundColor: '#ef4444',
+      padding: '6px 12px',
+      borderRadius: '4px',
+      textAlign: 'center'
+    };
+  }
+  
+  // Оранжевая: 10-50 часов - ТО в ближайшее время
+  if (hours < 50) {
+    return {
+      color: '#fff',
+      fontWeight: 'bold',
+      backgroundColor: '#f97316',
+      padding: '6px 12px',
+      borderRadius: '4px',
+      textAlign: 'center'
+    };
+  }
+  
+  // Зелёная: >= 50 часов - достаточно времени
+  return {
+    color: '#fff',
+    fontWeight: 'bold',
+    backgroundColor: '#10b981',
+    padding: '6px 12px',
+    borderRadius: '4px',
+    textAlign: 'center'
+  };
+};
+
+const openMaintenanceModal = (truck) => {
+  if (!truck.maintenance_info) {
+    console.warn('Информация о ТО недоступна для этой машины');
+    return;
+  }
+  
+  selectedMaintenanceTruck.value = truck;
+  selectedMaintenanceInfo.value = truck.maintenance_info;
+  showMaintenanceModal.value = true;
+};
+
+const closeMaintenanceModal = () => {
+  showMaintenanceModal.value = false;
+  selectedMaintenanceTruck.value = null;
+  selectedMaintenanceInfo.value = null;
+};
+
+const handleMaintenanceSuccess = async () => {
+  // Перезагружаем данные машин
+  await fetchFireTrucks();
+  closeMaintenanceModal();
 };
 
 onMounted(() => {
