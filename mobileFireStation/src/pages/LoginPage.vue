@@ -4,7 +4,7 @@
     <ion-content 
       :fullscreen="true"
       class="ion-content-center"
-      :style="{ '--background': 'linear-gradient(to bottom right, #f1f5f9, #e0f2fe)' }"
+      :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)' }"
     >
       <!-- Card Container - Centered -->
       <div class="login-container">

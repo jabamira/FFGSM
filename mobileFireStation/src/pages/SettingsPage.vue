@@ -1,17 +1,12 @@
 <template>
   <ion-page class="page-layout">
-    <ion-header :translucent="true">
-      <ion-toolbar>
-        <ion-title :style="{ color: palette.dark }">Настройки</ion-title>
+    <ion-header :translucent="true" class="no-border">
+      <ion-toolbar :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', '--border-bottom': 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '24px' }">
+        <ion-title :style="{ color: palette.dark, textAlign: 'center', width: '100%' }">Настройки</ion-title>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true" class="ion-padding">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title size="large" :style="{ color: palette.dark }">Настройки</ion-title>
-        </ion-toolbar>
-      </ion-header>
+    <ion-content :fullscreen="true" class="ion-padding" :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)' }">
 
       <div class="space-y-6 pb-4">
         <!-- Profile Section -->
@@ -95,6 +90,16 @@
 .page-layout ion-content {
   flex: 1;
   overflow: auto;
+}
+
+/* Удалить border и shadow из header */
+.page-layout ion-header {
+  --border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.page-layout ion-header.no-border::after {
+  display: none !important;
 }
 </style>
 

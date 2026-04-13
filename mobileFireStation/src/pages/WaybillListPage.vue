@@ -1,20 +1,15 @@
 <template>
   <ion-page class="page-layout">
-    <ion-header :translucent="true">
-      <ion-toolbar>
-        <ion-title :style="{ color: palette.dark }">Путевые листы</ion-title>
-        <ion-buttons slot="end">
-          <ion-menu-button></ion-menu-button>
-        </ion-buttons>
+    <ion-header :translucent="true" class="no-border">
+      <ion-toolbar :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', '--border-bottom': 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '24px' }">
+        <ion-title :style="{ color: palette.dark, textAlign: 'center', width: '100%' }">Путевыые листы</ion-title>
+        <p v-if="filteredWaybills.length > 0" :style="{ color: palette.medium, fontSize: '12px', margin: '6px 0 0 0', textAlign: 'center' }">
+          Всего: {{ filteredWaybills.length }}
+        </p>
       </ion-toolbar>
     </ion-header>
 
-    <ion-content :fullscreen="true" class="ion-padding">
-      <ion-header collapse="condense">
-        <ion-toolbar>
-          <ion-title size="large" :style="{ color: palette.dark }">Мои путевые листы</ion-title>
-        </ion-toolbar>
-      </ion-header>
+    <ion-content :fullscreen="true" class="ion-padding" :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)' }">
 
       <!-- Offline Status Bar -->
       <div v-if="!isOnlineMode" class="mb-4 p-3 rounded-lg bg-yellow-100 border-l-4 border-yellow-500">
@@ -181,6 +176,16 @@
   --padding-start: 24px;
   --padding-end: 24px;
 }
+
+/* Удалить border и shadow из header */
+.page-layout ion-header {
+  --border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.page-layout ion-header.no-border::after {
+  display: none !important;
+}
 </style>
 
 <script setup>
@@ -191,6 +196,7 @@ import { palette, Button } from '../components/ui/importUi'
 import { getCacheData, setCacheData, isOnline, onlineStatusListener, CACHE_KEYS } from '../utils/cacheUtils'
 import { getPendingSyncCount } from '../utils/syncQueue'
 import { useAuthStore } from '../stores/auth'
+import { getNovosibirskDate } from '../utils'
 import FooterNavigation from '../components/FooterNavigation.vue'
 import {
   IonPage,
@@ -219,11 +225,13 @@ const pendingSyncCount = ref(getPendingSyncCount())
 
 const filteredWaybills = computed(() => {
   // Фильтруем только путевые листы на сегодня (по времени Новосибирска)
-  const d = new Date()
-  const offset = 7 * 60 * 60 * 1000 // UTC+7 для Новосибирска
-  const novosibirskDate = new Date(d.getTime() + offset)
-  const today = novosibirskDate.toISOString().split('T')[0]
+  const today = getNovosibirskDate()
+  console.log('[WaybillListPage] Today date (Novosibirsk):', today)
+  console.log('[WaybillListPage] All waybills:', waybills.value.map(w => ({ id: w.id, date: w.date })))
+  
   let filtered = waybills.value.filter(w => w.date === today)
+  
+  console.log('[WaybillListPage] Filtered by today:', filtered.length)
   
   // Сортируем: сначала пожарные, потом легковые
   filtered.sort((a, b) => {

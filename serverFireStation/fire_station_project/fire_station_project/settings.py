@@ -152,3 +152,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# JWT Token Configuration
+# Время жизни токена - 7 дней (604800 секунд)
+JWT_TOKEN_LIFETIME = 7 * 24 * 60 * 60  # 7 days in seconds

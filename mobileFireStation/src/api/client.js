@@ -51,8 +51,10 @@ class ApiClient {
             method: error.config?.method,
           },
         })
-        if (error.response?.status === 401) {
+        // Если токен истек или доступ запрещен
+        if (error.response?.status === 401 || error.response?.status === 403) {
           localStorage.removeItem('auth_token')
+          localStorage.removeItem('auth_user')
           window.location.href = '/login'
         }
         return Promise.reject(error)
