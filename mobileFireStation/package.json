@@ -11,7 +11,10 @@
     "ionic:serve": "npm run dev",
     "android": "ionic capacitor build android",
     "ios": "ionic capacitor build ios",
-    "sync": "ionic capacitor sync"
+    "sync": "ionic capacitor sync",
+    "icons:generate": "npx @capacitor/assets generate",
+    "splash:generate": "npx @capacitor/assets generate --splash",
+    "icons:replace": "npm run icons:generate && npm run sync"
   },
   "dependencies": {
     "@capacitor/android": "^6.0.1",

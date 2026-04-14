@@ -4,6 +4,17 @@ const config: CapacitorConfig = {
   appId: 'com.firestation.mobile',
   appName: 'Fire Station Mobile',
   webDir: 'dist',
+  
+  // Пути к иконкам
+  icon: 'src/assets/icons/icon.png',
+  
+  // Сплэш экран
+  splash: {
+    image: 'src/assets/icons/icon-512.png',
+    backgroundColor: '#ffffff',
+    showSpinner: false,
+  },
+  
   server: {
     androidScheme: 'http',
     cleartext: true,
@@ -11,13 +22,17 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 3000,
+      launchAutoHide: true,
+      backgroundColor: '#ffffff',
+      showSpinner: false,
+    },
+    ScreenOrientation: {
+      orientations: ['portrait'],
     },
     Capacitor: {
       handleURLOpen: true,
     },
-  
-   
   },
 };
 
