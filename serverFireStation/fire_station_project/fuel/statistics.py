@@ -31,8 +31,12 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
         GET /api/statistics/summary/?from=2025-01-01&to=2025-01-31&vehicle_type=all
         GET /api/statistics/summary/?vehicle_type=all (загрузит все время)
         
-        vehicle_type: all | passenger-car | fire-truck
-        from, to: опциональны (если не указаны - загружается статистика за всё время)
+        Parameters:
+        - vehicle_type: all | passenger-car | fire-truck
+        - from, to: опциональны (если не указаны - загружается статистика за всё время)
+        - vehicle_type_prefix: ft (fire-truck) | pc (passenger-car) - для фильтра конкретной машины
+        - vehicle_id: ID конкретной машины (если указан vehicle_type_prefix)
+        - driver_id: ID конкретного водителя
         """
         try:
             import logging
@@ -41,6 +45,9 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
             from_str = request.query_params.get('from')
             to_str = request.query_params.get('to')
             vehicle_type = request.query_params.get('vehicle_type', 'all')
+            vehicle_type_prefix = request.query_params.get('vehicle_type_prefix')
+            vehicle_id = request.query_params.get('vehicle_id')
+            driver_id = request.query_params.get('driver_id')
             
             # Если даты указаны, их нужно обе
             if (from_str and not to_str) or (not from_str and to_str):
@@ -87,6 +94,14 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
                 
                 if from_date and to_date:
                     query = query.filter(date__gte=from_date, date__lte=to_date)
+                
+                # Filter by specific vehicle if requested
+                if vehicle_type_prefix == 'pc' and vehicle_id:
+                    query = query.filter(car_id=int(vehicle_id))
+                
+                # Filter by driver if requested
+                if driver_id:
+                    query = query.filter(driver_id=int(driver_id))
                 
                 pc_waybills = query.select_related('car', 'driver').prefetch_related('records')
                 
@@ -173,6 +188,14 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
                 
                 if from_date and to_date:
                     query = query.filter(date__gte=from_date, date__lte=to_date)
+                
+                # Filter by specific vehicle if requested
+                if vehicle_type_prefix == 'ft' and vehicle_id:
+                    query = query.filter(car_id=int(vehicle_id))
+                
+                # Filter by driver if requested
+                if driver_id:
+                    query = query.filter(driver_id=int(driver_id))
                 
                 ft_waybills = query.select_related('car', 'driver').prefetch_related('records')
                 

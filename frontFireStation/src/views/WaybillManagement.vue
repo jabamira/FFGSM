@@ -90,8 +90,10 @@
           <DataTable
             :columns="recordsColumns"
             :data="records"
-            :selectedIds="selectedRecordIds"
-            @select="(ids) => selectedRecordIds = ids"
+            :selectable="true"
+            :show-select-all="false"
+            :selected-rows="getSelectedRecordIndexes()"
+            @row-selected="onRecordsSelected"
             @row-click="(row) => openEditRecord(row)"
             :hideActions="false"
           >
@@ -898,12 +900,23 @@ const openEditRecord = (record) => {
 
 // Форматировать decimal число: заменить запятую на точку и округлить до 3 знаков
 const formatDecimalForSubmit = (value) => {
-  if (value === null || value === '' || isNaN(value)) return 0;
-  // Заменить запятую на точку
-  const normalized = String(value).replace(',', '.');
-  const num = parseFloat(normalized);
-  // Округлить до 3 знаков после запятой
-  return parseFloat(num.toFixed(3));
+  // Если пусто, null или NaN - возвращаем 0
+  if (value === null || value === undefined || value === '' || isNaN(value)) return '0.000';
+  
+  // Преобразуем в строку и заменяем запятую на точку
+  let stringValue = String(value).trim().replace(',', '.');
+  
+  // Если после обработки осталась пустая строка - возвращаем 0
+  if (!stringValue) return '0.000';
+  
+  // Парсим как число
+  const num = parseFloat(stringValue);
+  
+  // Проверяем если число валидно
+  if (isNaN(num)) return '0.000';
+  
+  // Форматируем до 3 знаков после запятой и преобразуем обратно в строку
+  return num.toFixed(3);
 };
 
 const handleAddRecord = async (recordData) => {
@@ -1108,6 +1121,16 @@ const handleEditRecord = async (recordData) => {
     const errorText = errorMsg || 'Произошла ошибка при обновлении записи';
     recordEditModal.value?.setValidationError(errorText);
   }
+};
+
+const getSelectedRecordIndexes = () => {
+  return records.value
+    .map((record, index) => selectedRecordIds.value.includes(record.id) ? index : -1)
+    .filter(index => index !== -1);
+};
+
+const onRecordsSelected = (selectedIndexes) => {
+  selectedRecordIds.value = selectedIndexes.map(idx => records.value[idx].id);
 };
 
 const openDeleteRecordsModal = () => {

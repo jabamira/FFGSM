@@ -1222,16 +1222,18 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
     def perform_maintenance(self, request):
         """
         Провести техническое обслуживание машины.
-        Создает запись ТО и обновляет норму.
+        Создает запись ТО.
         
         Параметры:
         - car_id: ID легкового автомобиля (опционально)
         - truck_id: ID пожарного автомобиля (опционально)
         - maintenance_type: тип ТО (ТО-1, ТО-2, etc)
         - date: дата проведения ТО
-        - operating_hours: моточасы в момент ТО (обязательно)
         - spent: израсходовано топлива
         - received: получено топлива
+        
+        Примечание: operating_hours ВСЕГДА берутся из текущих значений в OperatingHoursCars.
+                   Фронтенд не должен передавать это значение.
         """
         try:
             from decimal import Decimal
@@ -1242,7 +1244,6 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
             truck_id = request.data.get('truck_id')
             maintenance_type = request.data.get('maintenance_type')
             date = request.data.get('date')
-            operating_hours = request.data.get('operating_hours')
             spent = request.data.get('spent', 0)
             received = request.data.get('received', 0)
             
@@ -1253,26 +1254,20 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
             if not date:
                 return Response({'error': 'date обязателена'}, status=400)
             
-            if operating_hours is None or operating_hours == '':
-                return Response({'error': 'operating_hours обязательна'}, status=400)
+            if not car_id and not truck_id:
+                return Response({'error': 'Необходимо указать car_id или truck_id'}, status=400)
             
             # Валидация на отрицательные значения
             try:
-                operating_hours_val = float(operating_hours)
                 spent_val = float(spent) if spent else 0
                 received_val = float(received) if received else 0
                 
-                if operating_hours_val < 0:
-                    return Response({'error': 'operating_hours не может быть отрицательной'}, status=400)
                 if spent_val < 0:
                     return Response({'error': 'spent не может быть отрицательным'}, status=400)
                 if received_val < 0:
                     return Response({'error': 'received не может быть отрицательным'}, status=400)
             except (ValueError, TypeError):
                 return Response({'error': 'Неверный формат числовых значений'}, status=400)
-            
-            if not car_id and not truck_id:
-                return Response({'error': 'Необходимо указать car_id или truck_id'}, status=400)
             
             # Получить машину
             passenger_car = None
@@ -1281,6 +1276,20 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
                 passenger_car = PassengerCar.objects.get(id=car_id)
             else:
                 fire_truck = FireTruck.objects.get(id=truck_id)
+            
+            # operating_hours ВСЕГДА берутся из OperatingHoursCars (текущие значения)
+            # Никогда не передаются с фронта
+            if passenger_car:
+                hours_obj = OperatingHoursCars.objects.filter(passenger_car=passenger_car).order_by('-date').first()
+            else:
+                hours_obj = OperatingHoursCars.objects.filter(fire_truck=fire_truck).order_by('-date').first()
+            
+            if not hours_obj:
+                return Response(
+                    {'error': 'Текущие моточасы не найдены в системе. Пожалуйста, внесите стартовые данные о моточасах машины.'},
+                    status=400
+                )
+            operating_hours_val = float(hours_obj.operating_hours)
             
             # Получить норму ТО (интервал)
             if passenger_car:
@@ -1320,17 +1329,11 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
                 operating_hours=Decimal(str(operating_hours_val))
             )
             
-            # Обновить норму: новая норма = operating_hours + интервал
-            new_norm_value = Decimal(str(operating_hours_val + interval))
-            norm_obj.norm = new_norm_value
-            norm_obj.date = timezone.now().date()
-            norm_obj.save()
-            
             serializer = TechnicalMaintenanceSerializer(maintenance)
             return Response({
                 'success': True,
                 'maintenance': serializer.data,
-                'new_norm': float(new_norm_value)
+                'next_maintenance_at': float(operating_hours_val + interval)
             }, status=201)
         
         except PassengerCar.DoesNotExist:

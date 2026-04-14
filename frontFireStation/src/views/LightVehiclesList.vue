@@ -30,13 +30,17 @@
             {{ formatFuelType(row.fuel_type) }}
           </template>
           <template #cell-hours_until_maintenance="{ row }">
-            <button 
-              @click.stop="openMaintenanceModal(row)"
-              :style="getMaintenanceStyle(row)"
-              class="cursor-pointer hover:opacity-80 transition-opacity w-full"
-            >
-              {{ formatMaintenanceHours(row) }}
-            </button>
+            <div @click.stop class="w-full">
+              <Button 
+                @click="openMaintenanceModal(row)"
+                :style="getMaintenanceStyle(row)"
+                variant="secondary"
+                size="sm"
+                class="w-full"
+              >
+                {{ formatMaintenanceHours(row) }}
+              </Button>
+            </div>
           </template>
         </DataTable>
       </div>
@@ -547,13 +551,13 @@ const handleCrudDelete = () => {
 };
 
 const formatMaintenanceHours = (row) => {
-  // Проверка наличия нормы ТО
-  if (row.technical_maintenance_norm === null || row.technical_maintenance_norm === undefined) {
-    return 'нет нормы на ТО';
+  // Проверка наличия информации о ТО
+  if (!row.maintenance_info || row.maintenance_info?.error) {
+    return 'нет норм';
   }
   
   const maintenanceType = row.maintenance_info?.maintenance_type || 'ТО';
-  const hours = row.hours_until_maintenance;
+  const hours = row.maintenance_info?.interval;  // Используем interval из maintenance_info
   
   if (hours === null || hours === undefined) {
     return `${maintenanceType}: нет данных`;
@@ -573,30 +577,30 @@ const formatMaintenanceHours = (row) => {
 };
 
 const getMaintenanceStyle = (row) => {
-  // Проверка наличия нормы ТО
-  if (row.technical_maintenance_norm === null || row.technical_maintenance_norm === undefined) {
+  // Проверка наличия информации о ТО - если нет норм, серый цвет
+  if (!row.maintenance_info || row.maintenance_info?.error) {
     return {
-      color: '#666',
-      backgroundColor: '#f0f0f0',
+      color: palette.medium,
+      backgroundColor: palette.light + '30',
       padding: '6px 12px',
       borderRadius: '4px',
       textAlign: 'center',
       fontSize: '0.9em',
-      border: '1px solid #ddd'
+      border: `1px solid ${palette.light}`
     };
   }
   
-  const hours = row.hours_until_maintenance;
+  const hours = row.maintenance_info?.interval;  // Используем interval из maintenance_info
   
   if (hours === null || hours === undefined) {
     return {
-      color: '#666',
-      backgroundColor: '#f0f0f0',
+      color: palette.medium,
+      backgroundColor: palette.light + '30',
       padding: '6px 12px',
       borderRadius: '4px',
       textAlign: 'center',
       fontSize: '0.9em',
-      border: '1px solid #ddd'
+      border: `1px solid ${palette.light}`
     };
   }
   
@@ -635,15 +639,27 @@ const getMaintenanceStyle = (row) => {
   };
 };
 
-const openMaintenanceModal = (car) => {
-  if (!car.maintenance_info) {
-    console.warn('Информация о ТО недоступна для этой машины');
-    return;
+const openMaintenanceModal = async (car) => {
+  try {
+    // Получить свежие данные машины с информацией по всем видам ТО
+    const response = await axios.get(`/passenger-cars/${car.id}/?include_all_maintenance_info=true`, {
+      headers: { Authorization: `Bearer ${auth.access}` }
+    });
+    
+    const freshCar = response.data;
+    
+    if (!freshCar.maintenance_info || freshCar.maintenance_info?.error) {
+      console.warn('Информация о ТО недоступна для этой машины');
+      return;
+    }
+    
+    selectedMaintenanceCar.value = freshCar;
+    selectedMaintenanceInfo.value = freshCar.maintenance_info;
+    showMaintenanceModal.value = true;
+  } catch (error) {
+    console.error('[PassengerCars] Ошибка при загрузке данных для модала ТО:', error);
+    errorModalRef.value?.openModal(error);
   }
-  
-  selectedMaintenanceCar.value = car;
-  selectedMaintenanceInfo.value = car.maintenance_info;
-  showMaintenanceModal.value = true;
 };
 
 const closeMaintenanceModal = () => {

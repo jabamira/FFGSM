@@ -5,52 +5,76 @@
     @close="close"
   >
     <div class="space-y-4">
+      <!-- Выбор вида ТО (если доступны несколько видов) -->
+      <div v-if="allMaintenanceItems && allMaintenanceItems.length > 0" class="space-y-2">
+        <label :style="{ color: palette.dark }" class="block text-sm font-medium">Вид ТО</label>
+        <div class="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded p-2">
+          <button
+            v-for="item in allMaintenanceItems"
+            :key="item.maintenance_type"
+            @click="selectMaintenanceType(item)"
+            :style="{
+              backgroundColor: getMaintenanceColor(item.interval),
+              color: '#fff',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              border: form.maintenance_type === item.maintenance_type ? '2px solid white' : 'none',
+              fontWeight: form.maintenance_type === item.maintenance_type ? 'bold' : 'normal',
+              cursor: 'pointer'
+            }"
+            class="w-full text-left hover:shadow transition-shadow"
+          >
+            {{ getMaintenanceTypeLabel(item.maintenance_type) }}: {{ item.interval.toFixed(2) }} ч
+          </button>
+        </div>
+      </div>
+
       <!-- Сообщение об ошибке отсутствия нормы -->
-      <div v-if="maintenanceInfo?.error" class="rounded-lg p-4 bg-amber-50 border border-amber-200">
-        <p class="text-sm font-semibold text-amber-700">⚠️ {{ maintenanceInfo.error }}</p>
+      <div v-if="allMaintenanceInfo?.error" class="rounded-lg p-4 bg-amber-50 border border-amber-200">
+        <p class="text-sm font-semibold text-amber-700">⚠️ {{ allMaintenanceInfo.error }}</p>
       </div>
 
       <!-- Сводка -->
-      <div v-if="!maintenanceInfo?.error" class="bg-gray-50 border border-gray-200 rounded p-4">
-        <p class="font-semibold mb-3" :style="{ color: palette.dark }">Сводка</p>
+      <div v-if="currentMaintenanceInfo && !allMaintenanceInfo?.error" class="bg-gray-50 border border-gray-200 rounded p-4">
+        <p class="font-semibold mb-3" :style="{ color: palette.dark }">Сводка: {{ getMaintenanceTypeLabel(currentMaintenanceInfo.maintenance_type) }}</p>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Текущие часы</p>
-            <p class="font-semibold" :style="{ color: palette.dark }">{{ (maintenanceInfo?.current_hours || 0).toFixed(2) }} ч</p>
+            <p class="font-semibold" :style="{ color: palette.dark }">{{ (allMaintenanceInfo?.current_hours || 0).toFixed(2) }} ч</p>
           </div>
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Осталось до ТО</p>
-            <p class="font-semibold" :style="{ color: maintenanceInfo?.interval !== null && maintenanceInfo?.interval !== undefined && maintenanceInfo.interval < 0 ? '#ef4444' : palette.dark }">
-              {{ maintenanceInfo?.interval !== null && maintenanceInfo?.interval !== undefined ? maintenanceInfo.interval.toFixed(2) : 'N/A' }} ч
+            <p class="font-semibold" :style="{ color: currentMaintenanceInfo?.interval !== null && currentMaintenanceInfo?.interval !== undefined && currentMaintenanceInfo.interval < 0 ? '#ef4444' : palette.dark }">
+              {{ currentMaintenanceInfo?.interval !== null && currentMaintenanceInfo?.interval !== undefined ? currentMaintenanceInfo.interval.toFixed(2) : 'N/A' }} ч
             </p>
           </div>
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Интервал между ТО</p>
             <p class="font-semibold" :style="{ color: palette.dark }">
-              {{ maintenanceInfo?.norm_interval_value !== null && maintenanceInfo?.norm_interval_value !== undefined ? maintenanceInfo.norm_interval_value.toFixed(2) : 'N/A' }} ч
+              {{ currentMaintenanceInfo?.norm_interval_value !== null && currentMaintenanceInfo?.norm_interval_value !== undefined ? currentMaintenanceInfo.norm_interval_value.toFixed(2) : 'N/A' }} ч
             </p>
           </div>
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Следующее ТО</p>
             <p class="font-semibold" :style="{ color: palette.dark }">
-              {{ maintenanceInfo?.next_maintenance_at !== null && maintenanceInfo?.next_maintenance_at !== undefined ? maintenanceInfo.next_maintenance_at.toFixed(2) : 'N/A' }} ч
+              {{ currentMaintenanceInfo?.next_maintenance_at !== null && currentMaintenanceInfo?.next_maintenance_at !== undefined ? currentMaintenanceInfo.next_maintenance_at.toFixed(2) : 'N/A' }} ч
             </p>
           </div>
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Предыдущее ТО было на</p>
             <p class="font-semibold" :style="{ color: palette.dark }">
-              {{ maintenanceInfo?.previous_maintenance_hours !== null && maintenanceInfo?.previous_maintenance_hours !== undefined ? maintenanceInfo.previous_maintenance_hours.toFixed(2) : 'N/A' }} ч
+              {{ currentMaintenanceInfo?.previous_maintenance_hours !== null && currentMaintenanceInfo?.previous_maintenance_hours !== undefined ? currentMaintenanceInfo.previous_maintenance_hours.toFixed(2) : 'N/A' }} ч
             </p>
           </div>
-          <div v-if="maintenanceInfo?.last_maintenance_date">
+          <div v-if="currentMaintenanceInfo?.last_maintenance_date">
             <p :style="{ color: palette.medium }" class="text-xs">Дата последнего ТО</p>
-            <p class="font-semibold" :style="{ color: palette.dark }">{{ maintenanceInfo?.last_maintenance_date }}</p>
+            <p class="font-semibold" :style="{ color: palette.dark }">{{ currentMaintenanceInfo?.last_maintenance_date }}</p>
           </div>
         </div>
       </div>
 
       <!-- Форма проведения ТО -->
-      <div v-if="maintenanceInfo && !maintenanceInfo?.error" class="space-y-3">
+      <div v-if="currentMaintenanceInfo && !allMaintenanceInfo?.error" class="space-y-3">
         <!-- Сообщение об ошибке валидации -->
         <div v-if="Object.keys(formErrors).length > 0" class="rounded-lg p-3 bg-red-50 border border-red-200">
           <p class="text-sm font-semibold text-red-600">{{ error }}</p>
@@ -62,17 +86,6 @@
           :hint="fieldDefinitions.technicalMaintenance.date.hint"
           :error="formErrors.date"
           :required="fieldDefinitions.technicalMaintenance.date.required"
-        />
-        <TextInput 
-          v-model="form.operating_hours" 
-          :label="fieldDefinitions.technicalMaintenance.operating_hours.label" 
-          :hint="fieldDefinitions.technicalMaintenance.operating_hours.hint"
-          :error="formErrors.operating_hours"
-          type="number"
-          step="0.001"
-          placeholder="0.0"
-          :required="fieldDefinitions.technicalMaintenance.operating_hours.required"
-          min="0"
         />
         <TextInput 
           v-model="form.spent" 
@@ -108,8 +121,8 @@
     </div>
 
     <template #footer>
-      <Button variant="secondary" size="md" @click="close" :disabled="isLoading || maintenanceInfo?.error">Отмена</Button>
-      <Button variant="primary" size="md" @click="submitMaintenance" :disabled="isLoading || maintenanceInfo?.error">
+      <Button variant="secondary" size="md" @click="close" :disabled="isLoading || allMaintenanceInfo?.error">Отмена</Button>
+      <Button variant="primary" size="md" @click="submitMaintenance" :disabled="isLoading || allMaintenanceInfo?.error || !currentMaintenanceInfo">
         {{ isLoading ? 'Сохраняется...' : 'Провести ТО' }}
       </Button>
     </template>
@@ -151,9 +164,9 @@ const error = ref('');
 const formErrors = ref({});
 const form = ref({
   date: '',
-  operating_hours: '0',
   spent: '0',
-  received: '0'
+  received: '0',
+  maintenance_type: ''
 });
 
 const carType = computed(() => {
@@ -162,6 +175,53 @@ const carType = computed(() => {
 
 const carId = computed(() => {
   return props.car?.id || props.truck?.id;
+});
+
+// Маппинг для переводов видов ТО
+const maintenanceTypeLabels = {
+  'engine_oil': 'Замена моторного масла и фильтра',
+  'air_filter': 'Замена воздушного фильтра',
+  'cabine_filter': 'Замена салонного фильтра',
+  'antifreeze': 'Замена антифриза'
+};
+
+const getMaintenanceTypeLabel = (typeCode) => {
+  return maintenanceTypeLabels[typeCode] || typeCode;
+};
+
+// Получить все варианты ТО для этой машины
+const allMaintenanceInfo = computed(() => {
+  return props.car?.all_maintenance_info || props.truck?.all_maintenance_info || { items: [], error: null };
+});
+
+const allMaintenanceItems = computed(() => {
+  return allMaintenanceInfo.value?.items || [];
+});
+
+// Текущая информация о выбранном виде ТО
+const currentMaintenanceInfo = ref(null);
+
+const getMaintenanceColor = (interval) => {
+  if (interval < 0) return '#ef4444';  // Красный - просрочено
+  if (interval < 10) return '#ef4444';  // Красный - менее 10 часов
+  if (interval < 50) return '#f97316';  // Оранжевый  - 10-50 часов
+  return '#10b981';  // Зелёный - 50+ часов
+};
+
+const selectMaintenanceType = (item) => {
+  form.value.maintenance_type = item.maintenance_type;
+  // Обновить сводку для выбранного вида ТО
+  currentMaintenanceInfo.value = item;
+};
+
+// Watch для автоматического обновления selectedMaintenanceInfo в родительском компоненте
+watch(() => form.value.maintenance_type, (newType) => {
+  if (newType) {
+    const selectedItem = allMaintenanceItems.value.find(item => item.maintenance_type === newType);
+    if (selectedItem) {
+      currentMaintenanceInfo.value = selectedItem;
+    }
+  }
 });
 
 // Initialize form when modal opens
@@ -178,12 +238,17 @@ const close = () => {
 
 const resetForm = () => {
   const today = getNovosibirskDateISO();
+  // Установить maintenance_type на первый доступный или пустой
+  const firstType = allMaintenanceItems.value.length > 0 ? allMaintenanceItems.value[0].maintenance_type : '';
+  const firstItem = allMaintenanceItems.value.length > 0 ? allMaintenanceItems.value[0] : null;
+  
   form.value = { 
     date: today,
-    operating_hours: '0',
     spent: '0',
-    received: '0'
+    received: '0',
+    maintenance_type: firstType
   };
+  currentMaintenanceInfo.value = firstItem;
   error.value = '';
   formErrors.value = {};
 };
@@ -192,7 +257,7 @@ const submitMaintenance = async () => {
   formErrors.value = {};
   error.value = '';
 
-  if (!props.maintenanceInfo) {
+  if (!currentMaintenanceInfo.value) {
     error.value = 'Информация о ТО не загружена';
     return;
   }
@@ -200,7 +265,6 @@ const submitMaintenance = async () => {
   // Подготовить данные для валидации
   const dataToValidate = {
     date: form.value.date,
-    operating_hours: form.value.operating_hours,
     spent: form.value.spent,
     received: form.value.received
   };
@@ -208,7 +272,6 @@ const submitMaintenance = async () => {
   // Валидация только полей формы (исключаем car и maintenance_type, которые передаются как props)
   const fieldsToValidate = {
     date: fieldDefinitions.technicalMaintenance.date,
-    operating_hours: fieldDefinitions.technicalMaintenance.operating_hours,
     spent: fieldDefinitions.technicalMaintenance.spent,
     received: fieldDefinitions.technicalMaintenance.received
   };
@@ -225,8 +288,7 @@ const submitMaintenance = async () => {
   try {
     const payload = {
       date: form.value.date,
-      operating_hours: parseFloat(form.value.operating_hours),
-      maintenance_type: props.maintenanceInfo.maintenance_type,
+      maintenance_type: form.value.maintenance_type,
       spent: parseFloat(form.value.spent) || 0,
       received: parseFloat(form.value.received) || 0
     };

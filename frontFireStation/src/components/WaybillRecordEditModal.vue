@@ -91,6 +91,7 @@
           placeholder="0"
           step="0.001"
           min="0"
+          max="999.999"
           :required="fieldDefinitions.waybillRecord.fuel_refueled.required"
           :error="formErrors.fuel_refueled"
           :data-error="formErrors.fuel_refueled ? 'fuel_refueled' : null"
@@ -106,6 +107,7 @@
           placeholder="0"
           step="0.001"
           min="0"
+          max="999.999"
           :required="fieldDefinitions.waybillRecord.fuel_used.required"
           :error="formErrors.fuel_used"
           :data-error="formErrors.fuel_used ? 'fuel_used' : null"
@@ -570,6 +572,31 @@ const submitForm = async () => {
   } else {
     baseData.distance_city_km = parseInt(form.value.distance_city_km) || 0;
     baseData.distance_area_km = parseInt(form.value.distance_area_km) || 0;
+    
+    // Проверка максимального расстояния на основе fieldDefinitions
+    const maxDistance = fieldDefinitions.waybillRecord.distance_city_km.maxValue || 900;
+    
+    // Проверка каждого поля отдельно
+    if (baseData.distance_city_km > maxDistance) {
+      generalError.value = `❌ Ошибка: Км по городу (${baseData.distance_city_km}) превышает максимум ${maxDistance} км!`;
+      await scrollToTop();
+      return;
+    }
+    
+    if (baseData.distance_area_km > maxDistance) {
+      generalError.value = `❌ Ошибка: Км по области (${baseData.distance_area_km}) превышает максимум ${maxDistance} км!`;
+      await scrollToTop();
+      return;
+    }
+    
+    // Проверка суммы расстояний
+    const totalDistance = baseData.distance_city_km + baseData.distance_area_km;
+    if (totalDistance > maxDistance * 2) {
+      generalError.value = `❌ Ошибка: Суммарное расстояние (${totalDistance} км) превышает ${ maxDistance * 2} км! ` +
+                          `Разделите запись на несколько дней.`;
+      await scrollToTop();
+      return;
+    }
   }
   
   console.log('[WaybillRecordEditModal] Submitting record data:', {

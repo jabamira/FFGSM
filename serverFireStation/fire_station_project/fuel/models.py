@@ -6,6 +6,9 @@ from django.contrib.auth.hashers import make_password, check_password, identify_
 from django.core.validators import MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from datetime import date
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # --- Мягкое удаление ---
@@ -376,13 +379,13 @@ class PassengerCarWaybill(SoftDeleteModel):
         help_text="сезон нормы"
     )
 
-    upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_spent = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_received = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    required_by_norm = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    availability_upon_delivery = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    savings = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    overrun = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    upon_issuance = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_spent = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_received = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    required_by_norm = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    availability_upon_delivery = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    savings = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    overrun = models.DecimalField(max_digits=12, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
 
     def __str__(self):
         return f"Путевой лист {self.car.number} от {self.date}"
@@ -393,6 +396,10 @@ class PassengerCarWaybill(SoftDeleteModel):
         super().save(*args, **kwargs)
 
     def recalc_totals(self, save=True):
+        logger.warning('\n' + '=' * 80)
+        logger.warning('[PassengerCarWaybill.recalc_totals] ВХОД В МЕТОД')
+        logger.warning('=' * 80)
+        
         start_state = (
             OdometerFuelPassengerCar.objects
             .filter(car=self.car, date__lte=self.date)
@@ -426,16 +433,81 @@ class PassengerCarWaybill(SoftDeleteModel):
             self.savings = Decimal('0.000')
             self.overrun = -diff
 
+        # ════════════════════════════════════════════════════════════════
+        # ЛОГИРОВАНИЕ ПЕРЕД СОХРАНЕНИЕМ В recalc_totals
+        # ════════════════════════════════════════════════════════════════
+        logger.warning('\n' + '=' * 80)
+        logger.warning('[PassengerCarWaybill.recalc_totals] ПЕРЕД СОХРАНЕНИЕМ')
+        logger.warning('=' * 80)
+        logger.warning(f'upon_issuance: {self.upon_issuance} (max: 999.999)')
+        logger.warning(f'total_spent: {self.total_spent} (max: 999.999)')
+        logger.warning(f'total_received: {self.total_received} (max: 999.999)')
+        logger.warning(f'required_by_norm: {self.required_by_norm} (max: 999.999)')
+        logger.warning(f'availability_upon_delivery: {self.availability_upon_delivery} (max: 999.999)')
+        logger.warning(f'savings: {self.savings} (max: 999.999)')
+        logger.warning(f'overrun: {self.overrun} (max: 999.999)')
+        
+        # Проверяем какие превышают лимиты
+        logger.warning('\n--- ПРОВЕРКА ЛИМИТОВ ---')
+        errors = []
+        
+        if self.upon_issuance and self.upon_issuance > Decimal('999.999'):
+            msg = f'❌ upon_issuance={self.upon_issuance} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.total_spent and self.total_spent > Decimal('999.999'):
+            msg = f'❌ total_spent={self.total_spent} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.total_received and self.total_received > Decimal('999.999'):
+            msg = f'❌ total_received={self.total_received} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.required_by_norm and self.required_by_norm > Decimal('999.999'):
+            msg = f'❌ required_by_norm={self.required_by_norm} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.availability_upon_delivery and self.availability_upon_delivery > Decimal('999.999'):
+            msg = f'❌ availability_upon_delivery={self.availability_upon_delivery} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.savings and self.savings > Decimal('999.999'):
+            msg = f'❌ savings={self.savings} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        if self.overrun and self.overrun > Decimal('999.999'):
+            msg = f'❌ overrun={self.overrun} > 999.999'
+            logger.error(msg)
+            errors.append(msg)
+        
+        logger.warning('=' * 80)
+        
+        if errors:
+            logger.error(f'\n⚠️  НАЙДЕНЫ ПЕРЕПОЛНЕНИЯ В recalc_totals:\n' + '\n'.join(errors))
+
         if save:
-            self.save(update_fields=[
-                'upon_issuance',
-                'total_spent',
-                'total_received',
-                'required_by_norm',
-                'availability_upon_delivery',
-                'savings',
-                'overrun',
-            ])
+            logger.warning('[recalc_totals] ВЫЗЫВАЕМ self.save()')
+            try:
+                self.save(update_fields=[
+                    'upon_issuance',
+                    'total_spent',
+                    'total_received',
+                    'required_by_norm',
+                    'availability_upon_delivery',
+                    'savings',
+                    'overrun',
+                ])
+                logger.warning('✅ recalc_totals УСПЕШНО СОХРАНЕНА')
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при save() в recalc_totals: {str(e)}')
+                logger.error(f'[recalc_totals ERROR] Это ошибка из самого recalc_totals!')
+                raise
     
     class Meta:
         db_table = 'passenger_car_waybill'
@@ -455,7 +527,7 @@ class OdometerFuelPassengerCar(SoftDeleteModel):
         null=False,
         blank=True,
         help_text="показания одометра, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     fuel = models.DecimalField(
@@ -590,7 +662,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр после возвращения, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     fuel_before_departure = models.DecimalField(
@@ -606,14 +678,14 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр перед выездом, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     distance_total_km = models.PositiveIntegerField(
         null=False,
         editable=False,
         help_text="всего пройдено км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     fuel_used_city = models.DecimalField(
@@ -657,6 +729,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         db_table = 'passenger_car_waybill_record'
 
     def _fill_start_values(self):
+        logger.warning('[_fill_start_values] НАЧАЛО')
         wb = self.passenger_car_waybill
         car = wb.car
 
@@ -674,8 +747,13 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
 
         self.odometer_before = last_state.odometer
         self.fuel_before_departure = last_state.fuel
+        
+        logger.warning(f'[_fill_start_values] odometer_before={self.odometer_before}')
+        logger.warning(f'[_fill_start_values] fuel_before_departure={self.fuel_before_departure} (max: 999.999)')
+        logger.warning('[_fill_start_values] КОНЕЦ')
 
     def _apply_norms(self):
+        logger.warning('[_apply_norms] НАЧАЛО')
         wb = self.passenger_car_waybill
         car = wb.car
 
@@ -691,9 +769,29 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         )
         if not norm:
             season_display = Season.get_display(wb.norm_season)
-            raise ValidationError(
-                f"Не найдена норма для {car.number}, сезон={season_display}"
+            
+            # Проверяем есть ли норма, но с датой позже даты путевого листа
+            future_norm = (
+                NormsPassengerCars.objects
+                .filter(
+                    car=car,
+                    season=wb.norm_season,
+                    date__gt=wb.date,
+                )
+                .order_by('date')
+                .first()
             )
+            
+            if future_norm:
+                raise ValidationError(
+                    f"Норма для {car.number}, сезон {season_display} существует, но создана позже даты путевого листа. "
+                    f"Дата норма: {future_norm.date.strftime('%d.%m.%Y')}, дата путевого листа: {wb.date.strftime('%d.%m.%Y')}. "
+                    f"Укажите дату путевого листа раньше или измените дату нормы."
+                )
+            else:
+                raise ValidationError(
+                    f"Не найдена норма для {car.number}, сезон={season_display}"
+                )
 
         self.distance_total_km = self.distance_city_km + self.distance_area_km
         self.odometer_after = self.odometer_before + self.distance_total_km
@@ -701,13 +799,40 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         self.fuel_used_city = Decimal(self.distance_city_km) * norm.city_norm
         self.fuel_used_area = Decimal(self.distance_area_km) * norm.area_norm
         self.fuel_used_normal = (self.fuel_used_city or 0) + (self.fuel_used_area or 0)
+        
+        logger.warning(f'[_apply_norms] distance_total_km={self.distance_total_km}')
+        logger.warning(f'[_apply_norms] odometer_after={self.odometer_after} (max: 999999)')
+        logger.warning(f'[_apply_norms] fuel_used_city={self.fuel_used_city} (max: 999.999)')
+        logger.warning(f'[_apply_norms] fuel_used_area={self.fuel_used_area} (max: 999.999)')
+        logger.warning(f'[_apply_norms] fuel_used_normal={self.fuel_used_normal} (max: 999.999)')
+        logger.warning('[_apply_norms] КОНЕЦ')
 
     def _calc_fuel_on_return(self):
+        logger.warning('[_calc_fuel_on_return] НАЧАЛО')
+        logger.warning(f'[_calc_fuel_on_return] fuel_before_departure={self.fuel_before_departure}')
+        logger.warning(f'[_calc_fuel_on_return] fuel_used={self.fuel_used}')
+        logger.warning(f'[_calc_fuel_on_return] fuel_refueled={self.fuel_refueled}')
+        
         self.fuel_on_return = (
             (self.fuel_before_departure or Decimal('0.000'))
             - (self.fuel_used or Decimal('0.000'))
             + (self.fuel_refueled or Decimal('0.000'))
         )
+        
+        logger.warning(f'[_calc_fuel_on_return] fuel_on_return={self.fuel_on_return} (max: 999.999)')
+        
+        # Проверка что топливо не может быть отрицательным
+        if self.fuel_on_return < 0:
+            raise ValidationError(
+                f"Остаток топлива не может быть отрицательным! "
+                f"Топливо перед: {self.fuel_before_departure} л, "
+                f"израсходовано: {self.fuel_used} л, "
+                f"заправлено: {self.fuel_refueled} л. "
+                f"Результат: {self.fuel_on_return} л. "
+                f"Пожалуйста, проверьте введенные значения."
+            )
+        
+        logger.warning('[_calc_fuel_on_return] КОНЕЦ')
 
     def _calc_operating_hours_total(self):
         wb = self.passenger_car_waybill
@@ -744,23 +869,149 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             self._fill_start_values()
             self._apply_norms()
             self._calc_fuel_on_return()
-            super().save(*args, **kwargs)
+            
+            # ════════════════════════════════════════════════════════════════
+            # ЛОГИРОВАНИЕ ВСЕ DECIMAL ПОЛЕЙ ПЕРЕД СОХРАНЕНИЕМ
+            # ════════════════════════════════════════════════════════════════
+            logger.warning('\n' + '=' * 80)
+            logger.warning('[PassengerCarWaybillRecord.save] ВСЕ ПОЛЯ ПЕРЕД super().save()')
+            logger.warning('=' * 80)
+            logger.warning(f'distance_city_km: {self.distance_city_km} (max: 999999, тип: {type(self.distance_city_km).__name__})')
+            logger.warning(f'distance_area_km: {self.distance_area_km} (max: 999999, тип: {type(self.distance_area_km).__name__})')
+            logger.warning(f'fuel_refueled: {self.fuel_refueled} (max: 999.999, тип: {type(self.fuel_refueled).__name__})')
+            logger.warning(f'fuel_used: {self.fuel_used} (max: 999.999, тип: {type(self.fuel_used).__name__})')
+            logger.warning(f'fuel_before_departure: {self.fuel_before_departure} (max: 999.999, тип: {type(self.fuel_before_departure).__name__})')
+            logger.warning(f'odometer_before: {self.odometer_before} (max: 999999, тип: {type(self.odometer_before).__name__})')
+            logger.warning(f'distance_total_km: {self.distance_total_km} (max: 999999, тип: {type(self.distance_total_km).__name__})')
+            logger.warning(f'fuel_used_city: {self.fuel_used_city} (max: 999.999, тип: {type(self.fuel_used_city).__name__})')
+            logger.warning(f'fuel_used_area: {self.fuel_used_area} (max: 999.999, тип: {type(self.fuel_used_area).__name__})')
+            logger.warning(f'fuel_on_return: {self.fuel_on_return} (max: 999.999, тип: {type(self.fuel_on_return).__name__})')
+            logger.warning(f'fuel_used_normal: {self.fuel_used_normal} (max: 999.999, тип: {type(self.fuel_used_normal).__name__})')
+            logger.warning(f'odometer_after: {self.odometer_after} (max: 999999, тип: {type(self.odometer_after).__name__})')
+            
+            # Проверяем какие превышают лимиты
+            logger.warning('\n--- ПРОВЕРКА ЛИМИТОВ ---')
+            errors = []
+            
+            if self.fuel_refueled and self.fuel_refueled > Decimal('999.999'):
+                msg = f'❌ fuel_refueled={self.fuel_refueled} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_used and self.fuel_used > Decimal('999.999'):
+                msg = f'❌ fuel_used={self.fuel_used} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_before_departure and self.fuel_before_departure > Decimal('999.999'):
+                msg = f'❌ fuel_before_departure={self.fuel_before_departure} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_used_city and self.fuel_used_city > Decimal('999.999'):
+                msg = f'❌ fuel_used_city={self.fuel_used_city} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_used_area and self.fuel_used_area > Decimal('999.999'):
+                msg = f'❌ fuel_used_area={self.fuel_used_area} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_on_return and self.fuel_on_return > Decimal('999.999'):
+                msg = f'❌ fuel_on_return={self.fuel_on_return} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.fuel_used_normal and self.fuel_used_normal > Decimal('999.999'):
+                msg = f'❌ fuel_used_normal={self.fuel_used_normal} > 999.999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.odometer_after and self.odometer_after > 999999:
+                msg = f'❌ odometer_after={self.odometer_after} > 999999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            if self.distance_total_km and self.distance_total_km > 999999:
+                msg = f'❌ distance_total_km={self.distance_total_km} > 999999'
+                logger.error(msg)
+                errors.append(msg)
+            
+            logger.warning('=' * 80)
+            
+            if errors:
+                logger.error(f'\n⚠️  НАЙДЕНЫ ПЕРЕПОЛНЕНИЯ:\n' + '\n'.join(errors))
+            
+            try:
+                super().save(*args, **kwargs)
+                logger.warning('✅ PassengerCarWaybillRecord УСПЕШНО СОХРАНЕНА')
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при super().save(): {str(e)}')
+                raise
 
-            OdometerFuelPassengerCar.objects.create(
-                car=self.passenger_car_waybill.car,
-                odometer=self.odometer_after,
-                fuel=self.fuel_on_return,
-                date=self.passenger_car_waybill.date,
-                waybill=self.passenger_car_waybill,
-            )
+            # ОТЛАДКА перед созданием OdometerFuelPassengerCar
+            logger.warning('=' * 80)
+            logger.warning('[PassengerCarWaybillRecord.save] ПЕРЕД СОЗДАНИЕМ OdometerFuelPassengerCar')
+            logger.warning('=' * 80)
+            logger.warning(f'odometer_after: {self.odometer_after} (тип: {type(self.odometer_after).__name__}, max: 999999)')
+            logger.warning(f'fuel_on_return: {self.fuel_on_return} (тип: {type(self.fuel_on_return).__name__}, max: 999.999)')
+            
+            # Проверяем лимиты перед созданием
+            if self.fuel_on_return > Decimal('999.999'):
+                logger.error(f'❌ ОШИБКА: fuel_on_return={self.fuel_on_return} превышает максимум 999.999!')
+            if self.odometer_after > 999999:
+                logger.error(f'❌ ОШИБКА: odometer_after={self.odometer_after} превышает максимум 999999!')
+            
+            logger.warning('=' * 80)
+
+            # Пробуем создать с явным логированием ошибок
+            try:
+                OdometerFuelPassengerCar.objects.create(
+                    car=self.passenger_car_waybill.car,
+                    odometer=self.odometer_after,
+                    fuel=self.fuel_on_return,
+                    date=self.passenger_car_waybill.date,
+                    waybill=self.passenger_car_waybill,
+                )
+                logger.warning('✅ OdometerFuelPassengerCar создана успешно')
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при создании OdometerFuelPassengerCar: {str(e)}')
+                logger.error(f'车_____VALUES:')
+                logger.error(f'  car: {self.passenger_car_waybill.car}')
+                logger.error(f'  odometer: {self.odometer_after}')
+                logger.error(f'  fuel: {self.fuel_on_return}')
+                logger.error(f'  date: {self.passenger_car_waybill.date}')
+                raise
 
             total_hours = self._calc_operating_hours_total()
 
-            OperatingHoursCars.objects.create(
-                passenger_car=self.passenger_car_waybill.car,
-                operating_hours=total_hours,
-                date=self.passenger_car_waybill.date,
-            )
+            # ОТЛАДКА перед созданием OperatingHoursCars
+            logger.warning('=' * 80)
+            logger.warning('[PassengerCarWaybillRecord.save] ПЕРЕД СОЗДАНИЕМ OperatingHoursCars')
+            logger.warning('=' * 80)
+            logger.warning(f'total_hours = {total_hours} (тип: {type(total_hours).__name__}, max: 999.999)')
+            
+            if total_hours > Decimal('999.999'):
+                logger.error(f'❌ ОШИБКА: total_hours={total_hours} превышает максимум 999.999!')
+            
+            logger.warning('=' * 80)
+
+            # Пробуем создать с явным логированием ошибок
+            try:
+                OperatingHoursCars.objects.create(
+                    passenger_car=self.passenger_car_waybill.car,
+                    operating_hours=total_hours,
+                    date=self.passenger_car_waybill.date,
+                )
+                logger.warning('✅ OperatingHoursCars создана успешно')
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
+                logger.error(f'VALUES:')
+                logger.error(f'  passenger_car: {self.passenger_car_waybill.car}')
+                logger.error(f'  operating_hours: {total_hours}')
+                logger.error(f'  date: {self.passenger_car_waybill.date}')
+                raise
 
             self.passenger_car_waybill.recalc_totals()
 
@@ -965,7 +1216,7 @@ class OdometerFuelFireTruck(SoftDeleteModel):
     odometer = models.PositiveIntegerField(
         null=False,
         blank=True,
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
     fuel = models.DecimalField(
         max_digits=6,
@@ -1071,7 +1322,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     odometer_after = models.PositiveIntegerField(
         null=False,
         help_text="одометр после возвращения, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     time_with_pump = models.PositiveIntegerField(
@@ -1115,14 +1366,14 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр перед выездом, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     distance_km = models.PositiveIntegerField(
         null=False,
         editable=False,
         help_text="пробег, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(9999999)]
     )
 
     fuel_on_return = models.DecimalField(
@@ -1205,9 +1456,29 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         )
         if not norm:
             season_display = Season.get_display(wb.norm_season)
-            raise ValidationError(
-                f"Не найдена норма для {car.number}, сезон={season_display}"
+            
+            # Проверяем есть ли норма, но с датой позже даты путевого листа
+            future_norm = (
+                NormsFireTruck.objects
+                .filter(
+                    car=car,
+                    season=wb.norm_season,
+                    date__gt=wb.date,
+                )
+                .order_by('date')
+                .first()
             )
+            
+            if future_norm:
+                raise ValidationError(
+                    f"Норма для {car.number}, сезон {season_display} существует, но создана позже даты путевого листа. "
+                    f"Дата норма: {future_norm.date.strftime('%d.%m.%Y')}, дата путевого листа: {wb.date.strftime('%d.%m.%Y')}. "
+                    f"Укажите дату путевого листа раньше или измените дату нормы."
+                )
+            else:
+                raise ValidationError(
+                    f"Не найдена норма для {car.number}, сезон={season_display}"
+                )
 
         self.distance_km = self.odometer_after - self.odometer_before
 
@@ -1227,6 +1498,17 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             - (self.fuel_used or Decimal('0.000'))
             + (self.fuel_refueled or Decimal('0.000'))
         )
+        
+        # Проверка что топливо не может быть отрицательным
+        if self.fuel_on_return < 0:
+            raise ValidationError(
+                f"Остаток топлива не может быть отрицательным! "
+                f"Топливо перед: {self.fuel_before_departure} л, "
+                f"израсходовано: {self.fuel_used} л, "
+                f"заправлено: {self.fuel_refueled} л. "
+                f"Результат: {self.fuel_on_return} л. "
+                f"Пожалуйста, проверьте введенные значения."
+            )
 
     def _calc_operating_hours_total(self):
         wb = self.fire_truck_waybill
@@ -1311,6 +1593,26 @@ class FireTruckWaybillRecord(SoftDeleteModel):
 
             total_hours = self._calc_operating_hours_total()
 
+            # ОТЛАДКА перед созданием OperatingHoursCars
+            logger.warning('=' * 80)
+            logger.warning('[FireTruckWaybillRecord.save] ПЕРЕД СОЗДАНИЕМ OperatingHoursCars')
+            logger.warning('=' * 80)
+            logger.warning(f'total_hours = {total_hours} (type: {type(total_hours).__name__})')
+            logger.warning(f'total_hours decimal_places = {total_hours.as_tuple().exponent if isinstance(total_hours, Decimal) else "N/A"}')
+            
+            # Проверяем все decimal поля
+            logger.warning(f'\n--- Все Decimal поля этой записи ---')
+            logger.warning(f'fuel_used_by_distance: {self.fuel_used_by_distance}')
+            logger.warning(f'fuel_used_with_pump: {self.fuel_used_with_pump}')
+            logger.warning(f'fuel_used_without_pump: {self.fuel_used_without_pump}')
+            logger.warning(f'fuel_used_normal: {self.fuel_used_normal}')
+            logger.warning(f'fuel_used: {self.fuel_used}')
+            logger.warning(f'fuel_refueled: {self.fuel_refueled}')
+            logger.warning(f'fuel_on_return: {self.fuel_on_return}')
+            logger.warning(f'fuel_before_departure: {self.fuel_before_departure}')
+            
+            logger.warning('=' * 80)
+
             OperatingHoursCars.objects.create(
                 fire_truck=self.fire_truck_waybill.car,
                 operating_hours=total_hours,
@@ -1341,7 +1643,7 @@ class TechnicalMaintenance(SoftDeleteModel):
 
     date = models.DateField(
         null=False,
-        help_text="дата"
+        help_text="дата"    
     )
 
     TYPE_CHOICES = (
@@ -1400,22 +1702,31 @@ class TechnicalMaintenance(SoftDeleteModel):
         if not self.number:
             self.number = next_doc_number(TechnicalMaintenance, length=6)
 
-        if self.passenger_car_id:
-            last_hours = (
-                OperatingHoursCars.objects
-                .filter(passenger_car=self.passenger_car)
-                .order_by('-date', '-id')
-                .first()
-            )
-        else:
-            last_hours = (
-                OperatingHoursCars.objects
-                .filter(fire_truck=self.fire_truck)
-                .order_by('-date', '-id')
-                .first()
-            )
+        # Только автоматически устанавливаем operating_hours если она не была явно передана
+        # (то есть если это новая запись, создаваемая через фронтенд)
+        #
+        # В perform_maintenance view при вызове .create() уже передаются корректные operating_hours,
+        # и этот код будет уважать это значение
+        
+        # Проверяем, была ли operating_hours явно установлена
+        # Если это новый объект (без pk) и operating_hours не установлена, берем из OperatingHoursCars
+        if self.pk is None and not self.operating_hours:
+            if self.passenger_car_id:
+                last_hours = (
+                    OperatingHoursCars.objects
+                    .filter(passenger_car=self.passenger_car)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+            else:
+                last_hours = (
+                    OperatingHoursCars.objects
+                    .filter(fire_truck=self.fire_truck)
+                    .order_by('-date', '-id')
+                    .first()
+                )
 
-        self.operating_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
+            self.operating_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
 
         super().save(*args, **kwargs)
 

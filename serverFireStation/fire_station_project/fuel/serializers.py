@@ -103,6 +103,7 @@ class PassengerCarSerializer(FriendlyModelSerializer):
     technical_maintenance_norm = serializers.SerializerMethodField()
     hours_until_maintenance = serializers.SerializerMethodField()
     maintenance_info = serializers.SerializerMethodField()
+    all_maintenance_info = serializers.SerializerMethodField()
 
     class Meta:
         model = PassengerCar
@@ -166,21 +167,76 @@ class PassengerCarSerializer(FriendlyModelSerializer):
         ).order_by('-date').first()
         
         current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
-        maintenance_at = float(norm_obj.norm)
-        interval = maintenance_at - current_hours
+        interval_value = float(norm_obj.norm)  # Это интервал между ТО (например, 100 часов)
         
-        # Часы проведения предыдущего ТО и интервал между ТО
+        # Часы проведения предыдущего ТО
         previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
-        norm_interval_value = maintenance_at - previous_hours
+        
+        # Следующее ТО должно быть на: previous_hours + интервал
+        next_maintenance_at = previous_hours + interval_value
+        
+        # Часов осталось до следующего ТО
+        hours_until_maintenance = next_maintenance_at - current_hours
         
         return {
             'maintenance_type': norm_obj.maintenance_type,
-            'interval': interval,  # Часов ДО следующего ТО
-            'norm_interval_value': norm_interval_value,  # Интервал между ТО (часов в норме)
+            'interval': hours_until_maintenance,  # Часов ДО следующего ТО (может быть отрицательным если уже пора)
+            'norm_interval_value': interval_value,  # Интервал из нормы (пример: каждые 100 часов)
             'previous_maintenance_hours': previous_hours,  # На каких часах было ТО
             'current_hours': current_hours,
-            'next_maintenance_at': maintenance_at,  # Абсолютное значение часов
+            'next_maintenance_at': next_maintenance_at,  # Абсолютное значение часов когда нужно ТО
             'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+        }
+
+    def get_all_maintenance_info(self, obj):
+        """Получить информацию по ВСЕМ видам ТО для этой машины"""
+        request = self.context.get('request')
+        if not request or request.query_params.get('include_all_maintenance_info') != 'true':
+            return None
+            
+        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
+        
+        # Получить все нормы (уникальные по maintenance_type)
+        all_norms = NormsTechnicalMaintenance.objects.filter(
+            passenger_car=obj
+        ).order_by('maintenance_type', '-date').distinct('maintenance_type')
+        
+        if not all_norms:
+            return {
+                'error': 'Нет установленных норм технического обслуживания',
+                'items': []
+            }
+        
+        maintenance_items = []
+        for norm_obj in all_norms:
+            if norm_obj.norm <= 0:
+                continue
+                
+            # Получить последнее ТО этого типа
+            last_maintenance = TechnicalMaintenance.objects.filter(
+                passenger_car=obj,
+                maintenance_type=norm_obj.maintenance_type
+            ).order_by('-date').first()
+            
+            interval_value = float(norm_obj.norm)
+            previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
+            next_maintenance_at = previous_hours + interval_value
+            hours_until_maintenance = next_maintenance_at - current_hours
+            
+            maintenance_items.append({
+                'maintenance_type': norm_obj.maintenance_type,
+                'interval': hours_until_maintenance,
+                'norm_interval_value': interval_value,
+                'previous_maintenance_hours': previous_hours,
+                'next_maintenance_at': next_maintenance_at,
+                'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+            })
+        
+        return {
+            'items': maintenance_items,
+            'current_hours': current_hours,
+            'error': None
         }
 
 
@@ -327,6 +383,7 @@ class FireTruckSerializer(FriendlyModelSerializer):
     technical_maintenance_norm = serializers.SerializerMethodField()
     hours_until_maintenance = serializers.SerializerMethodField()
     maintenance_info = serializers.SerializerMethodField()
+    all_maintenance_info = serializers.SerializerMethodField()
 
     class Meta:
         model = FireTruck
@@ -390,21 +447,76 @@ class FireTruckSerializer(FriendlyModelSerializer):
         ).order_by('-date').first()
         
         current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
-        maintenance_at = float(norm_obj.norm)
-        interval = maintenance_at - current_hours
+        interval_value = float(norm_obj.norm)  # Это интервал между ТО (например, 100 часов)
         
-        # Часы проведения предыдущего ТО и интервал между ТО
+        # Часы проведения предыдущего ТО
         previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
-        norm_interval_value = maintenance_at - previous_hours
+        
+        # Следующее ТО должно быть на: previous_hours + интервал
+        next_maintenance_at = previous_hours + interval_value
+        
+        # Часов осталось до следующего ТО
+        hours_until_maintenance = next_maintenance_at - current_hours
         
         return {
             'maintenance_type': norm_obj.maintenance_type,
-            'interval': interval,  # Часов ДО следующего ТО
-            'norm_interval_value': norm_interval_value,  # Интервал между ТО (часов в норме)
+            'interval': hours_until_maintenance,  # Часов ДО следующего ТО (может быть отрицательным если уже пора)
+            'norm_interval_value': interval_value,  # Интервал из нормы (пример: каждые 100 часов)
             'previous_maintenance_hours': previous_hours,  # На каких часах было ТО
             'current_hours': current_hours,
-            'next_maintenance_at': maintenance_at,  # Абсолютное значение часов
+            'next_maintenance_at': next_maintenance_at,  # Абсолютное значение часов когда нужно ТО
             'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+        }
+
+    def get_all_maintenance_info(self, obj):
+        """Получить информацию по ВСЕМ видам ТО для этой машины"""
+        request = self.context.get('request')
+        if not request or request.query_params.get('include_all_maintenance_info') != 'true':
+            return None
+            
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
+        
+        # Получить все нормы (уникальные по maintenance_type)
+        all_norms = NormsTechnicalMaintenance.objects.filter(
+            fire_truck=obj
+        ).order_by('maintenance_type', '-date').distinct('maintenance_type')
+        
+        if not all_norms:
+            return {
+                'error': 'Нет установленных норм технического обслуживания',
+                'items': []
+            }
+        
+        maintenance_items = []
+        for norm_obj in all_norms:
+            if norm_obj.norm <= 0:
+                continue
+                
+            # Получить последнее ТО этого типа
+            last_maintenance = TechnicalMaintenance.objects.filter(
+                fire_truck=obj,
+                maintenance_type=norm_obj.maintenance_type
+            ).order_by('-date').first()
+            
+            interval_value = float(norm_obj.norm)
+            previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
+            next_maintenance_at = previous_hours + interval_value
+            hours_until_maintenance = next_maintenance_at - current_hours
+            
+            maintenance_items.append({
+                'maintenance_type': norm_obj.maintenance_type,
+                'interval': hours_until_maintenance,
+                'norm_interval_value': interval_value,
+                'previous_maintenance_hours': previous_hours,
+                'next_maintenance_at': next_maintenance_at,
+                'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
+            })
+        
+        return {
+            'items': maintenance_items,
+            'current_hours': current_hours,
+            'error': None
         }
 
 

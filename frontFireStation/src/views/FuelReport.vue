@@ -493,6 +493,18 @@ const loadAnalytics = async () => {
     else if (filters.value.vehicleType === 'passenger_car') vehicleType = 'passenger-car';
     
     params.append('vehicle_type', vehicleType);
+    
+    // Add vehicle_id if selected (format: "ft-123" or "pc-456")
+    if (filters.value.vehicle) {
+      const [type, vehicleId] = filters.value.vehicle.split('-');
+      params.append('vehicle_type_prefix', type);
+      params.append('vehicle_id', vehicleId);
+    }
+    
+    // Add driver_id if selected
+    if (filters.value.driver) {
+      params.append('driver_id', filters.value.driver);
+    }
 
     // Fetch statistics from backend
     const statsRes = await axios.get(`/statistics/summary/?${params.toString()}`);
@@ -510,12 +522,6 @@ const loadAnalytics = async () => {
     // Process passenger cars
     if (Array.isArray(stats.passenger_cars)) {
       stats.passenger_cars.forEach(car => {
-        // Apply vehicle filter if specified
-        if (filters.value.vehicle) {
-          const [type, vehicleId] = filters.value.vehicle.split('-');
-          if (type !== 'pc' || parseInt(vehicleId) !== car.id) return;
-        }
-
         vehicleList.push({
           vehicleId: car.id,
           vehicleName: `${car.number} - ${car.brand} ${car.model}`,
@@ -530,12 +536,6 @@ const loadAnalytics = async () => {
     // Process fire trucks
     if (Array.isArray(stats.fire_trucks)) {
       stats.fire_trucks.forEach(truck => {
-        // Apply vehicle filter if specified
-        if (filters.value.vehicle) {
-          const [type, vehicleId] = filters.value.vehicle.split('-');
-          if (type !== 'ft' || parseInt(vehicleId) !== truck.id) return;
-        }
-
         vehicleList.push({
           vehicleId: `ft_${truck.id}`,
           vehicleName: `${truck.number} - ${truck.brand} ${truck.model}`,
@@ -552,12 +552,6 @@ const loadAnalytics = async () => {
       console.log('[FuelReport] Processing drivers from stats:', stats.drivers);
       console.log('[FuelReport] Driver filter value:', filters.value.driver);
       stats.drivers.forEach(driver => {
-        // Apply driver filter if specified
-        if (filters.value.driver && parseInt(filters.value.driver) !== driver.id) {
-          console.log(`[FuelReport] Filtering out driver ${driver.id} (${driver.name}) - filter value: ${filters.value.driver}`);
-          return;
-        }
-
         console.log(`[FuelReport] Adding driver ${driver.id} (${driver.name})`);
         driverList[driver.id] = {
           driverId: driver.id,
