@@ -377,12 +377,12 @@ class PassengerCarWaybill(SoftDeleteModel):
     )
 
     upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_spent = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_received = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    required_by_norm = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_spent = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_received = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    required_by_norm = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
     availability_upon_delivery = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    savings = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    overrun = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    savings = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    overrun = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
 
     def __str__(self):
         return f"Путевой лист {self.car.number} от {self.date}"
@@ -455,7 +455,7 @@ class OdometerFuelPassengerCar(SoftDeleteModel):
         null=False,
         blank=True,
         help_text="показания одометра, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
 
     fuel = models.DecimalField(
@@ -561,13 +561,13 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
     distance_city_km = models.PositiveIntegerField(
         null=False,
         help_text="пройдено км по городу",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(2000), MinValueValidator(0)]
     )
 
     distance_area_km = models.PositiveIntegerField(
         null=False,
         help_text="пройдено км по области",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(2000), MinValueValidator(0)]
     )
 
     fuel_refueled = models.DecimalField(
@@ -590,7 +590,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр после возвращения, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
 
     fuel_before_departure = models.DecimalField(
@@ -606,18 +606,18 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр перед выездом, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
 
     distance_total_km = models.PositiveIntegerField(
         null=False,
         editable=False,
         help_text="всего пройдено км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(4000), MinValueValidator(0)]
     )
 
     fuel_used_city = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -626,7 +626,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_area = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -644,7 +644,7 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_normal = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -895,12 +895,12 @@ class FireTruckWaybill(SoftDeleteModel):
     )
 
     upon_issuance = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_spent = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    total_received = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    required_by_norm = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_spent = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    total_received = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    required_by_norm = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
     availability_upon_delivery = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    savings = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
-    overrun = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    savings = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+    overrun = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
 
     def __str__(self):
         return f"Путевой лист ПА {self.car.number} от {self.date}"
@@ -965,7 +965,7 @@ class OdometerFuelFireTruck(SoftDeleteModel):
     odometer = models.PositiveIntegerField(
         null=False,
         blank=True,
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
     fuel = models.DecimalField(
         max_digits=6,
@@ -1071,19 +1071,19 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     odometer_after = models.PositiveIntegerField(
         null=False,
         help_text="одометр после возвращения, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
 
     time_with_pump = models.PositiveIntegerField(
         null=False,
         help_text="время работы с насосом, мин",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(2000), MinValueValidator(0)]
     )
 
     time_without_pump = models.PositiveIntegerField(
         null=False,
         help_text="время работы без насоса, мин",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(2000), MinValueValidator(0)]
     )
 
     fuel_refueled = models.DecimalField(
@@ -1095,7 +1095,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         help_text="фактически израсходовано, л",
@@ -1115,14 +1115,14 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         null=False,
         editable=False,
         help_text="одометр перед выездом, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(999999), MinValueValidator(0)]
     )
 
     distance_km = models.PositiveIntegerField(
         null=False,
         editable=False,
         help_text="пробег, км",
-        validators=[MaxValueValidator(999999)]
+        validators=[MaxValueValidator(2000), MinValueValidator(0)]
     )
 
     fuel_on_return = models.DecimalField(
@@ -1135,7 +1135,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_by_distance = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -1144,7 +1144,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_with_pump = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -1153,7 +1153,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_without_pump = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -1162,7 +1162,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
     )
 
     fuel_used_normal = models.DecimalField(
-        max_digits=6,
+        max_digits=7,
         decimal_places=3,
         null=False,
         editable=False,
@@ -1362,17 +1362,19 @@ class TechnicalMaintenance(SoftDeleteModel):
     )
 
     spent = models.DecimalField(
-        max_digits=9,
+        max_digits=6,
         decimal_places=3,
         null=False,
-        help_text="израсходовано"
+        help_text="израсходовано",
+        validators=[MinValueValidator(Decimal('0.000')), MaxValueValidator(Decimal('100.000'))]
     )
 
     received = models.DecimalField(
-        max_digits=9,
+        max_digits=6,
         decimal_places=3,
         null=False,
-        help_text="получено"
+        help_text="получено",
+        validators=[MinValueValidator(Decimal('0.000')), MaxValueValidator(Decimal('100.000'))]
     )
 
     operating_hours = models.DecimalField(
@@ -1434,17 +1436,17 @@ class NormsOperatingHoursFireTruck(SoftDeleteModel):
     )
 
     km_norm = models.DecimalField(
-        max_digits=5,
-        decimal_places=4,
+        max_digits=4,
+        decimal_places=3,
         help_text="норма по переводу в моточасы км(ч/км)",
-        validators=[MinValueValidator(Decimal('0.0000'))]
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
     with_pump_norm = models.DecimalField(
-        max_digits=6,
-        decimal_places=4,
+        max_digits=4,
+        decimal_places=3,
         help_text="норма по переводу в моточасы с насосом(просто коэффициент)",
-        validators=[MinValueValidator(Decimal('0.0000'))]
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
     date = models.DateField(
@@ -1468,19 +1470,19 @@ class NormsOperatingHoursPassengerCar(SoftDeleteModel):
     )
 
     city_norm = models.DecimalField(
-        max_digits=5,
-        decimal_places=4,
+        max_digits=4,
+        decimal_places=3,
         null=False,
         help_text="норма по переводу в моточасы по городу(ч/км)",
-        validators=[MinValueValidator(Decimal('0.0000'))]
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
     area_norm = models.DecimalField(
-        max_digits=5,
-        decimal_places=4,
+        max_digits=4,
+        decimal_places=3,
         null=False,
         help_text="норма по переводу в моточасы по области(ч/км)",
-        validators=[MinValueValidator(Decimal('0.0000'))]
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
     date = models.DateField(
@@ -1512,7 +1514,7 @@ class NormsTechnicalMaintenance(SoftDeleteModel):
         decimal_places=3,
         null=False,
         help_text="норма",
-        validators=[MinValueValidator(Decimal('0.0000'))]
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
     date = models.DateField(
