@@ -289,6 +289,15 @@ class PassengerCar(SoftDeleteModel):
         null=False,
         help_text="тип топлива"
     )
+    
+    operating_hours = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        default=Decimal('0.000'),
+        null=False,
+        help_text="текущие моточасы (сумма всех часов из путевых листов)",
+        validators=[MinValueValidator(Decimal('0.000'))]
+    )
 
 
     def __str__(self):
@@ -723,6 +732,15 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         help_text="израсходовано по норме, л",
         validators=[MinValueValidator(Decimal('0.000'))]
     )
+    
+    operating_hours_record = models.ForeignKey(
+        'OperatingHoursCars',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="passenger_car_waybill_records",
+        help_text="записанные моточасы для этой поездки"
+    )
 
     class Meta:
         ordering = ["id"]
@@ -985,21 +1003,11 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
                 raise
 
             # ════════════════════════════════════════════════════════════════
-            # ПРАВИЛЬНЫЙ РАСЧЁТ CUMULATIVE OPERATING HOURS
+            # РАСЧЁТ OPERATING HOURS (просто increment, не cumulative!)
             # ════════════════════════════════════════════════════════════════
             logger.warning('=' * 80)
-            logger.warning('[PassengerCarWaybillRecord.save] ОПЕРАЦИОННЫЕ ЧАСЫ')
+            logger.warning('[PassengerCarWaybillRecord.save] РАСЧЁТ МОТОЧАСОВ')
             logger.warning('=' * 80)
-            
-            # Находим ПОСЛЕДНЮЮ запись для этой машины (не путевого листа!)
-            # ВАЖНО: используем -id вместо -date чтобы взять последнюю ДОБАВЛЕННУЮ запись,
-            # а не последнюю по дате (которая может быть из другой поездки)
-            last_operating_hours = (
-                OperatingHoursCars.objects
-                .filter(passenger_car=self.passenger_car_waybill.car, fire_truck__isnull=True)
-                .order_by('-id')  # <- Берём по ID (по порядку добавления), не по дате!
-                .first()
-            )
             
             # Вычисляем increment (сколько часов за ЭТУ поездку)
             wb = self.passenger_car_waybill
@@ -1021,32 +1029,53 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             
             logger.warning(f'increment за эту поездку = {increment}')
             
-            # ВАЖНО: operating_hours ДОЛЖНЫ быть CUMULATIVE total вех часов машины
-            if last_operating_hours:
-                cumulative_total = last_operating_hours.operating_hours + increment
-                logger.warning(f'prev_total (из последней записи) = {last_operating_hours.operating_hours}')
-                logger.warning(f'NEW cumulative_total = {last_operating_hours.operating_hours} + {increment} = {cumulative_total}')
-            else:
-                cumulative_total = increment
-                logger.warning(f'Первая запись: cumulative_total = {increment}')
-            
-            logger.warning('=' * 80)
-
-            # Создаём OperatingHoursCars с CUMULATIVE total
+            # Создаём или обновляем OperatingHoursCars с ТОЛЬКО этим increment
+            # (не cumulative - просто часы этой поездки!)
             try:
-                OperatingHoursCars.objects.create(
-                    passenger_car=self.passenger_car_waybill.car,
-                    operating_hours=cumulative_total,  # <- CUMULATIVE, не increment!
-                    date=self.passenger_car_waybill.date,
-                )
-                logger.warning(f'✅ OperatingHoursCars создана с cumulative_total = {cumulative_total}')
+                # ВАЖНО: Используем FK самого record, а не update_or_create с (car, date),
+                # чтобы избежать MultipleObjectsReturned когда много поездок в один день
+                if self.operating_hours_record:
+                    # Уже существует - обновляем его
+                    self.operating_hours_record.operating_hours = increment
+                    self.operating_hours_record.save(update_fields=['operating_hours'])
+                    logger.warning(f'✅ OperatingHoursCars обновлена (id={self.operating_hours_record.id}) с hours = {increment}')
+                else:
+                    # Не существует - создаём новый
+                    operating_hours_record = OperatingHoursCars.objects.create(
+                        passenger_car=car,
+                        date=wb.date,
+                        operating_hours=increment,
+                    )
+                    logger.warning(f'✅ OperatingHoursCars создана (id={operating_hours_record.id}) с hours = {increment}')
+                    
+                    # Сохраняем FK на этот WaybillRecord
+                    self.operating_hours_record = operating_hours_record
+                    logger.warning(f'✅ FK operating_hours_record установлена на {operating_hours_record.id}')
+                    
+                    # ВАЖНО: Сохраняем FK в БД
+                    PassengerCarWaybillRecord.objects.filter(pk=self.pk).update(
+                        operating_hours_record=operating_hours_record
+                    )
+                    logger.warning(f'✅ FK сохранена в БД для record {self.pk}')
             except Exception as e:
                 logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
-                logger.error(f'VALUES:')
-                logger.error(f'  passenger_car: {self.passenger_car_waybill.car}')
-                logger.error(f'  operating_hours (cumulative): {cumulative_total}')
-                logger.error(f'  date: {self.passenger_car_waybill.date}')
                 raise
+            
+            # ════════════════════════════════════════════════════════════════
+            # ПЕРЕСЧЁТ TOTAL HOURS В МАШИНЕ
+            # ════════════════════════════════════════════════════════════════
+            from django.db.models import Sum
+            total_hours = (
+                OperatingHoursCars.objects
+                .filter(passenger_car=car, fire_truck__isnull=True)
+                .aggregate(total=Sum('operating_hours'))['total']
+            ) or Decimal('0.000')
+            
+            # Обновляем поле в машине
+            car.operating_hours = total_hours
+            car.save(update_fields=['operating_hours'])
+            logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
+            logger.warning('=' * 80)
 
             self.passenger_car_waybill.recalc_totals()
 
@@ -1084,6 +1113,15 @@ class FireTruck(SoftDeleteModel):
         choices=FuelType.choices,
         null=False,
         help_text="тип топлива"
+    )
+    
+    operating_hours = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        default=Decimal('0.000'),
+        null=False,
+        help_text="текущие моточасы (сумма всех часов из путевых листов)",
+        validators=[MinValueValidator(Decimal('0.000'))]
     )
 
 
@@ -1456,6 +1494,15 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         validators=[MinValueValidator(Decimal('0.000'))]
     )
 
+    operating_hours_record = models.ForeignKey(
+        'OperatingHoursCars',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fire_truck_waybill_records",
+        help_text="записанные моточасы для этой поездки"
+    )
+
     class Meta:
         ordering = ["id"]
         db_table = 'fire_truck_waybill_record'
@@ -1632,21 +1679,12 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             )
 
             # ════════════════════════════════════════════════════════════════
-            # ПРАВИЛЬНЫЙ РАСЧЁТ CUMULATIVE OPERATING HOURS
+            # ════════════════════════════════════════════════════════════════
+            # РАСЧЁТ OPERATING HOURS (просто increment, не cumulative!)
             # ════════════════════════════════════════════════════════════════
             logger.warning('=' * 80)
-            logger.warning('[FireTruckWaybillRecord.save] ОПЕРАЦИОННЫЕ ЧАСЫ')
+            logger.warning('[FireTruckWaybillRecord.save] РАСЧЁТ МОТОЧАСОВ')
             logger.warning('=' * 80)
-            
-            # Находим ПОСЛЕДНЮЮ запись для этой машины
-            # ВАЖНО: используем -id вместо -date чтобы взять последнюю ДОБАВЛЕННУЮ запись,
-            # а не последнюю по дате (которая может быть из другой поездки)
-            last_operating_hours = (
-                OperatingHoursCars.objects
-                .filter(fire_truck=self.fire_truck_waybill.car, passenger_car__isnull=True)
-                .order_by('-id')  # <- Берём по ID (по порядку добавления), не по дате!
-                .first()
-            )
             
             # Вычисляем increment (сколько часов за ЭТУ поездку)
             wb = self.fire_truck_waybill
@@ -1669,32 +1707,53 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             
             logger.warning(f'increment за эту поездку = {increment}')
             
-            # ВАЖНО: operating_hours ДОЛЖНЫ быть CUMULATIVE total всех часов машины
-            if last_operating_hours:
-                cumulative_total = last_operating_hours.operating_hours + increment
-                logger.warning(f'prev_total (из последней записи) = {last_operating_hours.operating_hours}')
-                logger.warning(f'NEW cumulative_total = {last_operating_hours.operating_hours} + {increment} = {cumulative_total}')
-            else:
-                cumulative_total = increment
-                logger.warning(f'Первая запись: cumulative_total = {increment}')
-            
-            logger.warning('=' * 80)
-
-            # Создаём OperatingHoursCars с CUMULATIVE total
+            # Создаём или обновляем OperatingHoursCars с ТОЛЬКО этим increment
+            # (не cumulative - просто часы этой поездки!)
             try:
-                OperatingHoursCars.objects.create(
-                    fire_truck=self.fire_truck_waybill.car,
-                    operating_hours=cumulative_total,  # <- CUMULATIVE, не increment!
-                    date=self.fire_truck_waybill.date,
-                )
-                logger.warning(f'✅ OperatingHoursCars создана с cumulative_total = {cumulative_total}')
+                # ВАЖНО: Используем FK самого record, а не update_or_create с (car, date),
+                # чтобы избежать MultipleObjectsReturned когда много поездок в один день
+                if self.operating_hours_record:
+                    # Уже существует - обновляем его
+                    self.operating_hours_record.operating_hours = increment
+                    self.operating_hours_record.save(update_fields=['operating_hours'])
+                    logger.warning(f'✅ OperatingHoursCars обновлена (id={self.operating_hours_record.id}) с hours = {increment}')
+                else:
+                    # Не существует - создаём новый
+                    operating_hours_record = OperatingHoursCars.objects.create(
+                        fire_truck=car,
+                        date=wb.date,
+                        operating_hours=increment,
+                    )
+                    logger.warning(f'✅ OperatingHoursCars создана (id={operating_hours_record.id}) с hours = {increment}')
+                    
+                    # Сохраняем FK на этот WaybillRecord
+                    self.operating_hours_record = operating_hours_record
+                    logger.warning(f'✅ FK operating_hours_record установлена на {operating_hours_record.id}')
+                    
+                    # ВАЖНО: Сохраняем FK в БД
+                    FireTruckWaybillRecord.objects.filter(pk=self.pk).update(
+                        operating_hours_record=operating_hours_record
+                    )
+                    logger.warning(f'✅ FK сохранена в БД для record {self.pk}')
             except Exception as e:
                 logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
-                logger.error(f'VALUES:')
-                logger.error(f'  fire_truck: {self.fire_truck_waybill.car}')
-                logger.error(f'  operating_hours (cumulative): {cumulative_total}')
-                logger.error(f'  date: {self.fire_truck_waybill.date}')
                 raise
+            
+            # ════════════════════════════════════════════════════════════════
+            # ПЕРЕСЧЁТ TOTAL HOURS В МАШИНЕ
+            # ════════════════════════════════════════════════════════════════
+            from django.db.models import Sum
+            total_hours = (
+                OperatingHoursCars.objects
+                .filter(fire_truck=car, passenger_car__isnull=True)
+                .aggregate(total=Sum('operating_hours'))['total']
+            ) or Decimal('0.000')
+            
+            # Обновляем поле в машине
+            car.operating_hours = total_hours
+            car.save(update_fields=['operating_hours'])
+            logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
+            logger.warning('=' * 80)
 
             self.fire_truck_waybill.recalc_totals()
 
@@ -1793,15 +1852,15 @@ class TechnicalMaintenance(SoftDeleteModel):
             if self.passenger_car_id:
                 last_hours = (
                     OperatingHoursCars.objects
-                    .filter(passenger_car=self.passenger_car)
-                    .order_by('-date', '-id')
+                    .filter(passenger_car=self.passenger_car, fire_truck__isnull=True)
+                    .order_by('-id')
                     .first()
                 )
             else:
                 last_hours = (
                     OperatingHoursCars.objects
-                    .filter(fire_truck=self.fire_truck)
-                    .order_by('-date', '-id')
+                    .filter(fire_truck=self.fire_truck, passenger_car__isnull=True)
+                    .order_by('-id')
                     .first()
                 )
 

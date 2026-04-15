@@ -1301,9 +1301,15 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
             # operating_hours ВСЕГДА берутся из OperatingHoursCars (текущие значения)
             # Никогда не передаются с фронта
             if passenger_car:
-                hours_obj = OperatingHoursCars.objects.filter(passenger_car=passenger_car).order_by('-date').first()
+                hours_obj = OperatingHoursCars.objects.filter(
+                    passenger_car=passenger_car, 
+                    fire_truck__isnull=True
+                ).order_by('-id').first()
             else:
-                hours_obj = OperatingHoursCars.objects.filter(fire_truck=fire_truck).order_by('-date').first()
+                hours_obj = OperatingHoursCars.objects.filter(
+                    fire_truck=fire_truck,
+                    passenger_car__isnull=True
+                ).order_by('-id').first()
             
             if not hours_obj:
                 return Response(
