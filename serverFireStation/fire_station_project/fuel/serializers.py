@@ -1,6 +1,7 @@
 from django.core.validators import MaxLengthValidator, MinValueValidator, MaxValueValidator
 from rest_framework import serializers
 from rest_framework.validators import UniqueValidator
+import logging
 
 from .models import (
     Role, Permission, User,
@@ -15,6 +16,8 @@ from .models import (
     TechnicalMaintenance,
     NormsTechnicalMaintenance,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class FriendlyModelSerializer(serializers.ModelSerializer):
@@ -118,9 +121,22 @@ class PassengerCarSerializer(FriendlyModelSerializer):
 
     def get_operating_hours(self, obj):
         """Получить текущие операционные часы машины"""
-        operating_hours = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        logger.warning(f'\n[PassengerCarSerializer.get_operating_hours] машина={obj.id}')
+        
+        all_records = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id')
+        logger.warning(f'  Записей с passenger_car={obj.id}, fire_truck=NULL: {all_records.count()}')
+        
+        if all_records.count() > 0:
+            logger.warning(f'  Первая (последняя по дате): id={all_records.first().id}, date={all_records.first().date}, hours={all_records.first().operating_hours}')
+        
+        operating_hours = all_records.first()
+        
         if operating_hours:
-            return float(operating_hours.operating_hours)
+            result = float(operating_hours.operating_hours)
+            logger.warning(f'  ✅ Возвращаем: {result}')
+            return result
+        
+        logger.warning(f'  ⚠️ Не найдено, возвращаем 0.0')
         return 0.0
 
     def get_technical_maintenance_norm(self, obj):
@@ -132,7 +148,7 @@ class PassengerCarSerializer(FriendlyModelSerializer):
 
     def get_hours_until_maintenance(self, obj):
         """Вычислить часы до следующего ТО"""
-        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id').first()
         norm_obj = NormsTechnicalMaintenance.objects.filter(passenger_car=obj).order_by('-date').first()
         
         if operating_hours_obj and norm_obj:
@@ -146,7 +162,9 @@ class PassengerCarSerializer(FriendlyModelSerializer):
         """Получить полную информацию о техническом обслуживании"""
         # Берем ПОСЛЕДНЮЮ СОЗДАННУЮ норму
         norm_obj = NormsTechnicalMaintenance.objects.filter(passenger_car=obj).order_by('-date').first()
-        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины
+        # Используем -id (а не -date) чтобы взять последнюю ДОБАВЛЕННУЮ запись
+        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id').first()
         
         # Проверяем, что норма существует и имеет положительное значение
         if not norm_obj or norm_obj.norm <= 0:
@@ -190,19 +208,44 @@ class PassengerCarSerializer(FriendlyModelSerializer):
 
     def get_all_maintenance_info(self, obj):
         """Получить информацию по ВСЕМ видам ТО для этой машины"""
+        logger.warning('\n' + '='*80)
+        logger.warning(f'[PassengerCarSerializer.get_all_maintenance_info] НАЧАЛО')
+        logger.warning(f'obj (машина) = {obj} (id={obj.id})')
+        logger.warning('='*80)
+        
         request = self.context.get('request')
         if not request or request.query_params.get('include_all_maintenance_info') != 'true':
+            logger.warning('[get_all_maintenance_info] include_all_maintenance_info != true, возвращаем None')
             return None
-            
-        operating_hours_obj = OperatingHoursCars.objects.filter(passenger_car=obj).order_by('-date').first()
+        
+        logger.warning('[get_all_maintenance_info] Ищем ПОСЛЕДНЮЮ запись OperatingHoursCars для этой машины')
+        
+        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины (по ID - последняя добавленная)
+        all_records = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id')
+        logger.warning(f'[get_all_maintenance_info] Всего записей с passenger_car={obj.id} и fire_truck=NULL: {all_records.count()}')
+        
+        for record in all_records[:5]:  # Логируем первые 5 записей
+            logger.warning(f'  - id={record.id}, date={record.date}, operating_hours={record.operating_hours}, passenger_car={record.passenger_car_id}, fire_truck={record.fire_truck_id}')
+        
+        operating_hours_obj = all_records.first()
+        
+        if operating_hours_obj:
+            logger.warning(f'[get_all_maintenance_info] НАЙДЕНА ПОСЛЕДНЯЯ: id={operating_hours_obj.id}, date={operating_hours_obj.date}, operating_hours={operating_hours_obj.operating_hours}')
+        else:
+            logger.warning(f'[get_all_maintenance_info] ❌ НЕ НАЙДЕНА ПОСЛЕДНЯЯ ЗАПИСЬ!')
+        
         current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
+        logger.warning(f'[get_all_maintenance_info] current_hours = {current_hours}')
         
         # Получить все нормы (уникальные по maintenance_type)
         all_norms = NormsTechnicalMaintenance.objects.filter(
             passenger_car=obj
         ).order_by('maintenance_type', '-date').distinct('maintenance_type')
         
+        logger.warning(f'[get_all_maintenance_info] Найдено норм: {all_norms.count()}')
+        
         if not all_norms:
+            logger.warning('[get_all_maintenance_info] ❌ НЕТ НОРМ! Возвращаем ошибку')
             return {
                 'error': 'Нет установленных норм технического обслуживания',
                 'items': []
@@ -210,7 +253,10 @@ class PassengerCarSerializer(FriendlyModelSerializer):
         
         maintenance_items = []
         for norm_obj in all_norms:
+            logger.warning(f'[get_all_maintenance_info] Обрабатываем норму: {norm_obj.maintenance_type}, norm={norm_obj.norm}')
+            
             if norm_obj.norm <= 0:
+                logger.warning(f'  ⚠️ norm <= 0, пропускаем')
                 continue
                 
             # Получить последнее ТО этого типа
@@ -219,10 +265,17 @@ class PassengerCarSerializer(FriendlyModelSerializer):
                 maintenance_type=norm_obj.maintenance_type
             ).order_by('-date').first()
             
+            if last_maintenance:
+                logger.warning(f'  📋 Последнее ТО: дата={last_maintenance.date}, operating_hours={last_maintenance.operating_hours}')
+            else:
+                logger.warning(f'  ℹ️ Ещё не было ТО этого типа')
+            
             interval_value = float(norm_obj.norm)
             previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
             next_maintenance_at = previous_hours + interval_value
             hours_until_maintenance = next_maintenance_at - current_hours
+            
+            logger.warning(f'  → previous_hours={previous_hours}, interval={interval_value}, next_at={next_maintenance_at}, hours_until={hours_until_maintenance}')
             
             maintenance_items.append({
                 'maintenance_type': norm_obj.maintenance_type,
@@ -232,6 +285,9 @@ class PassengerCarSerializer(FriendlyModelSerializer):
                 'next_maintenance_at': next_maintenance_at,
                 'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
             })
+        
+        logger.warning(f'[get_all_maintenance_info] ГОТОВО. Возвращаем {len(maintenance_items)} видов ТО')
+        logger.warning('='*80 + '\n')
         
         return {
             'items': maintenance_items,
@@ -398,9 +454,22 @@ class FireTruckSerializer(FriendlyModelSerializer):
 
     def get_operating_hours(self, obj):
         """Получить текущие операционные часы машины"""
-        operating_hours = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        logger.warning(f'\n[FireTruckSerializer.get_operating_hours] машина={obj.id}')
+        
+        all_records = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id')
+        logger.warning(f'  Записей с fire_truck={obj.id}, passenger_car=NULL: {all_records.count()}')
+        
+        if all_records.count() > 0:
+            logger.warning(f'  Первая (последняя по дате): id={all_records.first().id}, date={all_records.first().date}, hours={all_records.first().operating_hours}')
+        
+        operating_hours = all_records.first()
+        
         if operating_hours:
-            return float(operating_hours.operating_hours)
+            result = float(operating_hours.operating_hours)
+            logger.warning(f'  ✅ Возвращаем: {result}')
+            return result
+        
+        logger.warning(f'  ⚠️ Не найдено, возвращаем 0.0')
         return 0.0
 
     def get_technical_maintenance_norm(self, obj):
@@ -412,7 +481,7 @@ class FireTruckSerializer(FriendlyModelSerializer):
 
     def get_hours_until_maintenance(self, obj):
         """Вычислить часы до следующего ТО"""
-        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id').first()
         norm_obj = NormsTechnicalMaintenance.objects.filter(fire_truck=obj).order_by('-date').first()
         
         if operating_hours_obj and norm_obj:
@@ -426,7 +495,8 @@ class FireTruckSerializer(FriendlyModelSerializer):
         """Получить полную информацию о техническом обслуживании"""
         # Берем ПОСЛЕДНЮЮ СОЗДАННУЮ норму
         norm_obj = NormsTechnicalMaintenance.objects.filter(fire_truck=obj).order_by('-date').first()
-        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины (по ID - последняя добавленная)
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id').first()
         
         # Проверяем, что норма существует и имеет положительное значение
         if not norm_obj or norm_obj.norm <= 0:
@@ -474,7 +544,8 @@ class FireTruckSerializer(FriendlyModelSerializer):
         if not request or request.query_params.get('include_all_maintenance_info') != 'true':
             return None
             
-        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj).order_by('-date').first()
+        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины (по ID - последняя добавленная)
+        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id').first()
         current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
         
         # Получить все нормы (уникальные по maintenance_type)

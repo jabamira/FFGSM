@@ -219,14 +219,7 @@ const finalFilteredFireTrucks = computed(() => {
   if (filterFuelType.value) {
     filtered = filtered.filter(truck => truck.fuel_type === filterFuelType.value);
   }
-  
-  // Убедиться что у каждой машины есть часы до ТО (вычислить если нужно)
-  return filtered.map(truck => {
-    if (!truck.hours_until_maintenance && truck.technical_maintenance_norm !== null && truck.operating_hours !== null) {
-      truck.hours_until_maintenance = truck.technical_maintenance_norm - truck.operating_hours;
-    }
-    return truck;
-  });
+  return filtered;
 });
 
 const columns = [
@@ -271,10 +264,22 @@ const fetchFireTrucks = async () => {
   }
 
   try {
-    const response = await axios.get('/fire-trucks/?include_odometer=true', {
+    const response = await axios.get('/fire-trucks/?include_odometer=true&include_all_maintenance_info=true', {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
-    fireTrucks.value = response.data;
+    
+    // Для каждой машины выбираем самую критическую норму (с минимальным interval)
+    fireTrucks.value = response.data.map(truck => {
+      if (truck.all_maintenance_info && truck.all_maintenance_info.items && truck.all_maintenance_info.items.length > 0) {
+        // Находим вид ТО с наименьшим количеством часов до срока
+        const criticalMaintenance = truck.all_maintenance_info.items.reduce((min, current) => {
+          return current.interval < min.interval ? current : min;
+        });
+        // Используем критическую норму как основную maintenance_info
+        truck.maintenance_info = criticalMaintenance;
+      }
+      return truck;
+    });
   } catch (error) {
     console.error('Ошибка при загрузке пожарных автомобилей:', error);
   }
@@ -653,19 +658,23 @@ const getMaintenanceStyle = (row) => {
 const openMaintenanceModal = async (truck) => {
   try {
     // Получить свежие данные машины с информацией по всем видам ТО
-    const response = await axios.get(`/fire-trucks/${truck.id}/?include_all_maintenance_info=true`, {
+    // Добавляем timestamp для предотвращения кеширования и получения актуальных operating_hours
+    const timestamp = Date.now();
+    const response = await axios.get(`/fire-trucks/${truck.id}/?include_all_maintenance_info=true&t=${timestamp}`, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     
     const freshTruck = response.data;
+    console.log('[FireTrucks] Свежие данные с сервера:', freshTruck);
     
-    if (!freshTruck.maintenance_info || freshTruck.maintenance_info?.error) {
+    if (!freshTruck.all_maintenance_info || freshTruck.all_maintenance_info?.error) {
       console.warn('Информация о ТО недоступна для этой машины');
       return;
     }
     
     selectedMaintenanceTruck.value = freshTruck;
-    selectedMaintenanceInfo.value = freshTruck.maintenance_info;
+    // Передаем ALL виды ТО в модал, а не только одну норму
+    selectedMaintenanceInfo.value = freshTruck.all_maintenance_info;
     showMaintenanceModal.value = true;
   } catch (error) {
     console.error('[FireTrucks] Ошибка при загрузке данных для модала ТО:', error);

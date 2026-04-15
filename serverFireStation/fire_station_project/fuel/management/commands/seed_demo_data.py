@@ -1,8 +1,12 @@
+# fuel/management/commands/fill_db.py
+
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from decimal import Decimal
-from datetime import date, time
 from django.db.models import Q
+
+from decimal import Decimal
+from datetime import date, time, timedelta
+from random import randint, choice
 
 from fuel.models import (
     Role, User,
@@ -48,8 +52,12 @@ class Command(BaseCommand):
         demo_logins = [
             'admin',
             'mechanic',
-            'driver_pass',
-            'driver_fire',
+            'driver_0',
+            'driver_1',
+            'driver_2',
+            'driver_3',
+            'driver_4',
+            'driver_5',
         ]
 
         passenger_numbers = ['А001АА54', 'А002АА54']
@@ -64,49 +72,45 @@ class Command(BaseCommand):
             )
             self.stdout.write(self.style.SUCCESS("Старые demo-данные полностью удалены"))
 
-        # ---------------- ПОЛЬЗОВАТЕЛИ ----------------
-        users_data = [
-            {
-                "login": "admin",
-                "password": "admin123",
-                "name": "Системный",
-                "surname": "Администратор",
-                "last_name": "Demo",
-                "phone": "+70000000001",
-                "driver_license": None,
-                "role": admin_role,
-            },
-            {
-                "login": "mechanic",
-                "password": "mechanic123",
-                "name": "Иван",
-                "surname": "Механиков",
-                "last_name": "Петрович",
-                "phone": "+70000000002",
-                "driver_license": None,
-                "role": mechanic_role,
-            },
-            {
-                "login": "driver_pass",
+        # ---------------- ПОЛЬЗОВАТЕЛИ (8 шт.) ----------------
+        users_data = []
+
+        # 1 админ
+        users_data.append({
+            "login": "admin",
+            "password": "admin123",
+            "name": "Системный",
+            "surname": "Администратор",
+            "last_name": "Demo",
+            "phone": "79000000001",  # 11 цифр
+            "driver_license": None,
+            "role": admin_role,
+        })
+
+        # 1 механик
+        users_data.append({
+            "login": "mechanic",
+            "password": "mechanic123",
+            "name": "Иван",
+            "surname": "Механиков",
+            "last_name": "Петрович",
+            "phone": "79000000002",  # 11 цифр
+            "driver_license": None,
+            "role": mechanic_role,
+        })
+
+        # 6 водителей
+        for i in range(6):
+            users_data.append({
+                "login": f"driver_{i}",
                 "password": "driver123",
-                "name": "Петр",
-                "surname": "Иванов",
-                "last_name": "Сергеевич",
-                "phone": "+70000000003",
-                "driver_license": "001234567",
-                "role": driver_role,
-            },
-            {
-                "login": "driver_fire",
-                "password": "driver123",
-                "name": "Сергей",
-                "surname": "Пожарный",
+                "name": f"Водитель{i + 1}",
+                "surname": "Тестов",
                 "last_name": "Иванович",
-                "phone": "+70000000004",
-                "driver_license": "347654321",
+                "phone": f"790000000{str(i + 3).zfill(2)}",  # 79000000003..79000000008
+                "driver_license": f"{i+1:09d}",  # 9 цифр
                 "role": driver_role,
-            },
-        ]
+            })
 
         created_users = {}
         for data in users_data:
@@ -244,6 +248,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Нормы ТО созданы"))
 
         # ---------------- СТАРТОВЫЕ ПОКАЗАНИЯ ----------------
+        # Стартовые одометры и остаток топлива
         OdometerFuelPassengerCar.objects.create(
             car=passenger_car_1,
             date=date(2025, 1, 1),
@@ -276,116 +281,108 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Стартовые одометр/топливо созданы"))
 
-        # ---------------- ПУТЕВЫЕ ЛИСТЫ ЛЕГКОВЫЕ ----------------
-        pw1 = PassengerCarWaybill.objects.create(
-            car=passenger_car_1,
-            driver=created_users["driver_pass"],
-            date=date(2025, 2, 1),
-            norm_season="winter",
-        )
+        # ---------------- 100 ПУТЕВЫХ ЛИСТОВ ЛЕГКОВЫЕ ----------------
+        drivers = [u for u in created_users.values() if u.role == driver_role]
+        passenger_cars = [passenger_car_1, passenger_car_2]
 
-        pw2 = PassengerCarWaybill.objects.create(
-            car=passenger_car_2,
-            driver=created_users["driver_pass"],
-            date=date(2025, 2, 2),
-            norm_season="winter",
-        )
+        base_date = date(2025, 2, 1)
 
-        self.stdout.write(self.style.SUCCESS("Шапки путевых легковых созданы"))
+        for i in range(100):
+            car = choice(passenger_cars)
+            driver = choice(drivers)
+            d = base_date + timedelta(days=i % 28)
 
-        # ---------------- ЗАПИСИ К ЛЕГКОВЫМ ПУТЕВЫМ ----------------
-        PassengerCarWaybillRecord.objects.create(
-            passenger_car_waybill=pw1,
-            target="Поездка в район",
-            departure_time=time(8, 30, 0),
-            arrival_time=time(11, 0, 0),
-            distance_city_km=20,
-            distance_area_km=50,
-            fuel_refueled=Decimal('10.000'),
-            fuel_used=Decimal('7.500'),
-        )
+            pw = PassengerCarWaybill.objects.create(
+                car=car,
+                driver=driver,
+                date=d,
+                norm_season="winter",
+            )
 
-        PassengerCarWaybillRecord.objects.create(
-            passenger_car_waybill=pw2,
-            target="Поездка в город",
-            departure_time=time(9, 0, 0),
-            arrival_time=time(10, 30, 0),
-            distance_city_km=30,
-            distance_area_km=0,
-            fuel_refueled=Decimal('5.000'),
-            fuel_used=Decimal('3.000'),
-        )
+            # 1 запись на путевой лист (можно увеличить при необходимости)
+            distance_city = randint(5, 60)
+            distance_area = randint(0, 120)
 
-        self.stdout.write(self.style.SUCCESS("Записи легковых путевых созданы"))
+            PassengerCarWaybillRecord.objects.create(
+                passenger_car_waybill=pw,
+                target=f"Поездка №{i + 1}",
+                departure_time=time(randint(6, 10), choice([0, 15, 30, 45]), 0),
+                arrival_time=time(randint(11, 18), choice([0, 15, 30, 45]), 0),
+                distance_city_km=distance_city,
+                distance_area_km=distance_area,
+                fuel_refueled=Decimal(f"{randint(20, 40)}.000"),
+                fuel_used=Decimal(f"{randint(3, 18)}.000"),
+            )
 
-        # ---------------- ПУТЕВЫЕ ЛИСТЫ ПОЖАРНЫЕ ----------------
-        fw1 = FireTruckWaybill.objects.create(
-            car=fire_truck_1,
-            driver=created_users["driver_fire"],
-            date=date(2025, 2, 1),
-            norm_season="winter",
-        )
+        self.stdout.write(self.style.SUCCESS("100 путевых листов (легковые) созданы"))
 
-        fw2 = FireTruckWaybill.objects.create(
-            car=fire_truck_2,
-            driver=created_users["driver_fire"],
-            date=date(2025, 2, 2),
-            norm_season="winter",
-        )
+        # ---------------- 100 ПУТЕВЫХ ЛИСТОВ ПОЖАРНЫЕ ----------------
+        fire_trucks = [fire_truck_1, fire_truck_2]
+        fire_odometer_current = {
+            fire_truck_1.id: 50000,
+            fire_truck_2.id: 80000,
+        }
 
-        self.stdout.write(self.style.SUCCESS("Шапки путевых ПА созданы"))
+        for i in range(100):
+            car = choice(fire_trucks)
+            driver = choice(drivers)
+            d = base_date + timedelta(days=i % 28)
 
-        # ---------------- ЗАПИСИ К ПОЖАРНЫМ ПУТЕВЫМ ----------------
-        FireTruckWaybillRecord.objects.create(
-            fire_truck_waybill=fw1,
-            driving_route="ул. Ленина 15",
-            target="Тушение пожара",
-            departure_time=time(14, 0, 0),
-            arrival_time=time(15, 30, 0),
-            odometer_after=50020,
-            time_with_pump=30,
-            time_without_pump=10,
-            fuel_refueled=Decimal('0.000'),
-            fuel_used=Decimal('9.500'),
-        )
+            fw = FireTruckWaybill.objects.create(
+                car=car,
+                driver=driver,
+                date=d,
+                norm_season="winter",
+            )
 
-        FireTruckWaybillRecord.objects.create(
-            fire_truck_waybill=fw2,
-            driving_route="ул. Мира 10",
-            target="Учения",
-            departure_time=time(10, 0, 0),
-            arrival_time=time(11, 15, 0),
-            odometer_after=80010,
-            time_with_pump=15,
-            time_without_pump=5,
-            fuel_refueled=Decimal('20.000'),
-            fuel_used=Decimal('6.000'),
-        )
+            # имитация пробега: увеличиваем одометр
+            dist = randint(1, 30)
+            fire_odometer_current[car.id] += dist
 
-        self.stdout.write(self.style.SUCCESS("Записи пожарных путевых созданы"))
+            FireTruckWaybillRecord.objects.create(
+                fire_truck_waybill=fw,
+                driving_route=f"Маршрут №{i + 1}",
+                target=choice(["Тушение пожара", "Учения", "Дежурство", "Хозяйственный выезд"]),
+                departure_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
+                arrival_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
+                odometer_after=fire_odometer_current[car.id],
+                time_with_pump=randint(0, 60),
+                time_without_pump=randint(0, 20),
+                fuel_refueled=Decimal(f"{randint(0, 50)}.000"),
+                fuel_used=Decimal(f"{randint(5, 25)}.000"),
+            )
 
-        # ---------------- ДОКУМЕНТЫ ТО ----------------
-        TechnicalMaintenance.objects.create(
-            date=date(2025, 2, 15),
-            car_type='passenger',
-            passenger_car=passenger_car_1,
-            fire_truck=None,
-            maintenance_type='engine_oil',
-            spent=Decimal('2.000'),
-            received=Decimal('2.500'),
-            operating_hours=Decimal('0.000'),
-        )
+        self.stdout.write(self.style.SUCCESS("100 путевых листов (пожарные) созданы"))
 
-        TechnicalMaintenance.objects.create(
-            date=date(2025, 2, 16),
-            car_type='fire_truck',
-            passenger_car=None,
-            fire_truck=fire_truck_1,
-            maintenance_type='air_filter',
-            spent=Decimal('1.000'),
-            received=Decimal('1.000'),
-            operating_hours=Decimal('0.000'),
-        )
+        # ---------------- ДОКУМЕНТЫ ТО (по максимуму разумно) ----------------
+        # Создадим 40 документов ТО (20 для легковых, 20 для пожарных)
+        for i in range(20):
+            car = choice(passenger_cars)
+            mt = choice(maintenance_types)
+            TechnicalMaintenance.objects.create(
+                date=base_date + timedelta(days=randint(0, 27)),
+                car_type='passenger',
+                passenger_car=car,
+                fire_truck=None,
+                maintenance_type=mt,
+                spent=Decimal(f"{randint(1, 5)}.000"),
+                received=Decimal(f"{randint(1, 6)}.000"),
+                operating_hours=Decimal('0.000'),
+            )
+
+        for i in range(20):
+            car = choice(fire_trucks)
+            mt = choice(maintenance_types)
+            TechnicalMaintenance.objects.create(
+                date=base_date + timedelta(days=randint(0, 27)),
+                car_type='fire_truck',
+                passenger_car=None,
+                fire_truck=car,
+                maintenance_type=mt,
+                spent=Decimal(f"{randint(1, 5)}.000"),
+                received=Decimal(f"{randint(1, 6)}.000"),
+                operating_hours=Decimal('0.000'),
+            )
 
         self.stdout.write(self.style.SUCCESS("Документы ТО созданы"))
         self.stdout.write(self.style.SUCCESS("=== Полное заполнение БД завершено ==="))

@@ -34,7 +34,6 @@ export const waybillApi = {
   completePassengerCar: (id) =>
     apiClient.post(`/passenger-car-waybills/${id}/complete/`),
 
-  // Получает путевые листы пожарных машин
   listFireTruck: (params) =>
     apiClient.get('/fire-truck-waybills/', { params }),
 

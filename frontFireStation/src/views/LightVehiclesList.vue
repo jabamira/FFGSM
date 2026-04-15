@@ -211,14 +211,7 @@ const finalFilteredPassengerCars = computed(() => {
   if (filterFuelType.value) {
     filtered = filtered.filter(car => car.fuel_type === filterFuelType.value);
   }
-  
-  // Убедиться что у каждой машины есть часы до ТО (вычислить если нужно)
-  return filtered.map(car => {
-    if (!car.hours_until_maintenance && car.technical_maintenance_norm !== null && car.operating_hours !== null) {
-      car.hours_until_maintenance = car.technical_maintenance_norm - car.operating_hours;
-    }
-    return car;
-  });
+  return filtered;
 });
 
 const columns = [
@@ -261,10 +254,22 @@ const fetchPassengerCars = async () => {
   }
 
   try {
-    const response = await axios.get('/passenger-cars/?include_odometer=true', {
+    const response = await axios.get('/passenger-cars/?include_odometer=true&include_all_maintenance_info=true', {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
-    passengerCars.value = response.data;
+    
+    // Для каждой машины выбираем самую критическую норму (с минимальным interval)
+    passengerCars.value = response.data.map(car => {
+      if (car.all_maintenance_info && car.all_maintenance_info.items && car.all_maintenance_info.items.length > 0) {
+        // Находим вид ТО с наименьшим количеством часов до срока
+        const criticalMaintenance = car.all_maintenance_info.items.reduce((min, current) => {
+          return current.interval < min.interval ? current : min;
+        });
+        // Используем критическую норму как основную maintenance_info
+        car.maintenance_info = criticalMaintenance;
+      }
+      return car;
+    });
   } catch (error) {
     console.error('Ошибка при загрузке легковых автомобилей:', error);
   }
@@ -642,19 +647,23 @@ const getMaintenanceStyle = (row) => {
 const openMaintenanceModal = async (car) => {
   try {
     // Получить свежие данные машины с информацией по всем видам ТО
-    const response = await axios.get(`/passenger-cars/${car.id}/?include_all_maintenance_info=true`, {
+    // Добавляем timestamp для предотвращения кеширования и получения актуальных operating_hours
+    const timestamp = Date.now();
+    const response = await axios.get(`/passenger-cars/${car.id}/?include_all_maintenance_info=true&t=${timestamp}`, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     
     const freshCar = response.data;
+    console.log('[PassengerCars] Свежие данные с сервера:', freshCar);
     
-    if (!freshCar.maintenance_info || freshCar.maintenance_info?.error) {
+    if (!freshCar.all_maintenance_info || freshCar.all_maintenance_info?.error) {
       console.warn('Информация о ТО недоступна для этой машины');
       return;
     }
     
     selectedMaintenanceCar.value = freshCar;
-    selectedMaintenanceInfo.value = freshCar.maintenance_info;
+    // Передаем ALL виды ТО в модал, а не только одну норму
+    selectedMaintenanceInfo.value = freshCar.all_maintenance_info;
     showMaintenanceModal.value = true;
   } catch (error) {
     console.error('[PassengerCars] Ошибка при загрузке данных для модала ТО:', error);

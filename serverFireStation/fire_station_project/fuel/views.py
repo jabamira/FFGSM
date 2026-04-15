@@ -13,6 +13,9 @@ from decimal import Decimal
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from urllib.parse import quote
 from datetime import date
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     Role, Permission, User,
@@ -340,6 +343,15 @@ class PassengerCarViewSet(SoftDeleteModelViewSet):
         elif self.action == 'destroy':
             return base + [CanDeletePassengerCars()]
         return base
+    
+    def list(self, request, *args, **kwargs):
+        """Переопределяем список для логирования"""
+        logger.warning('\n' + '='*80)
+        logger.warning('[PassengerCarViewSet.list] НАЧАЛО')
+        logger.warning(f'  query_params: {dict(request.query_params)}')
+        logger.warning('='*80)
+        
+        return super().list(request, *args, **kwargs)
 
 
 class NormsPassengerCarsViewSet(SoftDeleteModelViewSet):
@@ -660,6 +672,15 @@ class FireTruckViewSet(SoftDeleteModelViewSet):
         elif self.action == 'destroy':
             return base + [CanDeleteFireTrucks()]
         return base
+    
+    def list(self, request, *args, **kwargs):
+        """Переопределяем список для логирования"""
+        logger.warning('\n' + '='*80)
+        logger.warning('[FireTruckViewSet.list] НАЧАЛО')
+        logger.warning(f'  query_params: {dict(request.query_params)}')
+        logger.warning('='*80)
+        
+        return super().list(request, *args, **kwargs)
 
 
 class NormsFireTruckViewSet(SoftDeleteModelViewSet):

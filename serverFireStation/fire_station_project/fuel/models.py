@@ -3,7 +3,7 @@ from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.contrib.auth.hashers import make_password, check_password, identify_hasher
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from datetime import date
 import logging
@@ -198,7 +198,7 @@ class User(SoftDeleteModel):
     login = models.CharField(max_length=15, unique=True, null=False)
     password = models.CharField(max_length=300, null=False)
 
-    phone = models.CharField(max_length=12, unique=True, null=False)
+    phone = models.CharField(max_length=11, validators=[MinLengthValidator(11)],  unique=True, null=False)
 
     driver_license = models.CharField(
         max_length=10,
@@ -977,39 +977,74 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
                 logger.warning('✅ OdometerFuelPassengerCar создана успешно')
             except Exception as e:
                 logger.error(f'❌ ОШИБКА при создании OdometerFuelPassengerCar: {str(e)}')
-                logger.error(f'车_____VALUES:')
+                logger.error(f'VALUES:')
                 logger.error(f'  car: {self.passenger_car_waybill.car}')
                 logger.error(f'  odometer: {self.odometer_after}')
                 logger.error(f'  fuel: {self.fuel_on_return}')
                 logger.error(f'  date: {self.passenger_car_waybill.date}')
                 raise
 
-            total_hours = self._calc_operating_hours_total()
-
-            # ОТЛАДКА перед созданием OperatingHoursCars
+            # ════════════════════════════════════════════════════════════════
+            # ПРАВИЛЬНЫЙ РАСЧЁТ CUMULATIVE OPERATING HOURS
+            # ════════════════════════════════════════════════════════════════
             logger.warning('=' * 80)
-            logger.warning('[PassengerCarWaybillRecord.save] ПЕРЕД СОЗДАНИЕМ OperatingHoursCars')
+            logger.warning('[PassengerCarWaybillRecord.save] ОПЕРАЦИОННЫЕ ЧАСЫ')
             logger.warning('=' * 80)
-            logger.warning(f'total_hours = {total_hours} (тип: {type(total_hours).__name__}, max: 999.999)')
             
-            if total_hours > Decimal('999.999'):
-                logger.error(f'❌ ОШИБКА: total_hours={total_hours} превышает максимум 999.999!')
+            # Находим ПОСЛЕДНЮЮ запись для этой машины (не путевого листа!)
+            # ВАЖНО: используем -id вместо -date чтобы взять последнюю ДОБАВЛЕННУЮ запись,
+            # а не последнюю по дате (которая может быть из другой поездки)
+            last_operating_hours = (
+                OperatingHoursCars.objects
+                .filter(passenger_car=self.passenger_car_waybill.car, fire_truck__isnull=True)
+                .order_by('-id')  # <- Берём по ID (по порядку добавления), не по дате!
+                .first()
+            )
+            
+            # Вычисляем increment (сколько часов за ЭТУ поездку)
+            wb = self.passenger_car_waybill
+            car = wb.car
+            norm = (
+                NormsOperatingHoursPassengerCar.objects
+                .filter(car=car, date__lte=wb.date)
+                .order_by('-date', '-id')
+                .first()
+            )
+            
+            if norm:
+                increment = (
+                    Decimal(self.distance_city_km) * norm.city_norm +
+                    Decimal(self.distance_area_km) * norm.area_norm
+                )
+            else:
+                increment = Decimal('0.000')
+            
+            logger.warning(f'increment за эту поездку = {increment}')
+            
+            # ВАЖНО: operating_hours ДОЛЖНЫ быть CUMULATIVE total вех часов машины
+            if last_operating_hours:
+                cumulative_total = last_operating_hours.operating_hours + increment
+                logger.warning(f'prev_total (из последней записи) = {last_operating_hours.operating_hours}')
+                logger.warning(f'NEW cumulative_total = {last_operating_hours.operating_hours} + {increment} = {cumulative_total}')
+            else:
+                cumulative_total = increment
+                logger.warning(f'Первая запись: cumulative_total = {increment}')
             
             logger.warning('=' * 80)
 
-            # Пробуем создать с явным логированием ошибок
+            # Создаём OperatingHoursCars с CUMULATIVE total
             try:
                 OperatingHoursCars.objects.create(
                     passenger_car=self.passenger_car_waybill.car,
-                    operating_hours=total_hours,
+                    operating_hours=cumulative_total,  # <- CUMULATIVE, не increment!
                     date=self.passenger_car_waybill.date,
                 )
-                logger.warning('✅ OperatingHoursCars создана успешно')
+                logger.warning(f'✅ OperatingHoursCars создана с cumulative_total = {cumulative_total}')
             except Exception as e:
                 logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
                 logger.error(f'VALUES:')
                 logger.error(f'  passenger_car: {self.passenger_car_waybill.car}')
-                logger.error(f'  operating_hours: {total_hours}')
+                logger.error(f'  operating_hours (cumulative): {cumulative_total}')
                 logger.error(f'  date: {self.passenger_car_waybill.date}')
                 raise
 
@@ -1552,7 +1587,12 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             if self.odometer_after < self.odometer_before:
                 raise ValidationError(
                     f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть меньше чем одометр перед поездкой ({self.odometer_before}). "
-                    f"Проверьте значение одометра после поездки (odometer_after)."
+                    f"Проверьте значение одометра после поездки (Одометр после возвращения (км) )."
+                )
+            if self.odometer_after - self.odometer_before > 2000:
+                raise ValidationError(
+                    f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть увелечен за раз более чем на две тысячи киллометров ({self.odometer_before}). "
+                    f"Проверьте значение одометра после поездки (Одометр после возвращения (км) )."
                 )
             
             self._apply_norms()
@@ -1591,33 +1631,70 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 waybill=self.fire_truck_waybill,
             )
 
-            total_hours = self._calc_operating_hours_total()
-
-            # ОТЛАДКА перед созданием OperatingHoursCars
+            # ════════════════════════════════════════════════════════════════
+            # ПРАВИЛЬНЫЙ РАСЧЁТ CUMULATIVE OPERATING HOURS
+            # ════════════════════════════════════════════════════════════════
             logger.warning('=' * 80)
-            logger.warning('[FireTruckWaybillRecord.save] ПЕРЕД СОЗДАНИЕМ OperatingHoursCars')
+            logger.warning('[FireTruckWaybillRecord.save] ОПЕРАЦИОННЫЕ ЧАСЫ')
             logger.warning('=' * 80)
-            logger.warning(f'total_hours = {total_hours} (type: {type(total_hours).__name__})')
-            logger.warning(f'total_hours decimal_places = {total_hours.as_tuple().exponent if isinstance(total_hours, Decimal) else "N/A"}')
             
-            # Проверяем все decimal поля
-            logger.warning(f'\n--- Все Decimal поля этой записи ---')
-            logger.warning(f'fuel_used_by_distance: {self.fuel_used_by_distance}')
-            logger.warning(f'fuel_used_with_pump: {self.fuel_used_with_pump}')
-            logger.warning(f'fuel_used_without_pump: {self.fuel_used_without_pump}')
-            logger.warning(f'fuel_used_normal: {self.fuel_used_normal}')
-            logger.warning(f'fuel_used: {self.fuel_used}')
-            logger.warning(f'fuel_refueled: {self.fuel_refueled}')
-            logger.warning(f'fuel_on_return: {self.fuel_on_return}')
-            logger.warning(f'fuel_before_departure: {self.fuel_before_departure}')
-            
-            logger.warning('=' * 80)
-
-            OperatingHoursCars.objects.create(
-                fire_truck=self.fire_truck_waybill.car,
-                operating_hours=total_hours,
-                date=self.fire_truck_waybill.date,
+            # Находим ПОСЛЕДНЮЮ запись для этой машины
+            # ВАЖНО: используем -id вместо -date чтобы взять последнюю ДОБАВЛЕННУЮ запись,
+            # а не последнюю по дате (которая может быть из другой поездки)
+            last_operating_hours = (
+                OperatingHoursCars.objects
+                .filter(fire_truck=self.fire_truck_waybill.car, passenger_car__isnull=True)
+                .order_by('-id')  # <- Берём по ID (по порядку добавления), не по дате!
+                .first()
             )
+            
+            # Вычисляем increment (сколько часов за ЭТУ поездку)
+            wb = self.fire_truck_waybill
+            car = wb.car
+            norm = (
+                NormsOperatingHoursFireTruck.objects
+                .filter(car=car, date__lte=wb.date)
+                .order_by('-date', '-id')
+                .first()
+            )
+            
+            if norm:
+                increment = (
+                    Decimal(self.distance_km) * norm.km_norm +
+                    Decimal(self.time_with_pump / 60.0) * norm.with_pump_norm +
+                    Decimal(self.time_without_pump / 60.0)
+                )
+            else:
+                increment = Decimal('0.000')
+            
+            logger.warning(f'increment за эту поездку = {increment}')
+            
+            # ВАЖНО: operating_hours ДОЛЖНЫ быть CUMULATIVE total всех часов машины
+            if last_operating_hours:
+                cumulative_total = last_operating_hours.operating_hours + increment
+                logger.warning(f'prev_total (из последней записи) = {last_operating_hours.operating_hours}')
+                logger.warning(f'NEW cumulative_total = {last_operating_hours.operating_hours} + {increment} = {cumulative_total}')
+            else:
+                cumulative_total = increment
+                logger.warning(f'Первая запись: cumulative_total = {increment}')
+            
+            logger.warning('=' * 80)
+
+            # Создаём OperatingHoursCars с CUMULATIVE total
+            try:
+                OperatingHoursCars.objects.create(
+                    fire_truck=self.fire_truck_waybill.car,
+                    operating_hours=cumulative_total,  # <- CUMULATIVE, не increment!
+                    date=self.fire_truck_waybill.date,
+                )
+                logger.warning(f'✅ OperatingHoursCars создана с cumulative_total = {cumulative_total}')
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
+                logger.error(f'VALUES:')
+                logger.error(f'  fire_truck: {self.fire_truck_waybill.car}')
+                logger.error(f'  operating_hours (cumulative): {cumulative_total}')
+                logger.error(f'  date: {self.fire_truck_waybill.date}')
+                raise
 
             self.fire_truck_waybill.recalc_totals()
 
