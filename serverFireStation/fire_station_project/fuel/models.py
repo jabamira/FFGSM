@@ -1114,11 +1114,11 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
                     .aggregate(models.Max('odometer'))['odometer__max']
                 )
                 
-                if max_odometer_prev_day is not None and self.odometer_before <= max_odometer_prev_day:
+                if max_odometer_prev_day is not None and self.odometer_before < max_odometer_prev_day:
                     raise ValidationError(
-                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} должен быть больше "
+                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} не должен быть меньше "
                         f"максимального одометра {max_odometer_prev_day} с предыдущего дня {prev_date}. "
-                        f"Одометры должны возрастать по датам!"
+                        f"Одометры не должны идти назад!"
                     )
             
             self._apply_norms()
@@ -2249,11 +2249,11 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                     .aggregate(models.Max('odometer'))['odometer__max']
                 )
                 
-                if max_odometer_prev_day is not None and self.odometer_before <= max_odometer_prev_day:
+                if max_odometer_prev_day is not None and self.odometer_before < max_odometer_prev_day:
                     raise ValidationError(
-                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} должен быть больше "
+                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} не должен быть меньше "
                         f"максимального одометра {max_odometer_prev_day} с предыдущего дня {prev_date}. "
-                        f"Одометры должны возрастать по датам!"
+                        f"Одометры не должны идти назад!"
                     )
             
             self._apply_norms()

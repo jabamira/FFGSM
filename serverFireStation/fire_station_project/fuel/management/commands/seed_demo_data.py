@@ -182,9 +182,9 @@ class Command(BaseCommand):
                     car=car,
                     season=season,
                     date=date(2025, 1, 1),
-                    with_pump_norm=Decimal('0.250') if season == 'summer' else Decimal('0.300'),
-                    without_pump_norm=Decimal('0.120') if season == 'summer' else Decimal('0.150'),
-                    km_norm=Decimal('0.180') if season == 'summer' else Decimal('0.200'),
+                    with_pump_norm=Decimal('0.080') if season == 'summer' else Decimal('0.100'),
+                    without_pump_norm=Decimal('0.040') if season == 'summer' else Decimal('0.050'),
+                    km_norm=Decimal('0.060') if season == 'summer' else Decimal('0.070'),
                 )
 
         self.stdout.write(self.style.SUCCESS("Нормы топлива созданы"))
@@ -286,6 +286,12 @@ class Command(BaseCommand):
         passenger_cars = [passenger_car_1, passenger_car_2]
 
         base_date = date(2025, 2, 1)
+        
+        # Инициализируем текущие одометры для каждой машины
+        passenger_odometer_current = {
+            passenger_car_1.id: 100000,
+            passenger_car_2.id: 70000,
+        }
 
         # Создаём записи для каждой легковой машины отдельно, упорядочивая по датам
         for car in passenger_cars:
@@ -304,6 +310,10 @@ class Command(BaseCommand):
                 # 1 запись на путевой лист (можно увеличить при необходимости)
                 distance_city = randint(5, 60)
                 distance_area = randint(0, 120)
+                
+                # имитация пробега: увеличиваем одометр
+                total_distance = distance_city + distance_area
+                passenger_odometer_current[car.id] += total_distance
 
                 # Рассчитываем часы
                 norm = NormsOperatingHoursPassengerCar.objects.filter(
@@ -326,7 +336,35 @@ class Command(BaseCommand):
                     date=pw.date,
                 )
                 
+                # Получаем текущее топливо в баке
+                last_fuel_state = (
+                    OdometerFuelPassengerCar.objects
+                    .filter(car=car, date__lte=d)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+                fuel_before_dep = last_fuel_state.fuel if last_fuel_state else Decimal('40.000')
+                
                 # Создаём WaybillRecord с FK на OperatingHoursCars
+                # Рассчитываем расход близко к норме (90-110% от нормы)
+                fuel_refuel = Decimal(f"{randint(8, 15)}.000")  # Меньше заправляем (8-15л)
+                
+                # Ограничиваем максимальное топливо в баке 100л
+                max_fuel_in_tank = Decimal('100.000')
+                if fuel_before_dep + fuel_refuel > max_fuel_in_tank:
+                    fuel_refuel = max(Decimal('0.000'), max_fuel_in_tank - fuel_before_dep)
+                
+                # Расчитываем расчитанную норму и делаем расход близко к ней
+                norm_city = norm.city_norm if norm else Decimal('0.070')
+                norm_area = norm.area_norm if norm else Decimal('0.050')
+                estimated_norm = Decimal(distance_city) * norm_city + Decimal(distance_area) * norm_area
+                # Увеличиваем в 3.5 раз
+                estimated_norm = estimated_norm * Decimal('4.7')
+                # Фактический = норма с случайным не большим +/- 10%
+                variance = Decimal(randint(-10, 10)) / Decimal('100')  # -10% to +10%
+                fuel_use = estimated_norm * (Decimal('1.0') + variance)
+                fuel_use = fuel_use.quantize(Decimal('0.001'))
+                
                 PassengerCarWaybillRecord.objects.create(
                     passenger_car_waybill=pw,
                     target=f"Поездка (машина {car.number})",
@@ -334,8 +372,9 @@ class Command(BaseCommand):
                     arrival_time=time(randint(11, 18), choice([0, 15, 30, 45]), 0),
                     distance_city_km=distance_city,
                     distance_area_km=distance_area,
-                    fuel_refueled=Decimal(f"{randint(5, 15)}.000"),
-                    fuel_used=Decimal(f"{randint(2, 8)}.000"),
+                    fuel_refueled=fuel_refuel,
+                    fuel_used=fuel_use,
+                    odometer_after=passenger_odometer_current[car.id],
                     operating_hours_record=operating_hours_record,  # FK!
                 )
 
@@ -392,6 +431,42 @@ class Command(BaseCommand):
                     date=fw.date,
                 )
 
+                # Получаем текущее топливо в баке
+                last_fuel_state = (
+                    OdometerFuelFireTruck.objects
+                    .filter(car=car, date__lte=d)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+                fuel_before_dep = last_fuel_state.fuel if last_fuel_state else Decimal('80.000')
+                
+                fuel_refuel = Decimal(f"{randint(15, 30)}.000")  # Меньше заправляем (15-30л)
+                
+                # Ограничиваем максимальное топливо в баке 200л
+                max_fuel_in_tank = Decimal('200.000')
+                if fuel_before_dep + fuel_refuel > max_fuel_in_tank:
+                    fuel_refuel = max(Decimal('0.000'), max_fuel_in_tank - fuel_before_dep)
+                
+                # Получаем нормы топлива для расхода
+                fuel_norm = (
+                    NormsFireTruck.objects
+                    .filter(car=car, season=fw.norm_season, date__lte=fw.date)
+                    .order_by('-date', '-id')
+                    .first()
+                )
+                
+                # Расчитываем рассчитанную норму и делаем расход близко к ней
+                norm_km = fuel_norm.km_norm if fuel_norm else Decimal('0.006')
+                norm_with_pump = fuel_norm.with_pump_norm if fuel_norm else Decimal('0.300')
+                norm_without_pump = fuel_norm.without_pump_norm if fuel_norm else Decimal('0.100')
+                estimated_norm = Decimal(dist) * norm_km + Decimal(time_with_pump / 60.0) * norm_with_pump + Decimal(time_without_pump / 60.0) * norm_without_pump
+                # Увеличиваем в 3.5 раз
+                estimated_norm = estimated_norm * Decimal('4.7')
+                # Фактический = норма с случайным не большим +/- 10%
+                variance = Decimal(randint(-10, 10)) / Decimal('100')  # -10% to +10%
+                fuel_use = estimated_norm * (Decimal('1.0') + variance)
+                fuel_use = fuel_use.quantize(Decimal('0.001'))
+                
                 FireTruckWaybillRecord.objects.create(
                     fire_truck_waybill=fw,
                     driving_route=f"Маршрут (машина {car.number})",
@@ -401,8 +476,8 @@ class Command(BaseCommand):
                     odometer_after=fire_odometer_current[car.id],
                     time_with_pump=time_with_pump,
                     time_without_pump=time_without_pump,
-                    fuel_refueled=Decimal(f"{randint(0, 20)}.000"),
-                    fuel_used=Decimal(f"{randint(2, 10)}.000"),
+                    fuel_refueled=fuel_refuel,
+                    fuel_used=fuel_use,
                     operating_hours_record=operating_hours_record,  # FK!
                 )
 

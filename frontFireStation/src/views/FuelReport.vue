@@ -90,49 +90,73 @@
         </div>
       </div>
 
-      <!-- Charts Grid - Row 0: Daily Fuel -->
-      <div v-if="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Fuel Over Time -->
-        <div class="bg-white rounded-lg shadow-lg p-6">
-          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Расход топлива по дням</h3>
-          <Line :data="chartFuelOverTime" :options="chartOptions" />
+      <!-- Trip Count and Operating Hours Cards -->
+      <div v-if="analytics" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+        <div class="bg-white rounded-lg shadow p-6 border-l-4" :style="{ borderColor: palette.primary }">
+          <div class="text-sm font-medium" :style="{ color: palette.medium }">Суммарно поездок</div>
+          <div class="text-3xl font-bold mt-2" :style="{ color: palette.dark }">{{ analytics.totalTripCount }}</div>
+          <div class="text-xs mt-2" :style="{ color: palette.light }">всего выездов</div>
         </div>
 
+        <div v-if="analytics.operatingHours > 0" class="bg-white rounded-lg shadow p-6 border-l-4" :style="{ borderColor: palette.success }">
+          <div class="text-sm font-medium" :style="{ color: palette.medium }">Моточасы</div>
+          <div class="text-3xl font-bold mt-2" :style="{ color: palette.dark }">{{ analytics.operatingHours.toFixed(2) }} ч</div>
+          <div class="text-xs mt-2" :style="{ color: palette.light }">часов работы</div>
+        </div>
+      </div>
+
+      <!-- Charts Grid - Row 0: Fact vs Norm + Operating Hours Over Time (2 columns) -->
+      <div v-if="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <!-- Fuel Fact vs Norm Over Time -->
         <div class="bg-white rounded-lg shadow-lg p-6">
-          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Факт vs Норма по дням</h3>
+          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Фактический расход vs расход по норме</h3>
           <Line :data="chartFuelFactVsNorm" :options="chartOptions" />
         </div>
-      </div>
 
-      <!-- Charts Grid - Row 1: By Driver and By Vehicle -->
-      <div v-if="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Fuel by Driver -->
-        <div v-if="!filters.driver && analytics.summaryByDriver && analytics.summaryByDriver.length > 0" class="bg-white rounded-lg shadow-lg p-6">
-          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Расход по водителям</h3>
-          <Bar :data="chartFuelByDriver" :options="chartOptions" />
-        </div>
-
-        <!-- Fuel by Vehicle -->
-        <div v-if="!filters.vehicle && analytics.summaryByVehicle && analytics.summaryByVehicle.length > 0" class="bg-white rounded-lg shadow-lg p-6">
-          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Расход по машинам</h3>
-          <Bar :data="chartFuelByVehicle" :options="chartOptions" />
+        <!-- Operating Hours Over Time (Area Chart) -->
+        <div v-if="analytics.operatingHours > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Моточасы по дням</h3>
+          <Line :data="chartOperatingHoursOverTime" :options="chartOptions" />
         </div>
       </div>
 
-      <!-- Charts Grid - Row 2: Distributions -->
+      <!-- Charts Grid - Row 1: By Driver and By Vehicle (2 columns) -->
       <div v-if="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <!-- Driver Distribution -->
+        <!-- Left: Operating Hours by Driver (if vehicle selected) OR Fuel by Driver (if nothing selected) -->
         <div v-if="!filters.driver && analytics.summaryByDriver && analytics.summaryByDriver.length > 0" class="bg-white rounded-lg shadow-lg p-6">
-          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">Распределение по водителям</h3>
-          <Doughnut :data="chartDriverDistribution" :options="chartOptions" />
+          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">
+            {{ filters.vehicle ? 'Моточасы по водителям' : 'Расход по водителям' }}
+          </h3>
+          <Bar :data="filters.vehicle ? chartOperatingHoursByDriver : chartFuelByDriver" :options="chartOptions" />
         </div>
 
-        <!-- Vehicle Distribution -->
+        <!-- Right: Fuel by Vehicle (if nothing selected) OR Operating Hours by Vehicle (if driver selected) -->
         <div v-if="!filters.vehicle && analytics.summaryByVehicle && analytics.summaryByVehicle.length > 0" class="bg-white rounded-lg shadow-lg p-6">
           <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">
-Распределение по машинам</h3>
-          <Doughnut :data="chartVehicleDistribution" :options="chartOptions" />
+            {{ filters.driver ? 'Моточасы по машинам' : 'Расход по машинам' }}
+          </h3>
+          <Bar :data="filters.driver ? chartOperatingHoursByVehicle : chartFuelByVehicle" :options="chartOptions" />
+        </div>
+      </div>
+
+      <!-- Charts Grid - Row 2: Distributions by Distance (2 columns) -->
+      <div v-if="analytics" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Left: Distance Distribution by Driver or Operating Hours by Driver -->
+        <div v-if="!filters.driver && analytics.summaryByDriver && analytics.summaryByDriver.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">
+            {{ filters.vehicle ? 'Моточасы по водителям' : 'Распределение пробега по водителям' }}
+          </h3>
+          <Doughnut v-if="!filters.vehicle" :data="chartDriverDistanceDistribution" :options="chartOptions" />
+          <Bar v-else :data="chartOperatingHoursByDriver" :options="chartOptions" />
+        </div>
+
+        <!-- Right: Distance Distribution by Vehicle or Operating Hours by Vehicle -->
+        <div v-if="!filters.vehicle && analytics.summaryByVehicle && analytics.summaryByVehicle.length > 0" class="bg-white rounded-lg shadow-lg p-6">
+          <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.dark }">
+            {{ filters.driver ? 'Моточасы по машинам' : 'Распределение пробега по машинам' }}
+          </h3>
+          <Doughnut v-if="!filters.driver" :data="chartVehicleDistanceDistribution" :options="chartOptions" />
+          <Bar v-else :data="chartOperatingHoursByVehicle" :options="chartOptions" />
         </div>
       </div>
 
@@ -212,7 +236,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { palette, SelectInput, Button, DateRangeInput } from '../components/ui/importUi';
 import NavigationMenu from '../components/NavigationMenu.vue';
@@ -292,22 +316,6 @@ const driverOptions = computed(() => {
       label: `${driver.name} ${driver.last_name}`.trim()
     }))
   ];
-});
-
-const chartFuelOverTime = computed(() => {
-  if (!analytics.value) return {};
-  
-  return {
-    labels: analytics.value.dailyFuel.map(d => d.date),
-    datasets: [{
-      label: 'Расход топлива (л)',
-      data: analytics.value.dailyFuel.map(d => d.fuel),
-      borderColor: palette.primary,
-      backgroundColor: palette.primary + '20',
-      tension: 0.3,
-      fill: true
-    }]
-  };
 });
 
 const chartFuelFactVsNorm = computed(() => {
@@ -421,6 +429,36 @@ const chartVehicleDistribution = computed(() => {
   };
 });
 
+// Распределение пробега по машинам
+const chartVehicleDistanceDistribution = computed(() => {
+  if (!analytics.value || !analytics.value.summaryByVehicle || analytics.value.summaryByVehicle.length === 0) return {};
+  
+  const colors = [
+    palette.primary,
+    palette.success,
+    palette.warning,
+    palette.danger,
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#14b8a6'  // teal
+  ];
+  
+  return {
+    labels: analytics.value.summaryByVehicle.map(v => v.vehicleName),
+    datasets: [{
+      data: analytics.value.summaryByVehicle.map(v => v.distance || 0),
+      backgroundColor: analytics.value.summaryByVehicle.map((_, i) => colors[i % colors.length]),
+      borderColor: '#fff',
+      borderWidth: 2
+    }]
+  };
+});
+
 const chartDriverDistribution = computed(() => {
   if (!analytics.value || !analytics.value.summaryByDriver || analytics.value.summaryByDriver.length === 0) return {};
   
@@ -450,6 +488,113 @@ const chartDriverDistribution = computed(() => {
   };
 });
 
+// Распределение пробега по водителям
+const chartDriverDistanceDistribution = computed(() => {
+  if (!analytics.value || !analytics.value.summaryByDriver || analytics.value.summaryByDriver.length === 0) return {};
+  
+  const colors = [
+    palette.primary,
+    palette.success,
+    palette.warning,
+    palette.danger,
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#14b8a6'  // teal
+  ];
+  
+  return {
+    labels: analytics.value.summaryByDriver.map(d => d.driverName),
+    datasets: [{
+      data: analytics.value.summaryByDriver.map(d => d.distance || 0),
+      backgroundColor: analytics.value.summaryByDriver.map((_, i) => colors[i % colors.length]),
+      borderColor: '#fff',
+      borderWidth: 2
+    }]
+  };
+});
+
+const chartOperatingHoursByDriver = computed(() => {
+  if (!analytics.value || !analytics.value.summaryByDriver || analytics.value.summaryByDriver.length === 0) return {};
+  
+  const colors = [
+    palette.primary,
+    palette.success,
+    palette.warning,
+    palette.danger,
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#14b8a6'  // teal
+  ];
+  
+  return {
+    labels: analytics.value.summaryByDriver.map(d => d.driverName),
+    datasets: [{
+      label: 'Моточасы (ч)',
+      data: analytics.value.summaryByDriver.map(d => d.operatingHours || 0),
+      backgroundColor: analytics.value.summaryByDriver.map((_, i) => colors[i % colors.length])
+    }]
+  };
+});
+
+const chartOperatingHoursByVehicle = computed(() => {
+  if (!analytics.value || !analytics.value.summaryByVehicle || analytics.value.summaryByVehicle.length === 0) return {};
+  
+  const colors = [
+    palette.primary,
+    palette.success,
+    palette.warning,
+    palette.danger,
+    '#3b82f6', // blue
+    '#10b981', // emerald
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#06b6d4', // cyan
+    '#ec4899', // pink
+    '#14b8a6'  // teal
+  ];
+  
+  return {
+    labels: analytics.value.summaryByVehicle.map(v => v.vehicleName),
+    datasets: [{
+      label: 'Моточасы (ч)',
+      data: analytics.value.summaryByVehicle.map(v => v.operatingHours || 0),
+      backgroundColor: analytics.value.summaryByVehicle.map((_, i) => colors[i % colors.length])
+    }]
+  };
+});
+
+// Area Chart для моточасов по дням (Line с fill)
+const chartOperatingHoursOverTime = computed(() => {
+  if (!analytics.value || !analytics.value.dailyFuel || analytics.value.dailyFuel.length === 0) return {};
+  
+  return {
+    labels: analytics.value.dailyFuel.map(d => d.date),
+    datasets: [{
+      label: 'Моточасы (ч)',
+      data: analytics.value.dailyFuel.map(d => d.operatingHours || 0),
+      borderColor: palette.success,
+      backgroundColor: palette.success + '40',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 4,
+      pointBackgroundColor: palette.success,
+      pointBorderColor: '#fff',
+      pointBorderWidth: 2
+    }]
+  };
+});
+
 // Load initial data
 onMounted(async () => {
   try {
@@ -464,10 +609,47 @@ onMounted(async () => {
     const driversRes = await axios.get('/users/');
     drivers_data.value = Array.isArray(driversRes.data) ? driversRes.data : driversRes.data.results || [];
     console.log('[FuelReport] Loaded drivers:', drivers_data.value.length > 0 ? drivers_data.value.map(d => ({ id: d.id, name: `${d.name} ${d.last_name}` })) : 'EMPTY');
+    
+    // Auto-load analytics on page load
+    await loadAnalytics();
   } catch (error) {
     console.error('Error loading data:', error);
   }
 });
+
+// When vehicle type changes, clear the selected vehicle and auto-load
+watch(
+  () => filters.value.vehicleType,
+  async (newType) => {
+    filters.value.vehicle = '';
+    await loadAnalytics();
+  }
+);
+
+// Auto-load when vehicle changes
+watch(
+  () => filters.value.vehicle,
+  async () => {
+    await loadAnalytics();
+  }
+);
+
+// Auto-load when driver changes
+watch(
+  () => filters.value.driver,
+  async () => {
+    await loadAnalytics();
+  }
+);
+
+// Auto-load when date range changes
+watch(
+  () => filters.value.dateRange,
+  async () => {
+    await loadAnalytics();
+  },
+  { deep: true }
+);
 
 const resetFilters = () => {
   filters.value = {
@@ -528,7 +710,8 @@ const loadAnalytics = async () => {
           tripCount: car.trip_count,
           distance: car.distance,
           fuelUsed: car.fuel_used,
-          fuelByNorm: car.fuel_by_norm
+          fuelByNorm: car.fuel_by_norm,
+          operatingHours: car.operating_hours || 0
         });
       });
     }
@@ -542,7 +725,8 @@ const loadAnalytics = async () => {
           tripCount: truck.trip_count,
           distance: truck.distance,
           fuelUsed: truck.fuel_used,
-          fuelByNorm: truck.fuel_by_norm
+          fuelByNorm: truck.fuel_by_norm,
+          operatingHours: truck.operating_hours || 0
         });
       });
     }
@@ -555,11 +739,12 @@ const loadAnalytics = async () => {
         console.log(`[FuelReport] Adding driver ${driver.id} (${driver.name})`);
         driverList[driver.id] = {
           driverId: driver.id,
-          driverName: `${driver.name} ${driver.last_name}`.trim(),
+          driverName: driver.name,  // ← Используем name как есть, это уже полное имя
           tripCount: driver.trip_count,
           distance: driver.distance,
           fuelUsed: driver.fuel_used,
-          fuelByNorm: driver.fuel_by_norm
+          fuelByNorm: driver.fuel_by_norm,
+          operatingHours: driver.operating_hours || 0
         };
       });
     }
@@ -570,10 +755,13 @@ const loadAnalytics = async () => {
       totalFuelByNorm: stats.total.fuel_by_norm,
       totalDistance: stats.total.distance,
       tripCount: stats.total.trip_count,
+      totalTripCount: stats.total.trip_count,
+      operatingHours: stats.total.operating_hours || 0,
       dailyFuel: Array.isArray(stats.daily_fuel) ? stats.daily_fuel.map(item => ({
         date: item.date,
         fuel: item.fuel_used,
-        norm: item.fuel_by_norm
+        norm: item.fuel_by_norm,
+        operatingHours: item.operating_hours || 0
       })) : [],
       summaryByVehicle: vehicleList.sort((a, b) => b.fuelUsed - a.fuelUsed),
       summaryByDriver: Object.values(driverList).sort((a, b) => b.fuelUsed - a.fuelUsed)
@@ -593,6 +781,8 @@ const buildAnalytics = () => {
       totalFuelByNorm: 0,
       totalDistance: 0,
       tripCount: 0,
+      totalTripCount: 0,
+      operatingHours: 0,
       dailyFuel: [],
       summaryByVehicle: [],
       summaryByDriver: []

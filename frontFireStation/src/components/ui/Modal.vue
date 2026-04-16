@@ -11,7 +11,7 @@
         @mousedown.self="closeModal"
       >
         <div 
-          class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[800px] overflow-y-auto modal-scrollbar"
+          class="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto modal-scrollbar"
           :style="{ zIndex: isErrorModal ? 201 : 51 }"
         >
           <!-- Header -->
