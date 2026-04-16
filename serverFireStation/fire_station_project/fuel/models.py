@@ -6,7 +6,7 @@ from django.contrib.auth.hashers import make_password, check_password, identify_
 from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
 from decimal import Decimal
 from django.db.models import Q
-from datetime import date
+from datetime import date, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -529,6 +529,38 @@ class PassengerCarWaybill(SoftDeleteModel):
                 logger.error(f'[recalc_totals ERROR] Это ошибка из самого recalc_totals!')
                 raise
     
+    def delete(self, using=None, keep_parents=False):
+        """При удалении путевого листа запускаем каскадный пересчет для первой записи"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.warning(f'\n\n========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ЛА) ==========')
+        logger.warning(f'[delete] Удаляем путевой лист id={self.id}, date={self.date}, car={self.car.number}')
+        
+        # 🚗 Находим первую запись этого путевого листа
+        first_record = self.records.first()
+        
+        if not first_record:
+            logger.warning(f'[delete] Нет записей в путевом листе, просто удаляем')
+            self.deleted_at = timezone.now()
+            self.save(update_fields=['deleted_at'])
+            logger.warning(f'========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ЛА) ЗАВЕРШЕНО ==========\n')
+            return
+        
+        logger.warning(f'[delete] Первая запись в путевом листе: id={first_record.id}')
+        
+        # 🚗 Выполняем soft delete
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['deleted_at'])
+        logger.warning(f'[delete] Путевой лист помечен как удалённый')
+        
+        # 🚗 Запускаем каскадный пересчет через первую запись
+        # Дельта = минус пробег всего путевого листа
+        deletion_delta = -(first_record.odometer_after - first_record.odometer_before) if len(self.records.all()) == 1 else 0
+        
+        first_record.recalc_cascade_on_delete(deletion_delta=deletion_delta)
+        logger.warning(f'========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ЛА) ЗАВЕРШЕНО ==========\n')
+    
     class Meta:
         db_table = 'passenger_car_waybill'
 
@@ -773,21 +805,25 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         wb = self.passenger_car_waybill
         car = wb.car
 
+        # 🚗 ВАЖНО: Берем из OdometerFuel по дате путевого листа (не из записей путевого листа!)
+        # OdometerFuel хранит все одометры в правильном порядке возрастания
         last_state = (
             OdometerFuelPassengerCar.objects
-            .filter(car=car)
+            .filter(car=car, date__lte=wb.date)
             .order_by('-date', '-id')
             .first()
         )
         if not last_state:
             raise ValidationError(
-                f"Не найдены последние показания одометра/топлива для {car.number}. "
+                f"Не найдены последние показания одометра/топлива для {car.number} "
+                f"на дату {wb.date} или раньше. "
                 "Сначала создайте запись в OdometerFuelPassengerCar."
             )
 
         self.odometer_before = last_state.odometer
         self.fuel_before_departure = last_state.fuel
         
+        logger.warning(f'[_fill_start_values] Взяли из OdometerFuel id={last_state.id}, date={last_state.date}')
         logger.warning(f'[_fill_start_values] odometer_before={self.odometer_before}')
         logger.warning(f'[_fill_start_values] fuel_before_departure={self.fuel_before_departure} (max: 999.999)')
         logger.warning('[_fill_start_values] КОНЕЦ')
@@ -909,12 +945,17 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
-    def recalc_cascade(self):
+    def recalc_cascade(self, old_odometer_after=None):
         """Каскадный пересчет всех последующих записей во всех путевых листах этой машины"""
         wb = self.passenger_car_waybill
         car = wb.car
         logger.warning(f'\n\n========== КАСКАДНЫЙ ПЕРЕСЧЕТ НАЧАЛО (ЛА) ==========')
         logger.warning(f'[recalc_cascade] current record id={self.id}, date={wb.date}')
+        
+        if old_odometer_after is not None:
+            logger.warning(f'[recalc_cascade] РЕДАКТИРОВАНИЕ записи')
+        else:
+            logger.warning(f'[recalc_cascade] СОЗДАНИЕ новой записи')
         
         # 🚗 ВАЖНО: Правильный порядок - сначала по дате путевого листа, потом по id записи
         all_future_records = (
@@ -941,12 +982,17 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             logger.warning(f'\n[recalc_cascade] пересчитываем запись id={next_record.id}, waybill_date={next_record.passenger_car_waybill.date}')
             
             try:
-                # 🚗 ВАЖНО: Не вызываем save() который снова запустит recalc_cascade
-                # Вместо этого обновляем поля напрямую
+                # 🚗 ВАЖНО: Сохраняем РАССТОЯНИЕ (не меняется при пересчете)
+                distance = next_record.distance_total_km
                 
                 # Устанавливаем начальные значения из предыдущего состояния
                 next_record.odometer_before = prev_odometer
                 next_record.fuel_before_departure = prev_fuel
+                
+                # 🚗 ВАЖНО: Пересчитываем odometer_after сохраняя расстояние
+                # odometer_after = odometer_before + distance
+                next_record.odometer_after = next_record.odometer_before + distance
+                logger.warning(f'[recalc_cascade] Пересчет одометра: before={next_record.odometer_before}, distance={distance}, after={next_record.odometer_after}')
                 
                 # Пересчитываем нормы
                 next_record._apply_norms()
@@ -1042,10 +1088,38 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
+            # 🚗 ВАЖНО: Сохраняем СТАРОЕ значение одометра ДО редактирования для вычисления дельты
+            old_odometer_after = None
+            if self.pk is not None:  # Это редактирование, а не создание
+                try:
+                    current_db = PassengerCarWaybillRecord.objects.get(pk=self.pk)
+                    old_odometer_after = current_db.odometer_after
+                    logger.warning(f'[save] РЕДАКТИРОВАНИЕ: сохранили старый odometer_after={old_odometer_after}')
+                except PassengerCarWaybillRecord.DoesNotExist:
+                    old_odometer_after = None
+            
             # Заполнять начальные значения только при СОЗДАНИИ новой записи
             # При редактировании (UPDATE) одометр и топливо уже заполнены и не должны меняться
             if self.pk is None:  # Только для новых записей
                 self._fill_start_values()
+                
+                # 🚗 ВАЛИДАЦИЯ: odometer_before ДОЛЖЕН быть больше максимального одометра с предыдущей даты
+                wb = self.passenger_car_waybill
+                car = wb.car
+                prev_date = wb.date - timedelta(days=1)
+                
+                max_odometer_prev_day = (
+                    OdometerFuelPassengerCar.objects
+                    .filter(car=car, date=prev_date)
+                    .aggregate(models.Max('odometer'))['odometer__max']
+                )
+                
+                if max_odometer_prev_day is not None and self.odometer_before <= max_odometer_prev_day:
+                    raise ValidationError(
+                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} должен быть больше "
+                        f"максимального одометра {max_odometer_prev_day} с предыдущего дня {prev_date}. "
+                        f"Одометры должны возрастать по датам!"
+                    )
             
             self._apply_norms()
             self._calc_fuel_on_return()
@@ -1258,8 +1332,131 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             self.passenger_car_waybill.recalc_totals()
             
             # 🔥 ВАЖНО: Каскадный пересчет ПОСЛЕ всех обновлений
-            self.recalc_cascade()
+            self.recalc_cascade(old_odometer_after=old_odometer_after)
             logger.warning('[save] ✅ Все операции завершены успешно')
+
+    def delete(self, using=None, keep_parents=False):
+        """При удалении записи запускаем каскадный пересчет для следующих записей"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.warning(f'\n\n========== УДАЛЕНИЕ ЗАПИСИ ЛА ==========')
+        logger.warning(f'[delete] Удаляем запись id={self.id}, date={self.passenger_car_waybill.date}')
+        
+        # 🚗 Сохраняем данные ДО удаления
+        deleted_odometer_after = self.odometer_after
+        deleted_odometer_before = self.odometer_before
+        deleted_distance = deleted_odometer_after - deleted_odometer_before
+        logger.warning(f'[delete] Удаляемая запись: odometer_before={deleted_odometer_before}, odometer_after={deleted_odometer_after}, distance={deleted_distance}')
+        
+        # 🚗 Сохраняем дельту (ОТРИЦАТЕЛЬНУЮ - что вычесть)
+        # Все следующие записи потеряют этот пробег
+        deletion_delta = -deleted_distance
+        logger.warning(f'[delete] Дельта удаления (будет применена к следующим): {deletion_delta}')
+        
+        # 🚗 Выполняем soft delete
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['deleted_at'])
+        logger.warning(f'[delete] Запись помечена как удалённая')
+        
+        # 🚗 Запускаем каскадный пересчет для всех следующих записей
+        # Передаем параметр что это удаление, не редактирование
+        self.recalc_cascade_on_delete(deletion_delta=deletion_delta)
+        logger.warning(f'========== УДАЛЕНИЕ ЗАПИСИ ЛА ЗАВЕРШЕНО ==========\n')
+    
+    def recalc_cascade_on_delete(self, deletion_delta=0):
+        """Каскадный пересчет при удалении записи (вычитаем пробег удаленной записи)"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        wb = self.passenger_car_waybill
+        car = wb.car
+        
+        logger.warning(f'[recalc_cascade_on_delete] Начало каскадного пересчета на удаление')
+        logger.warning(f'[recalc_cascade_on_delete] deletion_delta={deletion_delta}')
+        
+        # 🚗 Находим ВСЕ последующие записи
+        all_future_records = (
+            PassengerCarWaybillRecord.objects
+            .filter(
+                passenger_car_waybill__car=car,
+                passenger_car_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(passenger_car_waybill__date__gt=wb.date) |
+                models.Q(passenger_car_waybill__date=wb.date, id__gt=self.id)
+            )
+            .select_related('passenger_car_waybill')
+            .order_by('passenger_car_waybill__date', 'id')
+        )
+        
+        logger.warning(f'[recalc_cascade_on_delete] найдено последующих записей: {all_future_records.count()}')
+        
+        if all_future_records.count() == 0:
+            logger.warning(f'[recalc_cascade_on_delete] Нет последующих записей, каскад не требуется')
+            return
+        
+        # 🚗 Получаем odometer_before первой следующей записи (это будет новый prev_odometer)
+        first_next = all_future_records.first()
+        prev_odometer = self.odometer_before  # одометр до удаленной записи
+        prev_fuel = self.fuel_before_departure  # топливо до удаленной записи
+        
+        logger.warning(f'[recalc_cascade_on_delete] Новый prev_odometer={prev_odometer}')
+        
+        for next_record in all_future_records:
+            logger.warning(f'\n[recalc_cascade_on_delete] пересчитываем запись id={next_record.id}')
+            
+            try:
+                # 🚗 Устанавливаем новый odometer_before (с учетом удаления)
+                next_record.odometer_before = prev_odometer
+                next_record.fuel_before_departure = prev_fuel
+                
+                # 🚗 Применяем дельту удаления к odometer_after
+                logger.warning(f'⚠️  Применяем дельту удаления {deletion_delta}: odometer_after {next_record.odometer_after} → {next_record.odometer_after + deletion_delta}')
+                next_record.odometer_after = next_record.odometer_after + deletion_delta
+                
+                logger.warning(f'✅ Установили: odometer_before={next_record.odometer_before}, odometer_after={next_record.odometer_after}')
+                
+                # 🚗 Пересчитываем нормы и топливо
+                next_record._apply_norms()
+                next_record._calc_fuel_on_return()
+                
+                # 🚗 Сохраняем ТОЛЬКО нужные поля
+                PassengerCarWaybillRecord.objects.filter(pk=next_record.id).update(
+                    odometer_before=next_record.odometer_before,
+                    odometer_after=next_record.odometer_after,
+                    distance_total_km=next_record.distance_total_km,
+                    fuel_before_departure=next_record.fuel_before_departure,
+                    fuel_used_city=next_record.fuel_used_city,
+                    fuel_used_area=next_record.fuel_used_area,
+                    fuel_on_return=next_record.fuel_on_return,
+                    fuel_used_normal=next_record.fuel_used_normal,
+                )
+                logger.warning(f'✅ запись id={next_record.id} обновлена')
+                
+                # 🚗 Обновляем состояние для следующей итерации
+                prev_odometer = next_record.odometer_after
+                prev_fuel = next_record.fuel_on_return
+                
+                # 🚗 Обновляем OdometerFuel
+                OdometerFuelPassengerCar.objects.filter(
+                    waybill=next_record.passenger_car_waybill
+                ).delete()
+                
+                OdometerFuelPassengerCar.objects.create(
+                    car=car,
+                    odometer=next_record.odometer_after,
+                    fuel=next_record.fuel_on_return,
+                    date=next_record.passenger_car_waybill.date,
+                    waybill=next_record.passenger_car_waybill,
+                )
+                logger.warning(f'✅ OdometerFuel для waybill id={next_record.passenger_car_waybill_id} обновлена')
+                
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА в каскадном пересчете на удаление для записи id={next_record.id}: {str(e)}')
+                raise ValidationError(f'Ошибка при пересчете записи {next_record.id}: {str(e)}')
+        
+        logger.warning(f'\n✅ [recalc_cascade_on_delete] ВСЕ ЗАПИСИ ПЕРЕСЧИТАНЫ НА УДАЛЕНИЕ')
 
 
 # --- Пожарные автомобили -----------------------------------------------------
@@ -1465,6 +1662,37 @@ class FireTruckWaybill(SoftDeleteModel):
                 'required_by_norm', 'availability_upon_delivery',
                 'savings', 'overrun'
             ])
+    
+    def delete(self, using=None, keep_parents=False):
+        """При удалении путевого листа запускаем каскадный пересчет для первой записи"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.warning(f'\n\n========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ПА) ==========')
+        logger.warning(f'[delete] Удаляем путевой лист id={self.id}, date={self.date}, car={self.car.number}')
+        
+        # 🔥 Находим первую запись этого путевого листа
+        first_record = self.records.first()
+        
+        if not first_record:
+            logger.warning(f'[delete] Нет записей в путевом листе, просто удаляем')
+            self.deleted_at = timezone.now()
+            self.save(update_fields=['deleted_at'])
+            logger.warning(f'========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ПА) ЗАВЕРШЕНО ==========\n')
+            return
+        
+        logger.warning(f'[delete] Первая запись в путевом листе: id={first_record.id}')
+        
+        # 🔥 Выполняем soft delete
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['deleted_at'])
+        logger.warning(f'[delete] Путевой лист помечен как удалённый')
+        
+        # 🔥 Запускаем каскадный пересчет через первую запись
+        deletion_delta = -(first_record.odometer_after - first_record.odometer_before) if len(self.records.all()) == 1 else 0
+        
+        first_record.recalc_cascade_on_delete(deletion_delta=deletion_delta)
+        logger.warning(f'========== УДАЛЕНИЕ ПУТЕВОГО ЛИСТА (ПА) ЗАВЕРШЕНО ==========\n')
     
     class Meta:
         db_table = 'fire_truck_waybill'
@@ -1711,23 +1939,35 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         return (timezone.now() - date_datetime) <= timedelta(days=730)
 
     def _fill_start_values(self):
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.warning('[_fill_start_values] НАЧАЛО')
         wb = self.fire_truck_waybill
         car = wb.car
 
+        # 🔥 ВАЖНО: Берем из OdometerFuel по дате путевого листа (не из записей путевого листа!)
+        # OdometerFuel хранит все одометры в правильном порядке возрастания
         last_state = (
             OdometerFuelFireTruck.objects
-            .filter(car=car)
+            .filter(car=car, date__lte=wb.date)
             .order_by('-date', '-id')
             .first()
         )
         if not last_state:
             raise ValidationError(
-                f"Не найдены последние показания для ПА {car.number}. "
+                f"Не найдены последние показания для ПА {car.number} "
+                f"на дату {wb.date} или раньше. "
                 "Сначала создайте запись в OdometerFuelFireTruck."
             )
 
         self.odometer_before = last_state.odometer
         self.fuel_before_departure = last_state.fuel
+
+        logger.warning(f'[_fill_start_values] Взяли из OdometerFuel id={last_state.id}, date={last_state.date}')
+        logger.warning(f'[_fill_start_values] odometer_before={self.odometer_before}')
+        logger.warning(f'[_fill_start_values] fuel_before_departure={self.fuel_before_departure}')
+        logger.warning('[_fill_start_values] КОНЕЦ')
 
     def _fill_start_values_from_prev(self, prev_record):
         """Заполнить начальные значения из предыдущей записи (для каскадного пересчета)"""
@@ -1831,12 +2071,17 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
-    def recalc_cascade(self):
+    def recalc_cascade(self, old_odometer_after=None):
         """Каскадный пересчет всех последующих записей во всех путевых листах этой машины"""
         wb = self.fire_truck_waybill
         car = wb.car
         logger.warning(f'\n\n========== КАСКАДНЫЙ ПЕРЕСЧЕТ НАЧАЛО (ПА) ==========')
         logger.warning(f'[recalc_cascade] current record id={self.id}, date={wb.date}')
+        
+        if old_odometer_after is not None:
+            logger.warning(f'[recalc_cascade] РЕДАКТИРОВАНИЕ записи')
+        else:
+            logger.warning(f'[recalc_cascade] СОЗДАНИЕ новой записи')
         
         # 🔥 ВАЖНО: Правильный порядок - сначала по дате путевого листа, потом по id записи
         all_future_records = (
@@ -1863,12 +2108,19 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             logger.warning(f'\n[recalc_cascade] пересчитываем запись id={next_record.id}, waybill_date={next_record.fire_truck_waybill.date}')
             
             try:
-                # 🔥 ВАЖНО: Не вызываем save() который снова запустит recalc_cascade
-                # Вместо этого обновляем поля напрямую
+                # 🔥 ВАЖНО: Сохраняем РАССТОЯНИЕ (не меняется при пересчете)
+                distance = next_record.distance_km
                 
                 # Устанавливаем начальные значения из предыдущего состояния
                 next_record.odometer_before = prev_odometer
                 next_record.fuel_before_departure = prev_fuel
+                
+                # 🔥 ВАЖНО: Пересчитываем odometer_after сохраняя расстояние
+                # odometer_after = odometer_before + distance
+                next_record.odometer_after = next_record.odometer_before + distance
+                logger.warning(f'[recalc_cascade] Пересчет одометра: before={next_record.odometer_before}, distance={distance}, after={next_record.odometer_after}')
+                
+                logger.warning(f'✅ Установили: odometer_before={next_record.odometer_before}, odometer_after={next_record.odometer_after}, fuel_before_departure={next_record.fuel_before_departure}')
                 
                 # Пересчитываем нормы
                 next_record._apply_norms()
@@ -1914,7 +2166,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 )
                 logger.warning(f'✅ OdometerFuel для waybill id={next_record.fire_truck_waybill_id} обновлена')
                 
-                # 🔥 ВАЖНО: Пересчитываем моточасы для этой записи
+                # 🔥 Пересчитываем моточасы для этой записи
                 norm = NormsOperatingHoursFireTruck.objects.filter(
                     car=car, date__lte=next_record.fire_truck_waybill.date
                 ).order_by('-date', '-id').first()
@@ -1970,58 +2222,39 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         logger = logging.getLogger(__name__)
         
         with transaction.atomic():
-            # 🔥 Определяем odometer_before
-            if self.pk is not None:
-                # Это редактирование существующей записи
-                wb = self.fire_truck_waybill
-                car = wb.car
-                
-                # Найти текущую запись OdometerFuel для этого waybill
-                current_odometer = (
-                    OdometerFuelFireTruck.objects
-                    .filter(waybill=wb)
-                    .first()
-                )
-                
-                if current_odometer:
-                    # Найти ПРЕДЫДУЩУЮ запись OdometerFuel (с id меньше чем у текущей)
-                    prev_odometer_state = (
-                        OdometerFuelFireTruck.objects
-                        .filter(car=car, id__lt=current_odometer.id)
-                        .order_by('-id')
-                        .first()
-                    )
-                    
-                    if prev_odometer_state:
-                        self.odometer_before = prev_odometer_state.odometer
-                        self.fuel_before_departure = prev_odometer_state.fuel
-                        logger.warning(f'[save] РЕДАКТИРОВАНИЕ: odometer_before={self.odometer_before} взят из OdometerFuel id={prev_odometer_state.id}')
-                    else:
-                        raise ValidationError(
-                            f"Не найдены предыдущие показания одометра/топлива для {car.number}. "
-                            "Это первая запись в системе."
-                        )
-                else:
-                    # Если нет OdometerFuel для этого waybill - берем последнюю запись для машины
-                    last_odometer_state = (
-                        OdometerFuelFireTruck.objects
-                        .filter(car=car)
-                        .order_by('-id')
-                        .first()
-                    )
-                    
-                    if last_odometer_state:
-                        self.odometer_before = last_odometer_state.odometer
-                        self.fuel_before_departure = last_odometer_state.fuel
-                        logger.warning(f'[save] РЕДАКТИРОВАНИЕ: odometer_before={self.odometer_before} взят из последней OdometerFuel id={last_odometer_state.id}')
-                    else:
-                        raise ValidationError(
-                            f"Не найдены показания одометра/топлива для {car.number}."
-                        )
-            else:
-                # Это новая запись
+            # 🔥 ВАЖНО: Сохраняем СТАРОЕ значение одометра ДО редактирования для вычисления дельты
+            old_odometer_after = None
+            if self.pk is not None:  # Это редактирование, а не создание
+                try:
+                    current_db = FireTruckWaybillRecord.objects.get(pk=self.pk)
+                    old_odometer_after = current_db.odometer_after
+                    logger.warning(f'[save] РЕДАКТИРОВАНИЕ: сохранили старый odometer_after={old_odometer_after}')
+                except FireTruckWaybillRecord.DoesNotExist:
+                    old_odometer_after = None
+            
+            # Заполнять начальные значения только при СОЗДАНИИ новой записи
+            # При редактировании (UPDATE) одометр и топливо уже заполнены и не должны меняться
+            if self.pk is None:  # Только для новых записей
                 self._fill_start_values()
                 logger.warning(f'[save] СОЗДАНИЕ: odometer_before={self.odometer_before}')
+                
+                # 🔥 ВАЛИДАЦИЯ: odometer_before ДОЛЖЕН быть больше максимального одометра с предыдущей даты
+                wb = self.fire_truck_waybill
+                car = wb.car
+                prev_date = wb.date - timedelta(days=1)
+                
+                max_odometer_prev_day = (
+                    OdometerFuelFireTruck.objects
+                    .filter(car=car, date=prev_date)
+                    .aggregate(models.Max('odometer'))['odometer__max']
+                )
+                
+                if max_odometer_prev_day is not None and self.odometer_before <= max_odometer_prev_day:
+                    raise ValidationError(
+                        f"Ошибка! Одометр {self.odometer_before} на {wb.date} должен быть больше "
+                        f"максимального одометра {max_odometer_prev_day} с предыдущего дня {prev_date}. "
+                        f"Одометры должны возрастать по датам!"
+                    )
             
             self._apply_norms()
             self._calc_fuel_on_return()
@@ -2136,8 +2369,129 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             self.fire_truck_waybill.recalc_totals()
             
             # 5. Каскадный пересчет ПОСЛЕ всех обновлений
-            self.recalc_cascade()
+            self.recalc_cascade(old_odometer_after=old_odometer_after)
             logger.warning('[save] ✅ Все операции завершены успешно')
+
+    def delete(self, using=None, keep_parents=False):
+        """При удалении записи запускаем каскадный пересчет для следующих записей"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        logger.warning(f'\n\n========== УДАЛЕНИЕ ЗАПИСИ ПА ==========')
+        logger.warning(f'[delete] Удаляем запись id={self.id}, date={self.fire_truck_waybill.date}')
+        
+        # 🔥 Сохраняем данные ДО удаления
+        deleted_odometer_after = self.odometer_after
+        deleted_odometer_before = self.odometer_before
+        deleted_distance = deleted_odometer_after - deleted_odometer_before
+        logger.warning(f'[delete] Удаляемая запись: odometer_before={deleted_odometer_before}, odometer_after={deleted_odometer_after}, distance={deleted_distance}')
+        
+        # 🔥 Сохраняем дельту (ОТРИЦАТЕЛЬНУЮ - что вычесть)
+        deletion_delta = -deleted_distance
+        logger.warning(f'[delete] Дельта удаления (будет применена к следующим): {deletion_delta}')
+        
+        # 🔥 Выполняем soft delete
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['deleted_at'])
+        logger.warning(f'[delete] Запись помечена как удалённая')
+        
+        # 🔥 Запускаем каскадный пересчет для всех следующих записей
+        self.recalc_cascade_on_delete(deletion_delta=deletion_delta)
+        logger.warning(f'========== УДАЛЕНИЕ ЗАПИСИ ПА ЗАВЕРШЕНО ==========\n')
+    
+    def recalc_cascade_on_delete(self, deletion_delta=0):
+        """Каскадный пересчет при удалении записи (вычитаем пробег удаленной записи)"""
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        wb = self.fire_truck_waybill
+        car = wb.car
+        
+        logger.warning(f'[recalc_cascade_on_delete] Начало каскадного пересчета на удаление')
+        logger.warning(f'[recalc_cascade_on_delete] deletion_delta={deletion_delta}')
+        
+        # 🔥 Находим ВСЕ последующие записи
+        all_future_records = (
+            FireTruckWaybillRecord.objects
+            .filter(
+                fire_truck_waybill__car=car,
+                fire_truck_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(fire_truck_waybill__date__gt=wb.date) |
+                models.Q(fire_truck_waybill__date=wb.date, id__gt=self.id)
+            )
+            .select_related('fire_truck_waybill')
+            .order_by('fire_truck_waybill__date', 'id')
+        )
+        
+        logger.warning(f'[recalc_cascade_on_delete] найдено последующих записей: {all_future_records.count()}')
+        
+        if all_future_records.count() == 0:
+            logger.warning(f'[recalc_cascade_on_delete] Нет последующих записей, каскад не требуется')
+            return
+        
+        # 🔥 Получаем odometer_before первой следующей записи (это будет новый prev_odometer)
+        prev_odometer = self.odometer_before  # одометр до удаленной записи
+        prev_fuel = self.fuel_before_departure  # топливо до удаленной записи
+        
+        logger.warning(f'[recalc_cascade_on_delete] Новый prev_odometer={prev_odometer}')
+        
+        for next_record in all_future_records:
+            logger.warning(f'\n[recalc_cascade_on_delete] пересчитываем запись id={next_record.id}')
+            
+            try:
+                # 🔥 Устанавливаем новый odometer_before (с учетом удаления)
+                next_record.odometer_before = prev_odometer
+                next_record.fuel_before_departure = prev_fuel
+                
+                # 🔥 Применяем дельту удаления к odometer_after
+                logger.warning(f'⚠️  Применяем дельту удаления {deletion_delta}: odometer_after {next_record.odometer_after} → {next_record.odometer_after + deletion_delta}')
+                next_record.odometer_after = next_record.odometer_after + deletion_delta
+                
+                logger.warning(f'✅ Установили: odometer_before={next_record.odometer_before}, odometer_after={next_record.odometer_after}')
+                
+                # 🔥 Пересчитываем нормы и топливо
+                next_record._apply_norms()
+                next_record._calc_fuel_on_return()
+                
+                # 🔥 Сохраняем ТОЛЬКО нужные поля
+                FireTruckWaybillRecord.objects.filter(pk=next_record.id).update(
+                    odometer_before=next_record.odometer_before,
+                    odometer_after=next_record.odometer_after,
+                    distance_km=next_record.distance_km,
+                    fuel_before_departure=next_record.fuel_before_departure,
+                    fuel_used_by_distance=next_record.fuel_used_by_distance,
+                    fuel_used_with_pump=next_record.fuel_used_with_pump,
+                    fuel_used_without_pump=next_record.fuel_used_without_pump,
+                    fuel_on_return=next_record.fuel_on_return,
+                    fuel_used_normal=next_record.fuel_used_normal,
+                )
+                logger.warning(f'✅ запись id={next_record.id} обновлена')
+                
+                # 🔥 Обновляем состояние для следующей итерации
+                prev_odometer = next_record.odometer_after
+                prev_fuel = next_record.fuel_on_return
+                
+                # 🔥 Обновляем OdometerFuel
+                OdometerFuelFireTruck.objects.filter(
+                    waybill=next_record.fire_truck_waybill
+                ).delete()
+                
+                OdometerFuelFireTruck.objects.create(
+                    car=car,
+                    odometer=next_record.odometer_after,
+                    fuel=next_record.fuel_on_return,
+                    date=next_record.fire_truck_waybill.date,
+                    waybill=next_record.fire_truck_waybill,
+                )
+                logger.warning(f'✅ OdometerFuel для waybill id={next_record.fire_truck_waybill_id} обновлена')
+                
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА в каскадном пересчете на удаление для записи id={next_record.id}: {str(e)}')
+                raise ValidationError(f'Ошибка при пересчете записи {next_record.id}: {str(e)}')
+        
+        logger.warning(f'\n✅ [recalc_cascade_on_delete] ВСЕ ЗАПИСИ ПЕРЕСЧИТАНЫ НА УДАЛЕНИЕ')
 
 
 # --- Моточасы и ТО -----------------------------------------------------------
