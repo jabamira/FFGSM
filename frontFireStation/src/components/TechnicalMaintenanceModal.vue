@@ -14,7 +14,7 @@
             :key="item.maintenance_type"
             @click="selectMaintenanceType(item)"
             :style="{
-              backgroundColor: getMaintenanceColor(item.interval),
+              backgroundColor: getMaintenanceColor((item.last_maintenance_hours + item.norm_interval_value) - carCurrentHours),
               color: '#fff',
               padding: '8px 12px',
               borderRadius: '4px',
@@ -24,7 +24,7 @@
             }"
             class="w-full text-left hover:shadow transition-shadow"
           >
-            {{ getMaintenanceTypeLabel(item.maintenance_type) }}: {{ item.interval.toFixed(2) }} ч
+            {{ getMaintenanceTypeLabel(item.maintenance_type) }}: {{ ((item.last_maintenance_hours + item.norm_interval_value) - carCurrentHours).toFixed(2) }} ч
           </button>
         </div>
       </div>
@@ -40,7 +40,7 @@
         <div class="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Текущие часы</p>
-            <p class="font-semibold" :style="{ color: palette.dark }">{{ (allMaintenanceInfo?.current_hours || 0).toFixed(2) }} ч</p>
+            <p class="font-semibold" :style="{ color: palette.dark }">{{ carCurrentHours.toFixed(2) }} ч</p>
           </div>
           <div>
             <p :style="{ color: palette.medium }" class="text-xs">Осталось до ТО</p>
@@ -122,7 +122,12 @@
 
     <template #footer>
       <Button variant="secondary" size="md" @click="close" :disabled="isLoading || allMaintenanceInfo?.error">Отмена</Button>
-      <Button variant="primary" size="md" @click="submitMaintenance" :disabled="isLoading || allMaintenanceInfo?.error || !currentMaintenanceInfo">
+      <Button 
+        variant="primary" 
+        size="md" 
+        @click="submitMaintenance" 
+        :disabled="isLoading || allMaintenanceInfo?.error || !currentMaintenanceInfo || !form.maintenance_type"
+      >
         {{ isLoading ? 'Сохраняется...' : 'Провести ТО' }}
       </Button>
     </template>
@@ -177,6 +182,11 @@ const carId = computed(() => {
   return props.car?.id || props.truck?.id;
 });
 
+const carCurrentHours = computed(() => {
+  const hours = props.car?.operating_hours || props.truck?.operating_hours || 0;
+  return Number(hours);
+});
+
 // Маппинг для переводов видов ТО
 const maintenanceTypeLabels = {
   'engine_oil': 'Замена моторного масла и фильтра',
@@ -198,8 +208,23 @@ const allMaintenanceItems = computed(() => {
   return allMaintenanceInfo.value?.items || [];
 });
 
-// Текущая информация о выбранном виде ТО
+// Текущая информация о выбранном виде ТО (с вычисленными полями)
 const currentMaintenanceInfo = ref(null);
+
+// Вычислить производные значения на основе новой структуры
+const enrichMaintenanceInfo = (item) => {
+  const currentHours = Number(carCurrentHours.value) || 0;
+  const lastMaintenanceHours = Number(item.last_maintenance_hours) || 0;
+  const normIntervalValue = Number(item.norm_interval_value) || 0;
+  
+  return {
+    ...item,
+    // Вычисленные поля:
+    next_maintenance_at: lastMaintenanceHours + normIntervalValue,  // Абсолютное значение часов когда нужно ТО
+    interval: (lastMaintenanceHours + normIntervalValue) - currentHours,  // Часов ДО следующего ТО (может быть отрицательным если уже пора)
+    previous_maintenance_hours: lastMaintenanceHours  // Для совместимости с шаблоном
+  };
+};
 
 const getMaintenanceColor = (interval) => {
   if (interval < 0) return '#ef4444';  // Красный - просрочено
@@ -210,8 +235,14 @@ const getMaintenanceColor = (interval) => {
 
 const selectMaintenanceType = (item) => {
   form.value.maintenance_type = item.maintenance_type;
-  // Обновить сводку для выбранного вида ТО
-  currentMaintenanceInfo.value = item;
+  // Обновить сводку для выбранного вида ТО с вычисленными полями
+  currentMaintenanceInfo.value = enrichMaintenanceInfo(item);
+  console.log('[TechnicalMaintenance] Выбранный вид ТО:', {
+    maintenance_type: item.maintenance_type,
+    enriched: currentMaintenanceInfo.value,
+    raw: item,
+    carOperatingHours: carCurrentHours.value
+  });
 };
 
 // Watch для автоматического обновления selectedMaintenanceInfo в родительском компоненте
@@ -231,6 +262,11 @@ watch(() => props.isOpen, (newVal) => {
   }
 });
 
+// Watch для обновления текущих часов при изменении машины
+watch(() => carCurrentHours.value, (newHours) => {
+  console.log('[TechnicalMaintenance] Текущие часы обновлены:', newHours);
+});
+
 const close = () => {
   resetForm();
   emit('close');
@@ -242,13 +278,31 @@ const resetForm = () => {
   const firstType = allMaintenanceItems.value.length > 0 ? allMaintenanceItems.value[0].maintenance_type : '';
   const firstItem = allMaintenanceItems.value.length > 0 ? allMaintenanceItems.value[0] : null;
   
+  console.log('[TechnicalMaintenance] resetForm - данные с сервера:', {
+    carId: carId.value,
+    carOperatingHours: carCurrentHours.value,
+    allMaintenanceInfo: allMaintenanceInfo.value,
+    firstItem: firstItem,
+    firstItemDetails: firstItem ? {
+      maintenance_type: firstItem.maintenance_type,
+      last_maintenance_hours: firstItem.last_maintenance_hours,
+      norm_interval_value: firstItem.norm_interval_value,
+      interval: firstItem.interval,
+      next_maintenance_at: firstItem.next_maintenance_at,
+      previous_maintenance_hours: firstItem.previous_maintenance_hours,
+      last_maintenance_date: firstItem.last_maintenance_date
+    } : null,
+    enriched: firstItem ? enrichMaintenanceInfo(firstItem) : null,
+    allItems: allMaintenanceItems.value
+  });
+  
   form.value = { 
     date: today,
     spent: '0',
     received: '0',
     maintenance_type: firstType
   };
-  currentMaintenanceInfo.value = firstItem;
+  currentMaintenanceInfo.value = firstItem ? enrichMaintenanceInfo(firstItem) : null;
   error.value = '';
   formErrors.value = {};
 };
@@ -290,7 +344,8 @@ const submitMaintenance = async () => {
       date: form.value.date,
       maintenance_type: form.value.maintenance_type,
       spent: parseFloat(form.value.spent) || 0,
-      received: parseFloat(form.value.received) || 0
+      received: parseFloat(form.value.received) || 0,
+      operating_hours: carCurrentHours.value  // 🔴 Отправляем текущие часы машины
     };
 
     // Определить какой параметр отправлять
@@ -300,12 +355,22 @@ const submitMaintenance = async () => {
       payload.truck_id = carId.value;
     }
 
+    console.log('[TechnicalMaintenance] 🚀 Отправляем payload на /technical-maintenance/perform/:', {
+      payload,
+      carCurrentHours: carCurrentHours.value,
+      carOperatingHoursFromProps: props.car?.operating_hours || props.truck?.operating_hours,
+      selectedMaintenanceType: form.value.maintenance_type
+    });
+
     const response = await axios.post('/technical-maintenance/perform/', payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
 
     console.log('[TechnicalMaintenance] ТО проведено успешно:', response.data);
-    emit('success');
+    
+    // 🔴 Обновляем данные машины с новыми operating_hours
+    emit('success', response.data);
+    
     close();
   } catch (err) {
     console.error('[TechnicalMaintenance] Ошибка при проведении ТО:', err);

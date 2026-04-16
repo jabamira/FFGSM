@@ -59,6 +59,7 @@
               @click="openEditModal"
               variant="primary"
               size="md"
+              :disabled="!isWaybillEditable"
             >
               Редактировать путевой лист
             </Button>
@@ -66,16 +67,40 @@
               @click="openDeleteWaybillModal"
               variant="danger"
               size="md"
+              :disabled="!isWaybillEditable"
             >
               Удалить путевой лист
             </Button>
           </div>
+          <p v-if="!isWaybillEditable" class="text-sm text-gray-500 mt-3">
+            ❌ Редактирование и удаление недоступны. Путевой лист создан более 2 лет назад.
+          </p>
         </div>
       </div>
 
       <!-- Records Table Section -->
       <div class="bg-white rounded shadow p-6">
         <h3 class="text-xl font-semibold mb-4" :style="{ color: palette.dark }">Записи маршрута</h3>
+
+        <!-- Warning if waybill is not editable -->
+        <div v-if="!isWaybillEditable" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+          <div class="flex">
+            <div class="flex-shrink-0">
+              <span class="text-2xl">⚠️</span>
+            </div>
+            <div class="ml-3">
+              <p class="text-sm font-medium text-yellow-800">
+                Путевой лист от {{ formatDate(waybill.date) }} заблокирован для редактирования.
+              </p>
+              <p class="text-sm text-yellow-700 mt-1">
+                Редактирование доступно только в течение 2 лет от даты путевого листа.
+                <span v-if="editableUntilDate">
+                  Редактировать можно до {{ formatDate(editableUntilDate) }}.
+                </span>
+              </p>
+            </div>
+          </div>
+        </div>
 
         <!-- Loading state -->
         <div v-if="loading" class="flex items-center justify-center py-8">
@@ -136,7 +161,7 @@
         <div v-if="records.length > 0" class="bg-gray-50 border border-gray-200 rounded p-4">
           <p class="font-semibold mb-3" :style="{ color: palette.dark }">Итого</p>
           <!-- For Passenger Cars -->
-          <div v-if="carType === 'passenger-car'" class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div v-if="carType === 'passenger-car'" class="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Км по городу</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalCityKm }} км</p>
@@ -144,6 +169,10 @@
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Км по области</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalAreaKm }} км</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Моточасы</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalOperatingHours.toFixed(3) }} ч</p>
             </div>
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Время в пути</p>
@@ -159,10 +188,14 @@
             </div>
           </div>
           <!-- For Fire Trucks -->
-          <div v-else class="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          <div v-else class="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Километры</p>
               <p class="font-semibold" :style="{ color: palette.dark }">{{ totalDistance }} км</p>
+            </div>
+            <div>
+              <p :style="{ color: palette.medium }" class="text-xs">Моточасы</p>
+              <p class="font-semibold" :style="{ color: palette.dark }">{{ totalOperatingHours.toFixed(3) }} ч</p>
             </div>
             <div>
               <p :style="{ color: palette.medium }" class="text-xs">Работа с насосом (мин)</p>
@@ -193,7 +226,8 @@
         @delete="openDeleteRecordsModal"
         createLabel="Добавить запись"
         :deleteLabel="deleteRecordsLabel"
-        :isDeleteDisabled="isDeleteDisabled"
+        :isDeleteDisabled="isDeleteDisabled || !isWaybillEditable"
+        :isCreateDisabled="!isWaybillEditable"
       />
     </div>
   </div>
@@ -210,6 +244,7 @@
   <WaybillRecordEditModal
     ref="recordEditModal"
     :is-fire-truck="carType === 'fire-truck'"
+    :waybill-date="waybill.date"
     @add="handleAddRecord"
     @edit="handleEditRecord"
   />
@@ -314,7 +349,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { palette, SelectInput, TextInput, Modal, Button } from '../components/ui/importUi';
@@ -497,6 +532,10 @@ const totalFuelUsed = computed(() => {
   return parseFloat(total).toFixed(3);
 });
 
+const totalOperatingHours = computed(() => {
+  return waybill.value?.total_operating_hours || 0;
+});
+
 // Вспомогательная функция для конвертации времени HH:MM в минуты
 const timeToMinutes = (timeStr) => {
   if (!timeStr || typeof timeStr !== 'string') return 0;
@@ -577,6 +616,43 @@ const canDeleteRecords = computed(() => {
   return auth.permissions[permissionKey] || false;
 });
 
+const isWaybillEditable = computed(() => {
+  if (!waybill.value?.date) return false;
+  const waybillDate = new Date(waybill.value.date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  waybillDate.setHours(0, 0, 0, 0);
+  
+  // Вычисляем разницу в днях
+  const diffTime = today - waybillDate;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // 2 года = 730 дней (365 * 2)
+  return diffDays <= 730;
+});
+
+const editableUntilDate = computed(() => {
+  if (!waybill.value?.date) return null;
+  const waybillDate = new Date(waybill.value.date);
+  // Добавляем 2 года к дате путевого листа
+  const editableUntil = new Date(waybillDate);
+  editableUntil.setFullYear(editableUntil.getFullYear() + 2);
+  return editableUntil;
+});
+
+const editableDaysRemaining = computed(() => {
+  if (!editableUntilDate.value) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const editUntil = new Date(editableUntilDate.value);
+  editUntil.setHours(0, 0, 0, 0);
+  
+  const diffTime = editUntil - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  return Math.max(0, diffDays);
+});
+
 // Methods
 const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('ru-RU');
@@ -594,9 +670,10 @@ const formatKilometers = (value) => {
 };
 
 const getEndpoint = () => {
-  return carType.value === 'fire-truck'
+  const baseUrl = carType.value === 'fire-truck'
     ? `fire-truck-waybills/${waybillId.value}/`
     : `passenger-car-waybills/${waybillId.value}/`;
+  return `${baseUrl}?include_records=true`;
 };
 
 const getRecordsEndpoint = () => {
@@ -625,8 +702,12 @@ const fetchWaybill = async () => {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     waybill.value = response.data;
+    if (response.data.records) {
+      records.value = response.data.records;
+      console.log('[WaybillManagement] Records loaded from waybill:', records.value);
+    }
     console.log('[WaybillManagement] Waybill loaded:', waybill.value);
-    console.log('[WaybillManagement] Waybill driver ID:', waybill.value.driver);
+    console.log('[WaybillManagement] Total operating hours:', waybill.value.total_operating_hours);
   } catch (error) {
     console.error('Error loading waybill:', error);
     errorModalRef.value?.openModal(error);
@@ -698,6 +779,14 @@ const fetchDrivers = async () => {
 };
 
 const openEditModal = () => {
+  // Проверяем доступность редактирования
+  if (!isWaybillEditable.value) {
+    errorModalRef.value?.openModal({
+      detail: `Невозможно редактировать путевой лист от ${formatDate(waybill.value.date)}. Редактирование разрешено только в течение 2 лет от даты путевого листа.`
+    });
+    return;
+  }
+  
   // Check permissions before opening edit modal
   const permissionKey = carType.value === 'fire-truck'
     ? 'can_update_fire_truck_waybills'
@@ -723,7 +812,11 @@ const handleEditWaybill = async (waybillData) => {
   }
 
   try {
-    await axios.patch(getEndpoint(), waybillData, {
+    // Для PATCH запроса используем базовый URL без параметра include_records
+    const baseUrl = carType.value === 'fire-truck'
+      ? `fire-truck-waybills/${waybillId.value}/`
+      : `passenger-car-waybills/${waybillId.value}/`;
+    await axios.patch(baseUrl, waybillData, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     console.log('[WaybillManagement] Waybill updated successfully');
@@ -864,6 +957,14 @@ const handleDriverUpdated = async () => {
 };
 
 const openAddRecord = () => {
+  // Проверяем доступность редактирования путевого листа
+  if (!isWaybillEditable.value) {
+    errorModalRef.value?.openModal({
+      detail: `Невозможно добавить запись. Путевой лист от ${formatDate(waybill.value.date)} заблокирован для редактирования.`
+    });
+    return;
+  }
+  
   const permissionKey = carType.value === 'fire-truck'
     ? 'can_create_fire_truck_waybills_records'
     : 'can_create_passenger_cars_waybills_records';
@@ -1138,6 +1239,15 @@ const openDeleteRecordsModal = () => {
     noSelectionModal.value?.openModal();
     return;
   }
+  
+  // Проверяем доступность редактирования путевого листа
+  if (!isWaybillEditable.value) {
+    errorModalRef.value?.openModal({
+      detail: `Невозможно удалить записи. Путевой лист от ${formatDate(waybill.value.date)} заблокирован для редактирования.`
+    });
+    return;
+  }
+  
   const permissionKey = carType.value === 'fire-truck'
     ? 'can_delete_fire_truck_waybills_records'
     : 'can_delete_passenger_cars_waybills_records';
@@ -1177,6 +1287,14 @@ const confirmDeleteRecords = async () => {
 };
 
 const openDeleteWaybillModal = () => {
+  // Проверяем доступность редактирования
+  if (!isWaybillEditable.value) {
+    errorModalRef.value?.openModal({
+      detail: `Невозможно удалить путевой лист от ${formatDate(waybill.value.date)}. Удаление разрешено только в течение 2 лет от даты путевого листа.`
+    });
+    return;
+  }
+  
   if (!auth.permissions.can_delete_fire_truck_waybills && !auth.permissions.can_delete_passenger_cars_waybills) {
     permissionDeniedModal.value?.openModal('can_delete_waybills');
     return;
@@ -1222,10 +1340,18 @@ const fetchRecordsWithPermissionCheck = async () => {
 
 const setupCrudPermissions = () => {
   auth.setCrudPermissions({
-    canCreate: canCreateRecords.value,
-    canDelete: canDeleteRecords.value
+    canCreate: canCreateRecords.value && isWaybillEditable.value,
+    canDelete: canDeleteRecords.value && isWaybillEditable.value
   });
 };
+
+// Обновляем CRUD разрешения когда загружается путевой лист или меняется дата
+watch(
+  [canCreateRecords, canDeleteRecords, isWaybillEditable],
+  () => {
+    setupCrudPermissions();
+  }
+);
 
 // Odometer Modal Methods
 const openOdometerFromEdit = () => {
@@ -1302,7 +1428,7 @@ const handleNormAddSuccess = async () => {
 // Lifecycle
 onMounted(async () => {
   setupCrudPermissions();
-  const fetchTasks = [fetchWaybill(), fetchRecordsWithPermissionCheck(), fetchCars(), fetchDrivers()];
+  const fetchTasks = [fetchWaybill(), fetchCars(), fetchDrivers()];
   
   await Promise.all(fetchTasks);
 });

@@ -6,6 +6,7 @@ from django.utils.dateparse import parse_date
 from django.http import HttpResponse
 from rest_framework.permissions import IsAuthenticated
 from django.core.exceptions import ValidationError
+from django.db import models
 from io import BytesIO
 from django.conf import settings
 from openpyxl import Workbook, load_workbook
@@ -451,6 +452,65 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             return base + [CanDownloadPassengerCarWaybills()]
         return base
 
+    def perform_update(self, serializer):
+        """Валидация редактирования путевого листа - запретить изменение даты если он старше 7 дней"""
+        waybill = self.get_object()
+        
+        # Проверяем что путевой лист еще editable
+        if not waybill.is_editable():
+            raise DRFValidationError(
+                f"Невозможно редактировать путевой лист от {waybill.date}. "
+                f"Редактирование разрешено только для путевых листов, созданных не более 7 дней назад."
+            )
+        
+        # Проверяем что дата не была изменена (если путевой лист был editable и остается editable)
+        if 'date' in serializer.validated_data:
+            new_date = serializer.validated_data['date']
+            if new_date != waybill.date:
+                raise DRFValidationError(
+                    "Редактирование даты путевого листа запрещено. "
+                    "Дата путевого листа определяет доступность редактирования на 7 дней."
+                )
+        
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        """При удалении путевого листа - запустить cascade на первую запись следующего путевого листа"""
+        waybill = instance
+        car = waybill.car
+        
+        # Найти первую запись следующего путевого листа
+        next_waybill = (
+            PassengerCarWaybill.objects
+            .filter(
+                car=car,
+                date__gt=waybill.date,
+                deleted_at__isnull=True
+            )
+            .order_by('date', 'id')
+            .first()
+        )
+        
+        next_record = None
+        if next_waybill:
+            next_record = (
+                PassengerCarWaybillRecord.objects
+                .filter(passenger_car_waybill=next_waybill)
+                .order_by('id')
+                .first()
+            )
+        
+        # Удаляем путевой лист
+        super().perform_destroy(instance)
+        
+        # Если есть следующая запись - запускаем cascade
+        if next_record:
+            try:
+                next_record.recalc_cascade()
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при cascade после удаления путевого листа: {str(e)}')
+                # Не прерываем удаление, просто логируем ошибку
+
     @action(detail=False, methods=['get'], url_path='export-excel')
     def export_excel(self, request):
         car_id = request.query_params.get('car')
@@ -647,12 +707,79 @@ class PassengerCarWaybillRecordViewSet(SoftDeleteModelViewSet):
             raise DRFValidationError(error_detail)
 
     def perform_update(self, serializer):
+        # Serializer уже блокирует расчетные поля если путевой лист старше 7 дней
+        # Позволяем редактирование non-calculation полей в старых путевых листах
+        record = self.get_object()
+        
+        # Сохраняем старые значения расчетных полей для проверки изменений
+        old_fuel_refueled = record.fuel_refueled
+        old_fuel_used = record.fuel_used
+        old_odometer_after = record.odometer_after
+        old_distance_city_km = record.distance_city_km
+        old_distance_area_km = record.distance_area_km
+        
         try:
             serializer.save()
+            # Обновляем запись с актуальными данными из БД
+            record.refresh_from_db()
+            
+            # Каскадный пересчет ТОЛЬКО если изменились расчетные поля
+            calculation_fields_changed = (
+                old_fuel_refueled != record.fuel_refueled or
+                old_fuel_used != record.fuel_used or
+                old_odometer_after != record.odometer_after or
+                old_distance_city_km != record.distance_city_km or
+                old_distance_area_km != record.distance_area_km
+            )
+            
+            if calculation_fields_changed:
+                record.recalc_cascade()
+            
+            # Пересчитываем totals путевого листа
+            record.passenger_car_waybill.refresh_from_db()
+            record.passenger_car_waybill.recalc_totals()
         except ValidationError as e:
             # Преобразуем ValidationError в DRF format
             error_detail = e.message if hasattr(e, 'message') else str(e)
             raise DRFValidationError(error_detail)
+
+    def destroy(self, request, *args, **kwargs):
+        # Проверка: запись должна быть в пределах 7 дней для удаления
+        record = self.get_object()
+        if not record.passenger_car_waybill.is_editable():
+            raise DRFValidationError(
+                f"Невозможно удалить запись из путевого листа от {record.passenger_car_waybill.date}. "
+                f"Удаление разрешено только для путевых листов, созданных не более 7 дней назад."
+            )
+        
+        # Найти следующую запись для cascade пересчета
+        next_record = (
+            PassengerCarWaybillRecord.objects
+            .filter(
+                passenger_car_waybill__car=record.passenger_car_waybill.car,
+                passenger_car_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(passenger_car_waybill__date__gt=record.passenger_car_waybill.date) |
+                models.Q(passenger_car_waybill__date=record.passenger_car_waybill.date, id__gt=record.id)
+            )
+            .select_related('passenger_car_waybill')
+            .order_by('passenger_car_waybill__date', 'id')
+            .first()
+        )
+        
+        # Удаляем запись
+        response = super().destroy(request, *args, **kwargs)
+        
+        # Если есть следующая запись - запускаем cascade
+        if next_record:
+            try:
+                next_record.recalc_cascade()
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при cascade после удаления записи: {str(e)}')
+                # Не прерываем удаление, просто логируем ошибку
+        
+        return response
 
 
 # ================= ПОЖАРНЫЕ =================
@@ -779,6 +906,65 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
         elif self.action == 'export_excel':
             return base + [CanDownloadFireTruckWaybills()]
         return base
+
+    def perform_update(self, serializer):
+        """Валидация редактирования путевого листа - запретить изменение даты если он старше 7 дней"""
+        waybill = self.get_object()
+        
+        # Проверяем что путевой лист еще editable
+        if not waybill.is_editable():
+            raise DRFValidationError(
+                f"Невозможно редактировать путевой лист от {waybill.date}. "
+                f"Редактирование разрешено только для путевых листов, созданных не более 7 дней назад."
+            )
+        
+        # Проверяем что дата не была изменена (если путевой лист был editable и остается editable)
+        if 'date' in serializer.validated_data:
+            new_date = serializer.validated_data['date']
+            if new_date != waybill.date:
+                raise DRFValidationError(
+                    "Редактирование даты путевого листа запрещено. "
+                    "Дата путевого листа определяет доступность редактирования на 7 дней."
+                )
+        
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        """При удалении путевого листа - запустить cascade на первую запись следующего путевого листа"""
+        waybill = instance
+        car = waybill.car
+        
+        # Найти первую запись следующего путевого листа
+        next_waybill = (
+            FireTruckWaybill.objects
+            .filter(
+                car=car,
+                date__gt=waybill.date,
+                deleted_at__isnull=True
+            )
+            .order_by('date', 'id')
+            .first()
+        )
+        
+        next_record = None
+        if next_waybill:
+            next_record = (
+                FireTruckWaybillRecord.objects
+                .filter(fire_truck_waybill=next_waybill)
+                .order_by('id')
+                .first()
+            )
+        
+        # Удаляем путевой лист
+        super().perform_destroy(instance)
+        
+        # Если есть следующая запись - запускаем cascade
+        if next_record:
+            try:
+                next_record.recalc_cascade()
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при cascade после удаления путевого листа: {str(e)}')
+                # Не прерываем удаление, просто логируем ошибку
 
     @action(detail=False, methods=['get'], url_path='export-excel')
     def export_excel(self, request):
@@ -983,12 +1169,79 @@ class FireTruckWaybillRecordViewSet(SoftDeleteModelViewSet):
             raise DRFValidationError(error_detail)
 
     def perform_update(self, serializer):
+        # Serializer уже блокирует расчетные поля если путевой лист старше 7 дней
+        # Позволяем редактирование non-calculation полей в старых путевых листах
+        record = self.get_object()
+        
+        # Сохраняем старые значения расчетных полей для проверки изменений
+        old_fuel_refueled = record.fuel_refueled
+        old_fuel_used = record.fuel_used
+        old_odometer_after = record.odometer_after
+        old_time_with_pump = record.time_with_pump
+        old_time_without_pump = record.time_without_pump
+        
         try:
             serializer.save()
+            # Обновляем запись с актуальными данными из БД
+            record.refresh_from_db()
+            
+            # Каскадный пересчет ТОЛЬКО если изменились расчетные поля
+            calculation_fields_changed = (
+                old_fuel_refueled != record.fuel_refueled or
+                old_fuel_used != record.fuel_used or
+                old_odometer_after != record.odometer_after or
+                old_time_with_pump != record.time_with_pump or
+                old_time_without_pump != record.time_without_pump
+            )
+            
+            if calculation_fields_changed:
+                record.recalc_cascade()
+            
+            # Пересчитываем totals путевого листа
+            record.fire_truck_waybill.refresh_from_db()
+            record.fire_truck_waybill.recalc_totals()
         except ValidationError as e:
             # Преобразуем ValidationError в DRF format
             error_detail = e.message if hasattr(e, 'message') else str(e)
             raise DRFValidationError(error_detail)
+
+    def destroy(self, request, *args, **kwargs):
+        # Проверка: запись должна быть в пределах 7 дней для удаления
+        record = self.get_object()
+        if not record.fire_truck_waybill.is_editable():
+            raise DRFValidationError(
+                f"Невозможно удалить запись из путевого листа от {record.fire_truck_waybill.date}. "
+                f"Удаление разрешено только для путевых листов, созданных не более 7 дней назад."
+            )
+        
+        # Найти следующую запись для cascade пересчета
+        next_record = (
+            FireTruckWaybillRecord.objects
+            .filter(
+                fire_truck_waybill__car=record.fire_truck_waybill.car,
+                fire_truck_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(fire_truck_waybill__date__gt=record.fire_truck_waybill.date) |
+                models.Q(fire_truck_waybill__date=record.fire_truck_waybill.date, id__gt=record.id)
+            )
+            .select_related('fire_truck_waybill')
+            .order_by('fire_truck_waybill__date', 'id')
+            .first()
+        )
+        
+        # Удаляем запись
+        response = super().destroy(request, *args, **kwargs)
+        
+        # Если есть следующая запись - запускаем cascade
+        if next_record:
+            try:
+                next_record.recalc_cascade()
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА при cascade после удаления записи: {str(e)}')
+                # Не прерываем удаление, просто логируем ошибку
+        
+        return response
 
 
 # ================= МОТОЧАСЫ / ТО =================
@@ -1298,25 +1551,19 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
             else:
                 fire_truck = FireTruck.objects.get(id=truck_id)
             
-            # operating_hours ВСЕГДА берутся из OperatingHoursCars (текущие значения)
-            # Никогда не передаются с фронта
+            # operating_hours ВСЕГДА берутся из поля operating_hours машины (текущие значения)
+            # Никогда не передаются с фронта и не берутся из OperatingHoursCars
             if passenger_car:
-                hours_obj = OperatingHoursCars.objects.filter(
-                    passenger_car=passenger_car, 
-                    fire_truck__isnull=True
-                ).order_by('-id').first()
+                operating_hours_val = float(passenger_car.operating_hours)
             else:
-                hours_obj = OperatingHoursCars.objects.filter(
-                    fire_truck=fire_truck,
-                    passenger_car__isnull=True
-                ).order_by('-id').first()
+                operating_hours_val = float(fire_truck.operating_hours)
             
-            if not hours_obj:
-                return Response(
-                    {'error': 'Текущие моточасы не найдены в системе. Пожалуйста, внесите стартовые данные о моточасах машины.'},
-                    status=400
-                )
-            operating_hours_val = float(hours_obj.operating_hours)
+            print(f'[TechnicalMaintenance] 🔍 DEBUG perform_maintenance:')
+            print(f'  - car_id: {car_id}, truck_id: {truck_id}')
+            print(f'  - maintenance_type: {maintenance_type}')
+            print(f'  - date: {date}')
+            print(f'  - operating_hours_val (from car field): {operating_hours_val}')
+            print(f'  - spent: {spent_val}, received: {received_val}')
             
             # Получить норму ТО (интервал)
             if passenger_car:
@@ -1355,6 +1602,12 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
                 received=Decimal(str(received_val)),
                 operating_hours=Decimal(str(operating_hours_val))
             )
+            
+            print(f'[TechnicalMaintenance] ✅ Создана запись TechnicalMaintenance:')
+            print(f'  - id: {maintenance.id}')
+            print(f'  - date: {maintenance.date}')
+            print(f'  - maintenance_type: {maintenance.maintenance_type}')
+            print(f'  - operating_hours: {maintenance.operating_hours}')
             
             serializer = TechnicalMaintenanceSerializer(maintenance)
             return Response({

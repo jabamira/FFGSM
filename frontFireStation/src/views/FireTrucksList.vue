@@ -271,10 +271,25 @@ const fetchFireTrucks = async () => {
     // Для каждой машины выбираем самую критическую норму (с минимальным interval)
     fireTrucks.value = response.data.map(truck => {
       if (truck.all_maintenance_info && truck.all_maintenance_info.items && truck.all_maintenance_info.items.length > 0) {
+        // Обогащаем каждую ТО вычисленными значениями
+        const enrichedItems = truck.all_maintenance_info.items.map(item => {
+          const currentHours = Number(truck.operating_hours) || 0;
+          const lastMaintenanceHours = Number(item.last_maintenance_hours) || 0;
+          const normIntervalValue = Number(item.norm_interval_value) || 0;
+          
+          return {
+            ...item,
+            interval: (lastMaintenanceHours + normIntervalValue) - currentHours,
+            next_maintenance_at: lastMaintenanceHours + normIntervalValue,
+            previous_maintenance_hours: lastMaintenanceHours
+          };
+        });
+        
         // Находим вид ТО с наименьшим количеством часов до срока
-        const criticalMaintenance = truck.all_maintenance_info.items.reduce((min, current) => {
+        const criticalMaintenance = enrichedItems.reduce((min, current) => {
           return current.interval < min.interval ? current : min;
         });
+        
         // Используем критическую норму как основную maintenance_info
         truck.maintenance_info = criticalMaintenance;
       }
@@ -672,6 +687,33 @@ const openMaintenanceModal = async (truck) => {
       return;
     }
     
+    // Обогащаем каждую ТО вычисленными значениями
+    if (freshTruck.all_maintenance_info.items && freshTruck.all_maintenance_info.items.length > 0) {
+      const enrichedItems = freshTruck.all_maintenance_info.items.map(item => {
+        const currentHours = Number(freshTruck.operating_hours) || 0;
+        const lastMaintenanceHours = Number(item.last_maintenance_hours) || 0;
+        const normIntervalValue = Number(item.norm_interval_value) || 0;
+        
+        const enriched = {
+          ...item,
+          interval: (lastMaintenanceHours + normIntervalValue) - currentHours,
+          next_maintenance_at: lastMaintenanceHours + normIntervalValue,
+          previous_maintenance_hours: lastMaintenanceHours
+        };
+        
+        console.log('[FireTrucks] Обогащение ТО:', {
+          maintenance_type: item.maintenance_type,
+          currentHours,
+          lastMaintenanceHours,
+          normIntervalValue,
+          enriched
+        });
+        
+        return enriched;
+      });
+      freshTruck.all_maintenance_info.items = enrichedItems;
+    }
+    
     selectedMaintenanceTruck.value = freshTruck;
     // Передаем ALL виды ТО в модал, а не только одну норму
     selectedMaintenanceInfo.value = freshTruck.all_maintenance_info;
@@ -688,9 +730,32 @@ const closeMaintenanceModal = () => {
   selectedMaintenanceInfo.value = null;
 };
 
-const handleMaintenanceSuccess = async () => {
-  // Перезагружаем данные машин
-  await fetchFireTrucks();
+const handleMaintenanceSuccess = async (responseData) => {
+  // 🔴 Обновляем конкретную машину с новыми operating_hours
+  // После проведения ТО получаем свежие данные этой машины
+  if (selectedMaintenanceTruck.value?.id) {
+    try {
+      const truckId = selectedMaintenanceTruck.value.id;
+      const timestamp = Date.now();
+      const response = await axios.get(`/fire-trucks/${truckId}/?include_all_maintenance_info=true&t=${timestamp}`, {
+        headers: { Authorization: `Bearer ${auth.access}` }
+      });
+      
+      const updatedTruck = response.data;
+      console.log('[FireTrucks] ТО проведено! Обновленные данные машины:', updatedTruck);
+      
+      // Обновляем эту машину в списке
+      const idx = fireTrucks.value.findIndex(t => t.id === truckId);
+      if (idx !== -1) {
+        fireTrucks.value[idx] = updatedTruck;
+      }
+    } catch (error) {
+      console.error('[FireTrucks] Ошибка при обновлении машины после ТО:', error);
+      // В случае ошибки перезагружаем все машины
+      await fetchFireTrucks();
+    }
+  }
+  
   closeMaintenanceModal();
 };
 

@@ -17,6 +17,7 @@
         :label="createLabel"
         variant="primary"
         size="sm"
+        :disabled="isCreateDisabled"
       />
       <Button 
         v-if="auth.crudPermissions.canDelete"
@@ -65,6 +66,10 @@ defineProps({
     default: 'Удалить'
   },
   isDeleteDisabled: {
+    type: Boolean,
+    default: false
+  },
+  isCreateDisabled: {
     type: Boolean,
     default: false
   }

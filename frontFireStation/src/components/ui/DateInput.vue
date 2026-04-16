@@ -8,15 +8,20 @@
       <input
         ref="dateInput"
         type="text"
-        class="w-full px-3 py-2 border rounded text-sm cursor-pointer"
-        :class="{ 'border-red-500 border-2': error }"
+        class="w-full px-3 py-2 border rounded text-sm"
+        :class="{ 
+          'border-red-500 border-2': error,
+          'cursor-pointer': !disabled,
+          'cursor-not-allowed bg-gray-100': disabled
+        }"
         :style="{ 
           borderColor: error ? '#ef4444' : palette.light, 
-          color: palette.dark,
-          backgroundColor: 'white'
+          color: disabled ? '#9ca3af' : palette.dark,
+          backgroundColor: disabled ? '#f3f4f6' : 'white'
         }"
         readonly
         :placeholder="label"
+        :disabled="disabled"
       />
       <div 
         class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none"
@@ -62,6 +67,10 @@ const props = defineProps({
   error: {
     type: String,
     default: ''
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -117,6 +126,7 @@ onMounted(() => {
       emit('update:modelValue', newDate);
     },
     disableMobile: false,
+    disable: [props.disabled ? () => true : () => false],  // Disable all dates if disabled prop is true
   });
 
   // Initialize with today's date if no value provided

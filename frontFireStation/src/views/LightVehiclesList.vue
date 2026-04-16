@@ -261,10 +261,25 @@ const fetchPassengerCars = async () => {
     // Для каждой машины выбираем самую критическую норму (с минимальным interval)
     passengerCars.value = response.data.map(car => {
       if (car.all_maintenance_info && car.all_maintenance_info.items && car.all_maintenance_info.items.length > 0) {
+        // Обогащаем каждую ТО вычисленными значениями
+        const enrichedItems = car.all_maintenance_info.items.map(item => {
+          const currentHours = Number(car.operating_hours) || 0;
+          const lastMaintenanceHours = Number(item.last_maintenance_hours) || 0;
+          const normIntervalValue = Number(item.norm_interval_value) || 0;
+          
+          return {
+            ...item,
+            interval: (lastMaintenanceHours + normIntervalValue) - currentHours,
+            next_maintenance_at: lastMaintenanceHours + normIntervalValue,
+            previous_maintenance_hours: lastMaintenanceHours
+          };
+        });
+        
         // Находим вид ТО с наименьшим количеством часов до срока
-        const criticalMaintenance = car.all_maintenance_info.items.reduce((min, current) => {
+        const criticalMaintenance = enrichedItems.reduce((min, current) => {
           return current.interval < min.interval ? current : min;
         });
+        
         // Используем критическую норму как основную maintenance_info
         car.maintenance_info = criticalMaintenance;
       }
@@ -661,6 +676,33 @@ const openMaintenanceModal = async (car) => {
       return;
     }
     
+    // Обогащаем каждую ТО вычисленными значениями
+    if (freshCar.all_maintenance_info.items && freshCar.all_maintenance_info.items.length > 0) {
+      const enrichedItems = freshCar.all_maintenance_info.items.map(item => {
+        const currentHours = Number(freshCar.operating_hours) || 0;
+        const lastMaintenanceHours = Number(item.last_maintenance_hours) || 0;
+        const normIntervalValue = Number(item.norm_interval_value) || 0;
+        
+        const enriched = {
+          ...item,
+          interval: (lastMaintenanceHours + normIntervalValue) - currentHours,
+          next_maintenance_at: lastMaintenanceHours + normIntervalValue,
+          previous_maintenance_hours: lastMaintenanceHours
+        };
+        
+        console.log('[PassengerCars] Обогащение ТО:', {
+          maintenance_type: item.maintenance_type,
+          currentHours,
+          lastMaintenanceHours,
+          normIntervalValue,
+          enriched
+        });
+        
+        return enriched;
+      });
+      freshCar.all_maintenance_info.items = enrichedItems;
+    }
+    
     selectedMaintenanceCar.value = freshCar;
     // Передаем ALL виды ТО в модал, а не только одну норму
     selectedMaintenanceInfo.value = freshCar.all_maintenance_info;
@@ -677,9 +719,32 @@ const closeMaintenanceModal = () => {
   selectedMaintenanceInfo.value = null;
 };
 
-const handleMaintenanceSuccess = async () => {
-  // Перезагружаем данные машин
-  await fetchPassengerCars();
+const handleMaintenanceSuccess = async (responseData) => {
+  // 🔴 Обновляем конкретную машину с новыми operating_hours
+  // После проведения ТО получаем свежие данные этой машины
+  if (selectedMaintenanceCar.value?.id) {
+    try {
+      const carId = selectedMaintenanceCar.value.id;
+      const timestamp = Date.now();
+      const response = await axios.get(`/passenger-cars/${carId}/?include_all_maintenance_info=true&t=${timestamp}`, {
+        headers: { Authorization: `Bearer ${auth.access}` }
+      });
+      
+      const updatedCar = response.data;
+      console.log('[PassengerCars] ТО проведено! Обновленные данные машины:', updatedCar);
+      
+      // Обновляем эту машину в списке
+      const idx = passengerCars.value.findIndex(c => c.id === carId);
+      if (idx !== -1) {
+        passengerCars.value[idx] = updatedCar;
+      }
+    } catch (error) {
+      console.error('[PassengerCars] Ошибка при обновлении машины после ТО:', error);
+      // В случае ошибки перезагружаем все машины
+      await fetchPassengerCars();
+    }
+  }
+  
   closeMaintenanceModal();
 };
 

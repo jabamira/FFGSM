@@ -10,6 +10,16 @@
         <div v-if="generalError" role="alert" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
           <p class="text-sm font-semibold text-red-600 whitespace-pre-line">{{ generalError }}</p>
         </div>
+
+        <!-- Warning if waybill is older than 2 years -->
+        <div v-if="isWaybillOlderThan2Years" class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <p class="text-sm font-medium text-yellow-800">
+            ⚠️ Путевой лист создан более 2 лет назад
+          </p>
+          <p class="text-sm text-yellow-700 mt-2">
+            Редактирование старых данных может потребовать перерасчёта каскадных значений. При сохранении система автоматически пересчитает зависимые поля на основе введённых данных.
+          </p>
+        </div>
         <TextInput
           v-model="form.target"
           :label="fieldDefinitions.waybillRecord.target.label"
@@ -177,6 +187,10 @@ const props = defineProps({
   isFireTruck: {
     type: Boolean,
     default: false
+  },
+  waybillDate: {
+    type: String,
+    default: null
   }
 });
 
@@ -222,6 +236,22 @@ const formErrors = ref({
 });
 
 const generalError = ref('');
+
+// Проверяем, старше ли путевой лист 2 лет
+const isWaybillOlderThan2Years = computed(() => {
+  if (!props.waybillDate) return false;
+  
+  const waybillDate = new Date(props.waybillDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  waybillDate.setHours(0, 0, 0, 0);
+  
+  const diffTime = today - waybillDate;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  // 2 года = 730 дней (365 * 2)
+  return diffDays > 730;
+});
 
 // Field definitions for validation (combine with isFireTruck-specific fields)
 const getValidationDefinitions = () => {

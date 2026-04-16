@@ -38,6 +38,7 @@
         :hint="fieldDefinitions.waybillEdit.date.hint"
         :required="fieldDefinitions.waybillEdit.date.required"
         :error="formErrors.date"
+        :disabled="true"
       />
       <div v-if="generalError" class="rounded-lg p-4 bg-red-50 border-l-4 border-red-500">
         <p class="text-sm font-semibold text-red-600">{{ generalError }}</p>

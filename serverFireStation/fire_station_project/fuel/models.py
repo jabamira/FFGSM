@@ -5,6 +5,7 @@ from django.utils import timezone
 from django.contrib.auth.hashers import make_password, check_password, identify_hasher
 from django.core.validators import MinLengthValidator, MinValueValidator, MaxValueValidator
 from decimal import Decimal
+from django.db.models import Q
 from datetime import date
 import logging
 
@@ -396,6 +397,16 @@ class PassengerCarWaybill(SoftDeleteModel):
     savings = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
     overrun = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
 
+    def is_editable(self):
+        """Проверяет, может ли путевой лист быть отредактирован (не более 7 дней с даты путевого листа)"""
+        from django.utils import timezone
+        from datetime import timedelta
+        if not self.date:
+            return False
+        # Преобразуем date в datetime для сравнения
+        date_datetime = timezone.make_aware(timezone.datetime.combine(self.date, timezone.datetime.min.time()))
+        return (timezone.now() - date_datetime) <= timedelta(days=730)
+
     def __str__(self):
         return f"Путевой лист {self.car.number} от {self.date}"
 
@@ -746,6 +757,17 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         ordering = ["id"]
         db_table = 'passenger_car_waybill_record'
 
+    def is_editable(self):
+        """Проверяет, может ли запись быть отредактирована (путевой лист не более 7 дней давности)"""
+        from django.utils import timezone
+        from datetime import timedelta
+        wb_date = self.passenger_car_waybill.date
+        if not wb_date:
+            return False
+        # Преобразуем date в datetime для сравнения
+        date_datetime = timezone.make_aware(timezone.datetime.combine(wb_date, timezone.datetime.min.time()))
+        return (timezone.now() - date_datetime) <= timedelta(days=730)
+
     def _fill_start_values(self):
         logger.warning('[_fill_start_values] НАЧАЛО')
         wb = self.passenger_car_waybill
@@ -769,6 +791,11 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         logger.warning(f'[_fill_start_values] odometer_before={self.odometer_before}')
         logger.warning(f'[_fill_start_values] fuel_before_departure={self.fuel_before_departure} (max: 999.999)')
         logger.warning('[_fill_start_values] КОНЕЦ')
+
+    def _fill_start_values_from_prev(self, prev_record):
+        """Заполнить начальные значения из предыдущей записи (для каскадного пересчета)"""
+        self.odometer_before = prev_record.odometer_after
+        self.fuel_before_departure = prev_record.fuel_on_return
 
     def _apply_norms(self):
         logger.warning('[_apply_norms] НАЧАЛО')
@@ -882,11 +909,161 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
+    def recalc_cascade(self):
+        """Каскадный пересчет всех последующих записей во всех путевых листах этой машины"""
+        wb = self.passenger_car_waybill
+        car = wb.car
+        logger.warning(f'\n\n========== КАСКАДНЫЙ ПЕРЕСЧЕТ НАЧАЛО (ЛА) ==========')
+        logger.warning(f'[recalc_cascade] current record id={self.id}, date={wb.date}')
+        
+        # 🚗 ВАЖНО: Правильный порядок - сначала по дате путевого листа, потом по id записи
+        all_future_records = (
+            PassengerCarWaybillRecord.objects
+            .filter(
+                passenger_car_waybill__car=car,
+                passenger_car_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(passenger_car_waybill__date__gt=wb.date) |
+                models.Q(passenger_car_waybill__date=wb.date, id__gt=self.id)
+            )
+            .select_related('passenger_car_waybill')
+            .order_by('passenger_car_waybill__date', 'id')  # ← ВАЖНО: сначала дата, потом id
+        )
+        
+        logger.warning(f'[recalc_cascade] найдено последующих записей: {all_future_records.count()}')
+        
+        # 🚗 ВАЖНО: Берем начальные значения ИЗ ТЕКУЩЕЙ ЗАПИСИ
+        prev_odometer = self.odometer_after
+        prev_fuel = self.fuel_on_return
+        
+        for next_record in all_future_records:
+            logger.warning(f'\n[recalc_cascade] пересчитываем запись id={next_record.id}, waybill_date={next_record.passenger_car_waybill.date}')
+            
+            try:
+                # 🚗 ВАЖНО: Не вызываем save() который снова запустит recalc_cascade
+                # Вместо этого обновляем поля напрямую
+                
+                # Устанавливаем начальные значения из предыдущего состояния
+                next_record.odometer_before = prev_odometer
+                next_record.fuel_before_departure = prev_fuel
+                
+                # Пересчитываем нормы
+                next_record._apply_norms()
+                # Пересчитываем остаток топлива
+                next_record._calc_fuel_on_return()
+                
+                # 🚗 ВАЖНО: Проверяем валидацию ДО сохранения
+                if next_record.odometer_after < next_record.odometer_before:
+                    raise ValidationError(
+                        f"Ошибка при каскадном пересчете записи {next_record.id}: "
+                        f"одометр после ({next_record.odometer_after}) < одометр до ({next_record.odometer_before})"
+                    )
+                
+                # Сохраняем ТОЛЬКО нужные поля, НЕ вызывая recalc_cascade повторно
+                PassengerCarWaybillRecord.objects.filter(pk=next_record.id).update(
+                    odometer_before=next_record.odometer_before,
+                    odometer_after=next_record.odometer_after,
+                    distance_total_km=next_record.distance_total_km,
+                    fuel_before_departure=next_record.fuel_before_departure,
+                    fuel_used_city=next_record.fuel_used_city,
+                    fuel_used_area=next_record.fuel_used_area,
+                    fuel_on_return=next_record.fuel_on_return,
+                    fuel_used_normal=next_record.fuel_used_normal,
+                )
+                logger.warning(f'✅ запись id={next_record.id} пересчитана успешно (без вызова save)')
+                
+                # Обновляем состояние для следующей итерации
+                prev_odometer = next_record.odometer_after
+                prev_fuel = next_record.fuel_on_return
+                
+                # Обновляем OdometerFuel для этого путевого листа
+                OdometerFuelPassengerCar.objects.filter(
+                    waybill=next_record.passenger_car_waybill
+                ).delete()
+                
+                OdometerFuelPassengerCar.objects.create(
+                    car=car,
+                    odometer=next_record.odometer_after,
+                    fuel=next_record.fuel_on_return,
+                    date=next_record.passenger_car_waybill.date,
+                    waybill=next_record.passenger_car_waybill,
+                )
+                logger.warning(f'✅ OdometerFuel для waybill id={next_record.passenger_car_waybill_id} обновлена')
+                
+                # 🚗 ВАЖНО: Пересчитываем моточасы для этой записи
+                norm = NormsOperatingHoursPassengerCar.objects.filter(
+                    car=car, date__lte=next_record.passenger_car_waybill.date
+                ).order_by('-date', '-id').first()
+                
+                if norm:
+                    increment = (
+                        Decimal(next_record.distance_city_km) * norm.city_norm +
+                        Decimal(next_record.distance_area_km) * norm.area_norm
+                    )
+                else:
+                    increment = Decimal('0.000')
+                
+                # Обновляем OperatingHoursCars
+                if next_record.operating_hours_record:
+                    OperatingHoursCars.objects.filter(pk=next_record.operating_hours_record_id).update(
+                        operating_hours=increment
+                    )
+                else:
+                    operating_hours_record = OperatingHoursCars.objects.create(
+                        passenger_car=car,
+                        date=next_record.passenger_car_waybill.date,
+                        operating_hours=increment,
+                    )
+                    PassengerCarWaybillRecord.objects.filter(pk=next_record.id).update(
+                        operating_hours_record=operating_hours_record
+                    )
+                logger.warning(f'✅ Моточасы для записи id={next_record.id} обновлены: {increment}')
+                
+                # Пересчет totals в waybill
+                next_record.passenger_car_waybill.recalc_totals()
+                
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА в каскадном пересчете для записи id={next_record.id}: {str(e)}')
+                raise ValidationError(f'Ошибка при пересчете записи {next_record.id}: {str(e)}')
+        
+        # 🚗 ВАЖНО: Пересчет total hours в машине ПОСЛЕ всех обновлений
+        from django.db.models import Sum
+        total_hours = (
+            OperatingHoursCars.objects
+            .filter(passenger_car=car, fire_truck__isnull=True)
+            .aggregate(total=Sum('operating_hours'))['total']
+        ) or Decimal('0.000')
+        
+        car.operating_hours = total_hours
+        car.save(update_fields=['operating_hours'])
+        logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
+        logger.warning(f'========== КАСКАДНЫЙ ПЕРЕСЧЕТ КОНЕЦ ==========\n')
+
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            self._fill_start_values()
+            # Заполнять начальные значения только при СОЗДАНИИ новой записи
+            # При редактировании (UPDATE) одометр и топливо уже заполнены и не должны меняться
+            if self.pk is None:  # Только для новых записей
+                self._fill_start_values()
+            
             self._apply_norms()
             self._calc_fuel_on_return()
+            
+            # Валидация одометра только при СОЗДАНИИ новой записи
+            # При редактировании старой записи одометр НЕ ДОЛЖЕН менять (см. serializer read_only_fields)
+            if self.pk is None:  # Только для новых записей
+                # Валидация: одометр не может идти назад!
+                if self.odometer_after < self.odometer_before:
+                    raise ValidationError(
+                        f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть меньше чем одометр перед поездкой ({self.odometer_before}). "
+                        f"Проверьте значение км по городу и по области."
+                    )
+                if self.odometer_after - self.odometer_before > 2000:
+                    raise ValidationError(
+                        f"Ошибка: одометр не может увеличиться за раз более чем на 2000 км. "
+                        f"Проверьте значение км по городу и по области."
+                    )
             
             # ════════════════════════════════════════════════════════════════
             # ЛОГИРОВАНИЕ ВСЕ DECIMAL ПОЛЕЙ ПЕРЕД СОХРАНЕНИЕМ
@@ -1077,7 +1254,12 @@ class PassengerCarWaybillRecord(SoftDeleteModel):
             logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
             logger.warning('=' * 80)
 
+            # Пересчёт итогов путевого листа
             self.passenger_car_waybill.recalc_totals()
+            
+            # 🔥 ВАЖНО: Каскадный пересчет ПОСЛЕ всех обновлений
+            self.recalc_cascade()
+            logger.warning('[save] ✅ Все операции завершены успешно')
 
 
 # --- Пожарные автомобили -----------------------------------------------------
@@ -1225,6 +1407,16 @@ class FireTruckWaybill(SoftDeleteModel):
     availability_upon_delivery = models.DecimalField(max_digits=6, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
     savings = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
     overrun = models.DecimalField(max_digits=9, decimal_places=3, null=False, editable=False, default=Decimal('0.000'))
+
+    def is_editable(self):
+        """Проверяет, может ли путевой лист быть отредактирован (не более 7 дней с даты путевого листа)"""
+        from django.utils import timezone
+        from datetime import timedelta
+        if not self.date:
+            return False
+        # Преобразуем date в datetime для сравнения
+        date_datetime = timezone.make_aware(timezone.datetime.combine(self.date, timezone.datetime.min.time()))
+        return (timezone.now() - date_datetime) <= timedelta(days=730)
 
     def __str__(self):
         return f"Путевой лист ПА {self.car.number} от {self.date}"
@@ -1507,6 +1699,17 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         ordering = ["id"]
         db_table = 'fire_truck_waybill_record'
 
+    def is_editable(self):
+        """Проверяет, может ли запись быть отредактирована (путевой лист не более 7 дней давности)"""
+        from django.utils import timezone
+        from datetime import timedelta
+        wb_date = self.fire_truck_waybill.date
+        if not wb_date:
+            return False
+        # Преобразуем date в datetime для сравнения
+        date_datetime = timezone.make_aware(timezone.datetime.combine(wb_date, timezone.datetime.min.time()))
+        return (timezone.now() - date_datetime) <= timedelta(days=730)
+
     def _fill_start_values(self):
         wb = self.fire_truck_waybill
         car = wb.car
@@ -1525,6 +1728,11 @@ class FireTruckWaybillRecord(SoftDeleteModel):
 
         self.odometer_before = last_state.odometer
         self.fuel_before_departure = last_state.fuel
+
+    def _fill_start_values_from_prev(self, prev_record):
+        """Заполнить начальные значения из предыдущей записи (для каскадного пересчета)"""
+        self.odometer_before = prev_record.odometer_after
+        self.fuel_before_departure = prev_record.fuel_on_return
 
     def _apply_norms(self):
         wb = self.fire_truck_waybill
@@ -1623,27 +1831,212 @@ class FireTruckWaybillRecord(SoftDeleteModel):
         prev_total = last_hours.operating_hours if last_hours else Decimal('0.000')
         return prev_total + increment
 
+    def recalc_cascade(self):
+        """Каскадный пересчет всех последующих записей во всех путевых листах этой машины"""
+        wb = self.fire_truck_waybill
+        car = wb.car
+        logger.warning(f'\n\n========== КАСКАДНЫЙ ПЕРЕСЧЕТ НАЧАЛО (ПА) ==========')
+        logger.warning(f'[recalc_cascade] current record id={self.id}, date={wb.date}')
+        
+        # 🔥 ВАЖНО: Правильный порядок - сначала по дате путевого листа, потом по id записи
+        all_future_records = (
+            FireTruckWaybillRecord.objects
+            .filter(
+                fire_truck_waybill__car=car,
+                fire_truck_waybill__deleted_at__isnull=True
+            )
+            .filter(
+                models.Q(fire_truck_waybill__date__gt=wb.date) |
+                models.Q(fire_truck_waybill__date=wb.date, id__gt=self.id)
+            )
+            .select_related('fire_truck_waybill')
+            .order_by('fire_truck_waybill__date', 'id')  # ← ВАЖНО: сначала дата, потом id
+        )
+        
+        logger.warning(f'[recalc_cascade] найдено последующих записей: {all_future_records.count()}')
+        
+        # 🔥 ВАЖНО: Берем начальные значения ИЗ ТЕКУЩЕЙ ЗАПИСИ
+        prev_odometer = self.odometer_after
+        prev_fuel = self.fuel_on_return
+        
+        for next_record in all_future_records:
+            logger.warning(f'\n[recalc_cascade] пересчитываем запись id={next_record.id}, waybill_date={next_record.fire_truck_waybill.date}')
+            
+            try:
+                # 🔥 ВАЖНО: Не вызываем save() который снова запустит recalc_cascade
+                # Вместо этого обновляем поля напрямую
+                
+                # Устанавливаем начальные значения из предыдущего состояния
+                next_record.odometer_before = prev_odometer
+                next_record.fuel_before_departure = prev_fuel
+                
+                # Пересчитываем нормы
+                next_record._apply_norms()
+                # Пересчитываем остаток топлива
+                next_record._calc_fuel_on_return()
+                
+                # 🔥 ВАЖНО: Проверяем валидацию ДО сохранения
+                if next_record.odometer_after < next_record.odometer_before:
+                    raise ValidationError(
+                        f"Ошибка при каскадном пересчете записи {next_record.id}: "
+                        f"одометр после ({next_record.odometer_after}) < одометр до ({next_record.odometer_before})"
+                    )
+                
+                # Сохраняем ТОЛЬКО нужные поля, НЕ вызывая recalc_cascade повторно
+                FireTruckWaybillRecord.objects.filter(pk=next_record.id).update(
+                    odometer_before=next_record.odometer_before,
+                    odometer_after=next_record.odometer_after,
+                    distance_km=next_record.distance_km,
+                    fuel_before_departure=next_record.fuel_before_departure,
+                    fuel_used_by_distance=next_record.fuel_used_by_distance,
+                    fuel_used_with_pump=next_record.fuel_used_with_pump,
+                    fuel_used_without_pump=next_record.fuel_used_without_pump,
+                    fuel_on_return=next_record.fuel_on_return,
+                    fuel_used_normal=next_record.fuel_used_normal,
+                )
+                logger.warning(f'✅ запись id={next_record.id} пересчитана успешно (без вызова save)')
+                
+                # Обновляем состояние для следующей итерации
+                prev_odometer = next_record.odometer_after
+                prev_fuel = next_record.fuel_on_return
+                
+                # Обновляем OdometerFuel для этого путевого листа
+                OdometerFuelFireTruck.objects.filter(
+                    waybill=next_record.fire_truck_waybill
+                ).delete()
+                
+                OdometerFuelFireTruck.objects.create(
+                    car=car,
+                    odometer=next_record.odometer_after,
+                    fuel=next_record.fuel_on_return,
+                    date=next_record.fire_truck_waybill.date,
+                    waybill=next_record.fire_truck_waybill,
+                )
+                logger.warning(f'✅ OdometerFuel для waybill id={next_record.fire_truck_waybill_id} обновлена')
+                
+                # 🔥 ВАЖНО: Пересчитываем моточасы для этой записи
+                norm = NormsOperatingHoursFireTruck.objects.filter(
+                    car=car, date__lte=next_record.fire_truck_waybill.date
+                ).order_by('-date', '-id').first()
+                
+                if norm:
+                    increment = (
+                        Decimal(next_record.distance_km) * norm.km_norm +
+                        Decimal(next_record.time_with_pump / 60.0) * norm.with_pump_norm +
+                        Decimal(next_record.time_without_pump / 60.0)
+                    )
+                else:
+                    increment = Decimal('0.000')
+                
+                # Обновляем OperatingHoursCars
+                if next_record.operating_hours_record:
+                    OperatingHoursCars.objects.filter(pk=next_record.operating_hours_record_id).update(
+                        operating_hours=increment
+                    )
+                else:
+                    operating_hours_record = OperatingHoursCars.objects.create(
+                        fire_truck=car,
+                        date=next_record.fire_truck_waybill.date,
+                        operating_hours=increment,
+                    )
+                    FireTruckWaybillRecord.objects.filter(pk=next_record.id).update(
+                        operating_hours_record=operating_hours_record
+                    )
+                logger.warning(f'✅ Моточасы для записи id={next_record.id} обновлены: {increment}')
+                
+                # Пересчет totals в waybill
+                next_record.fire_truck_waybill.recalc_totals()
+                
+            except Exception as e:
+                logger.error(f'❌ ОШИБКА в каскадном пересчете для записи id={next_record.id}: {str(e)}')
+                raise ValidationError(f'Ошибка при пересчете записи {next_record.id}: {str(e)}')
+        
+        # 🔥 ВАЖНО: Пересчет total hours в машине ПОСЛЕ всех обновлений
+        from django.db.models import Sum
+        total_hours = (
+            OperatingHoursCars.objects
+            .filter(fire_truck=car, passenger_car__isnull=True)
+            .aggregate(total=Sum('operating_hours'))['total']
+        ) or Decimal('0.000')
+        
+        car.operating_hours = total_hours
+        car.save(update_fields=['operating_hours'])
+        logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
+        
+        logger.warning(f'✅ [recalc_cascade] ВСЕ ЗАПИСИ ПЕРЕСЧИТАНЫ\n========== КАСКАДНЫЙ ПЕРЕСЧЕТ КОНЕЦ ==========\n')
+        
     def save(self, *args, **kwargs):
         import logging
         logger = logging.getLogger(__name__)
         
         with transaction.atomic():
-            self._fill_start_values()
-            
-            # Валидация: одометр не может идти назад!
-            if self.odometer_after < self.odometer_before:
-                raise ValidationError(
-                    f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть меньше чем одометр перед поездкой ({self.odometer_before}). "
-                    f"Проверьте значение одометра после поездки (Одометр после возвращения (км) )."
+            # 🔥 Определяем odometer_before
+            if self.pk is not None:
+                # Это редактирование существующей записи
+                wb = self.fire_truck_waybill
+                car = wb.car
+                
+                # Найти текущую запись OdometerFuel для этого waybill
+                current_odometer = (
+                    OdometerFuelFireTruck.objects
+                    .filter(waybill=wb)
+                    .first()
                 )
-            if self.odometer_after - self.odometer_before > 2000:
-                raise ValidationError(
-                    f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть увелечен за раз более чем на две тысячи киллометров ({self.odometer_before}). "
-                    f"Проверьте значение одометра после поездки (Одометр после возвращения (км) )."
-                )
+                
+                if current_odometer:
+                    # Найти ПРЕДЫДУЩУЮ запись OdometerFuel (с id меньше чем у текущей)
+                    prev_odometer_state = (
+                        OdometerFuelFireTruck.objects
+                        .filter(car=car, id__lt=current_odometer.id)
+                        .order_by('-id')
+                        .first()
+                    )
+                    
+                    if prev_odometer_state:
+                        self.odometer_before = prev_odometer_state.odometer
+                        self.fuel_before_departure = prev_odometer_state.fuel
+                        logger.warning(f'[save] РЕДАКТИРОВАНИЕ: odometer_before={self.odometer_before} взят из OdometerFuel id={prev_odometer_state.id}')
+                    else:
+                        raise ValidationError(
+                            f"Не найдены предыдущие показания одометра/топлива для {car.number}. "
+                            "Это первая запись в системе."
+                        )
+                else:
+                    # Если нет OdometerFuel для этого waybill - берем последнюю запись для машины
+                    last_odometer_state = (
+                        OdometerFuelFireTruck.objects
+                        .filter(car=car)
+                        .order_by('-id')
+                        .first()
+                    )
+                    
+                    if last_odometer_state:
+                        self.odometer_before = last_odometer_state.odometer
+                        self.fuel_before_departure = last_odometer_state.fuel
+                        logger.warning(f'[save] РЕДАКТИРОВАНИЕ: odometer_before={self.odometer_before} взят из последней OdometerFuel id={last_odometer_state.id}')
+                    else:
+                        raise ValidationError(
+                            f"Не найдены показания одометра/топлива для {car.number}."
+                        )
+            else:
+                # Это новая запись
+                self._fill_start_values()
+                logger.warning(f'[save] СОЗДАНИЕ: odometer_before={self.odometer_before}')
             
             self._apply_norms()
             self._calc_fuel_on_return()
+            
+            # 🔥 Валидация одометра ВСЕГДА
+            if self.odometer_after < self.odometer_before:
+                raise ValidationError(
+                    f"Ошибка: одометр после поездки ({self.odometer_after}) не может быть меньше чем одометр перед поездкой ({self.odometer_before}). "
+                    f"Проверьте значение одометра после возвращения (км)."
+                )
+            if self.odometer_after - self.odometer_before > 2000:
+                raise ValidationError(
+                    f"Ошибка: одометр не может увеличиться за раз более чем на 2000 км. "
+                    f"Проверьте значение одометра после возвращения (км)."
+                )
             
             # Логирование всех полей перед сохранением
             logger.warning(f'\n\n========== ПЕРЕД СОХРАНЕНИЕМ В БД ==========')
@@ -1670,6 +2063,8 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 logger.error(f'[save] Тип ошибки: {type(e).__name__}')
                 raise
 
+            # 1. Обновляем или создаем OdometerFuel
+            OdometerFuelFireTruck.objects.filter(waybill=self.fire_truck_waybill).delete()
             OdometerFuelFireTruck.objects.create(
                 car=self.fire_truck_waybill.car,
                 odometer=self.odometer_after,
@@ -1678,23 +2073,16 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 waybill=self.fire_truck_waybill,
             )
 
-            # ════════════════════════════════════════════════════════════════
-            # ════════════════════════════════════════════════════════════════
-            # РАСЧЁТ OPERATING HOURS (просто increment, не cumulative!)
-            # ════════════════════════════════════════════════════════════════
+            # 2. Расчет моточасов
             logger.warning('=' * 80)
             logger.warning('[FireTruckWaybillRecord.save] РАСЧЁТ МОТОЧАСОВ')
             logger.warning('=' * 80)
             
-            # Вычисляем increment (сколько часов за ЭТУ поездку)
             wb = self.fire_truck_waybill
             car = wb.car
-            norm = (
-                NormsOperatingHoursFireTruck.objects
-                .filter(car=car, date__lte=wb.date)
-                .order_by('-date', '-id')
-                .first()
-            )
+            norm = NormsOperatingHoursFireTruck.objects.filter(
+                car=car, date__lte=wb.date
+            ).order_by('-date', '-id').first()
             
             if norm:
                 increment = (
@@ -1707,18 +2095,12 @@ class FireTruckWaybillRecord(SoftDeleteModel):
             
             logger.warning(f'increment за эту поездку = {increment}')
             
-            # Создаём или обновляем OperatingHoursCars с ТОЛЬКО этим increment
-            # (не cumulative - просто часы этой поездки!)
             try:
-                # ВАЖНО: Используем FK самого record, а не update_or_create с (car, date),
-                # чтобы избежать MultipleObjectsReturned когда много поездок в один день
                 if self.operating_hours_record:
-                    # Уже существует - обновляем его
                     self.operating_hours_record.operating_hours = increment
                     self.operating_hours_record.save(update_fields=['operating_hours'])
                     logger.warning(f'✅ OperatingHoursCars обновлена (id={self.operating_hours_record.id}) с hours = {increment}')
                 else:
-                    # Не существует - создаём новый
                     operating_hours_record = OperatingHoursCars.objects.create(
                         fire_truck=car,
                         date=wb.date,
@@ -1726,11 +2108,9 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                     )
                     logger.warning(f'✅ OperatingHoursCars создана (id={operating_hours_record.id}) с hours = {increment}')
                     
-                    # Сохраняем FK на этот WaybillRecord
                     self.operating_hours_record = operating_hours_record
                     logger.warning(f'✅ FK operating_hours_record установлена на {operating_hours_record.id}')
                     
-                    # ВАЖНО: Сохраняем FK в БД
                     FireTruckWaybillRecord.objects.filter(pk=self.pk).update(
                         operating_hours_record=operating_hours_record
                     )
@@ -1739,9 +2119,7 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 logger.error(f'❌ ОШИБКА при создании OperatingHoursCars: {str(e)}')
                 raise
             
-            # ════════════════════════════════════════════════════════════════
-            # ПЕРЕСЧЁТ TOTAL HOURS В МАШИНЕ
-            # ════════════════════════════════════════════════════════════════
+            # 3. Пересчет total hours в машине
             from django.db.models import Sum
             total_hours = (
                 OperatingHoursCars.objects
@@ -1749,13 +2127,17 @@ class FireTruckWaybillRecord(SoftDeleteModel):
                 .aggregate(total=Sum('operating_hours'))['total']
             ) or Decimal('0.000')
             
-            # Обновляем поле в машине
             car.operating_hours = total_hours
             car.save(update_fields=['operating_hours'])
             logger.warning(f'✅ машина {car.number}: operating_hours = {total_hours}')
             logger.warning('=' * 80)
 
+            # 4. Пересчет totals в waybill
             self.fire_truck_waybill.recalc_totals()
+            
+            # 5. Каскадный пересчет ПОСЛЕ всех обновлений
+            self.recalc_cascade()
+            logger.warning('[save] ✅ Все операции завершены успешно')
 
 
 # --- Моточасы и ТО -----------------------------------------------------------
@@ -1840,31 +2222,14 @@ class TechnicalMaintenance(SoftDeleteModel):
         if not self.number:
             self.number = next_doc_number(TechnicalMaintenance, length=6)
 
-        # Только автоматически устанавливаем operating_hours если она не была явно передана
-        # (то есть если это новая запись, создаваемая через фронтенд)
-        #
-        # В perform_maintenance view при вызове .create() уже передаются корректные operating_hours,
-        # и этот код будет уважать это значение
-        
-        # Проверяем, была ли operating_hours явно установлена
-        # Если это новый объект (без pk) и operating_hours не установлена, берем из OperatingHoursCars
-        if self.pk is None and not self.operating_hours:
+        # operating_hours всегда берется из поля машины (car.operating_hours)
+        # Если operating_hours не передана (и это новая запись),
+        # берем из PassengerCar.operating_hours или FireTruck.operating_hours
+        if not self.operating_hours:
             if self.passenger_car_id:
-                last_hours = (
-                    OperatingHoursCars.objects
-                    .filter(passenger_car=self.passenger_car, fire_truck__isnull=True)
-                    .order_by('-id')
-                    .first()
-                )
+                self.operating_hours = self.passenger_car.operating_hours
             else:
-                last_hours = (
-                    OperatingHoursCars.objects
-                    .filter(fire_truck=self.fire_truck, passenger_car__isnull=True)
-                    .order_by('-id')
-                    .first()
-                )
-
-            self.operating_hours = last_hours.operating_hours if last_hours else Decimal('0.000')
+                self.operating_hours = self.fire_truck.operating_hours
 
         super().save(*args, **kwargs)
 

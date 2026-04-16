@@ -268,14 +268,14 @@ class Command(BaseCommand):
             car=fire_truck_1,
             date=date(2025, 1, 1),
             odometer=50000,
-            fuel=Decimal('150.000'),
+            fuel=Decimal('80.000'),
             waybill=None,
         )
         OdometerFuelFireTruck.objects.create(
             car=fire_truck_2,
             date=date(2025, 1, 1),
             odometer=80000,
-            fuel=Decimal('180.000'),
+            fuel=Decimal('100.000'),
             waybill=None,
         )
 
@@ -287,55 +287,57 @@ class Command(BaseCommand):
 
         base_date = date(2025, 2, 1)
 
-        for i in range(100):
-            car = choice(passenger_cars)
-            driver = choice(drivers)
-            d = base_date + timedelta(days=i % 28)
+        # Создаём записи для каждой легковой машины отдельно, упорядочивая по датам
+        for car in passenger_cars:
+            # Для каждой машины создаём 50 записей с последовательными датами
+            for i in range(50):
+                driver = choice(drivers)
+                d = base_date + timedelta(days=i)
 
-            pw = PassengerCarWaybill.objects.create(
-                car=car,
-                driver=driver,
-                date=d,
-                norm_season="winter",
-            )
-
-            # 1 запись на путевой лист (можно увеличить при необходимости)
-            distance_city = randint(5, 60)
-            distance_area = randint(0, 120)
-
-            # Рассчитываем часы
-            norm = NormsOperatingHoursPassengerCar.objects.filter(
-                car=pw.car,
-                date__lte=pw.date
-            ).order_by('-date', '-id').first()
-            
-            if norm:
-                hours_increment = (
-                    Decimal(distance_city) * norm.city_norm +
-                    Decimal(distance_area) * norm.area_norm
+                pw = PassengerCarWaybill.objects.create(
+                    car=car,
+                    driver=driver,
+                    date=d,
+                    norm_season="winter",
                 )
-            else:
-                hours_increment = Decimal('0.000')
-            
-            # Создаём OperatingHoursCars
-            operating_hours_record = OperatingHoursCars.objects.create(
-                passenger_car=pw.car,
-                operating_hours=hours_increment,
-                date=pw.date,
-            )
-            
-            # Создаём WaybillRecord с FK на OperatingHoursCars
-            PassengerCarWaybillRecord.objects.create(
-                passenger_car_waybill=pw,
-                target=f"Поездка №{i + 1}",
-                departure_time=time(randint(6, 10), choice([0, 15, 30, 45]), 0),
-                arrival_time=time(randint(11, 18), choice([0, 15, 30, 45]), 0),
-                distance_city_km=distance_city,
-                distance_area_km=distance_area,
-                fuel_refueled=Decimal(f"{randint(20, 40)}.000"),
-                fuel_used=Decimal(f"{randint(3, 18)}.000"),
-                operating_hours_record=operating_hours_record,  # FK!
-            )
+
+                # 1 запись на путевой лист (можно увеличить при необходимости)
+                distance_city = randint(5, 60)
+                distance_area = randint(0, 120)
+
+                # Рассчитываем часы
+                norm = NormsOperatingHoursPassengerCar.objects.filter(
+                    car=pw.car,
+                    date__lte=pw.date
+                ).order_by('-date', '-id').first()
+                
+                if norm:
+                    hours_increment = (
+                        Decimal(distance_city) * norm.city_norm +
+                        Decimal(distance_area) * norm.area_norm
+                    )
+                else:
+                    hours_increment = Decimal('0.000')
+                
+                # Создаём OperatingHoursCars
+                operating_hours_record = OperatingHoursCars.objects.create(
+                    passenger_car=pw.car,
+                    operating_hours=hours_increment,
+                    date=pw.date,
+                )
+                
+                # Создаём WaybillRecord с FK на OperatingHoursCars
+                PassengerCarWaybillRecord.objects.create(
+                    passenger_car_waybill=pw,
+                    target=f"Поездка (машина {car.number})",
+                    departure_time=time(randint(6, 10), choice([0, 15, 30, 45]), 0),
+                    arrival_time=time(randint(11, 18), choice([0, 15, 30, 45]), 0),
+                    distance_city_km=distance_city,
+                    distance_area_km=distance_area,
+                    fuel_refueled=Decimal(f"{randint(5, 15)}.000"),
+                    fuel_used=Decimal(f"{randint(2, 8)}.000"),
+                    operating_hours_record=operating_hours_record,  # FK!
+                )
 
         self.stdout.write(self.style.SUCCESS("100 путевых листов (легковые) созданы"))
 
@@ -346,61 +348,63 @@ class Command(BaseCommand):
             fire_truck_2.id: 80000,
         }
 
-        for i in range(100):
-            car = choice(fire_trucks)
-            driver = choice(drivers)
-            d = base_date + timedelta(days=i % 28)
+        # Создаём записи для каждой пожарной машины отдельно, упорядочивая по датам
+        for car in fire_trucks:
+            # Для каждой машины создаём 50 записей с последовательными датами
+            for i in range(50):
+                driver = choice(drivers)
+                d = base_date + timedelta(days=i)
 
-            fw = FireTruckWaybill.objects.create(
-                car=car,
-                driver=driver,
-                date=d,
-                norm_season="winter",
-            )
-
-            # имитация пробега: увеличиваем одометр
-            dist = randint(1, 30)
-            fire_odometer_current[car.id] += dist
-            
-            # Генерируем время с/без насоса
-            time_with_pump = randint(0, 60)
-            time_without_pump = randint(0, 20)
-            
-            # Рассчитываем часы для пожарной машины
-            norm = NormsOperatingHoursFireTruck.objects.filter(
-                car=car,
-                date__lte=fw.date
-            ).order_by('-date', '-id').first()
-            
-            if norm:
-                hours_increment = (
-                    Decimal(dist) * norm.km_norm +
-                    Decimal(time_with_pump / 60.0) * norm.with_pump_norm +
-                    Decimal(time_without_pump / 60.0)
+                fw = FireTruckWaybill.objects.create(
+                    car=car,
+                    driver=driver,
+                    date=d,
+                    norm_season="winter",
                 )
-            else:
-                hours_increment = Decimal('0.000')
-            
-            # Создаём OperatingHoursCars
-            operating_hours_record = OperatingHoursCars.objects.create(
-                fire_truck=car,
-                operating_hours=hours_increment,
-                date=fw.date,
-            )
 
-            FireTruckWaybillRecord.objects.create(
-                fire_truck_waybill=fw,
-                driving_route=f"Маршрут №{i + 1}",
-                target=choice(["Тушение пожара", "Учения", "Дежурство", "Хозяйственный выезд"]),
-                departure_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
-                arrival_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
-                odometer_after=fire_odometer_current[car.id],
-                time_with_pump=time_with_pump,
-                time_without_pump=time_without_pump,
-                fuel_refueled=Decimal(f"{randint(0, 50)}.000"),
-                fuel_used=Decimal(f"{randint(5, 25)}.000"),
-                operating_hours_record=operating_hours_record,  # FK!
-            )
+                # имитация пробега: увеличиваем одометр
+                dist = randint(1, 30)
+                fire_odometer_current[car.id] += dist
+                
+                # Генерируем время с/без насоса
+                time_with_pump = randint(0, 60)
+                time_without_pump = randint(0, 20)
+                
+                # Рассчитываем часы для пожарной машины
+                norm = NormsOperatingHoursFireTruck.objects.filter(
+                    car=car,
+                    date__lte=fw.date
+                ).order_by('-date', '-id').first()
+                
+                if norm:
+                    hours_increment = (
+                        Decimal(dist) * norm.km_norm +
+                        Decimal(time_with_pump / 60.0) * norm.with_pump_norm +
+                        Decimal(time_without_pump / 60.0)
+                    )
+                else:
+                    hours_increment = Decimal('0.000')
+                
+                # Создаём OperatingHoursCars
+                operating_hours_record = OperatingHoursCars.objects.create(
+                    fire_truck=car,
+                    operating_hours=hours_increment,
+                    date=fw.date,
+                )
+
+                FireTruckWaybillRecord.objects.create(
+                    fire_truck_waybill=fw,
+                    driving_route=f"Маршрут (машина {car.number})",
+                    target=choice(["Тушение пожара", "Учения", "Дежурство", "Хозяйственный выезд"]),
+                    departure_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
+                    arrival_time=time(randint(0, 23), choice([0, 15, 30, 45]), 0),
+                    odometer_after=fire_odometer_current[car.id],
+                    time_with_pump=time_with_pump,
+                    time_without_pump=time_without_pump,
+                    fuel_refueled=Decimal(f"{randint(0, 20)}.000"),
+                    fuel_used=Decimal(f"{randint(2, 10)}.000"),
+                    operating_hours_record=operating_hours_record,  # FK!
+                )
 
         self.stdout.write(self.style.SUCCESS("100 путевых листов (пожарные) созданы"))
 

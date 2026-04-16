@@ -102,7 +102,6 @@ class UserSerializer(FriendlyModelSerializer):
 
 class PassengerCarSerializer(FriendlyModelSerializer):
     odometer_fuel_records = serializers.SerializerMethodField()
-    operating_hours = serializers.SerializerMethodField()
     technical_maintenance_norm = serializers.SerializerMethodField()
     hours_until_maintenance = serializers.SerializerMethodField()
     maintenance_info = serializers.SerializerMethodField()
@@ -118,26 +117,6 @@ class PassengerCarSerializer(FriendlyModelSerializer):
             records = obj.odometer_fuel_records.all()
             return OdometerFuelPassengerCarSerializer(records, many=True).data
         return None
-
-    def get_operating_hours(self, obj):
-        """Получить текущие операционные часы машины"""
-        logger.warning(f'\n[PassengerCarSerializer.get_operating_hours] машина={obj.id}')
-        
-        all_records = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id')
-        logger.warning(f'  Записей с passenger_car={obj.id}, fire_truck=NULL: {all_records.count()}')
-        
-        if all_records.count() > 0:
-            logger.warning(f'  Первая (последняя по дате): id={all_records.first().id}, date={all_records.first().date}, hours={all_records.first().operating_hours}')
-        
-        operating_hours = all_records.first()
-        
-        if operating_hours:
-            result = float(operating_hours.operating_hours)
-            logger.warning(f'  ✅ Возвращаем: {result}')
-            return result
-        
-        logger.warning(f'  ⚠️ Не найдено, возвращаем 0.0')
-        return 0.0
 
     def get_technical_maintenance_norm(self, obj):
         """Получить норму технического обслуживания (часы)"""
@@ -218,25 +197,6 @@ class PassengerCarSerializer(FriendlyModelSerializer):
             logger.warning('[get_all_maintenance_info] include_all_maintenance_info != true, возвращаем None')
             return None
         
-        logger.warning('[get_all_maintenance_info] Ищем ПОСЛЕДНЮЮ запись OperatingHoursCars для этой машины')
-        
-        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины (по ID - последняя добавленная)
-        all_records = OperatingHoursCars.objects.filter(passenger_car=obj, fire_truck__isnull=True).order_by('-id')
-        logger.warning(f'[get_all_maintenance_info] Всего записей с passenger_car={obj.id} и fire_truck=NULL: {all_records.count()}')
-        
-        for record in all_records[:5]:  # Логируем первые 5 записей
-            logger.warning(f'  - id={record.id}, date={record.date}, operating_hours={record.operating_hours}, passenger_car={record.passenger_car_id}, fire_truck={record.fire_truck_id}')
-        
-        operating_hours_obj = all_records.first()
-        
-        if operating_hours_obj:
-            logger.warning(f'[get_all_maintenance_info] НАЙДЕНА ПОСЛЕДНЯЯ: id={operating_hours_obj.id}, date={operating_hours_obj.date}, operating_hours={operating_hours_obj.operating_hours}')
-        else:
-            logger.warning(f'[get_all_maintenance_info] ❌ НЕ НАЙДЕНА ПОСЛЕДНЯЯ ЗАПИСЬ!')
-        
-        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
-        logger.warning(f'[get_all_maintenance_info] current_hours = {current_hours}')
-        
         # Получить все нормы (уникальные по maintenance_type)
         all_norms = NormsTechnicalMaintenance.objects.filter(
             passenger_car=obj
@@ -263,7 +223,7 @@ class PassengerCarSerializer(FriendlyModelSerializer):
             last_maintenance = TechnicalMaintenance.objects.filter(
                 passenger_car=obj,
                 maintenance_type=norm_obj.maintenance_type
-            ).order_by('-date').first()
+            ).order_by('-date', '-id').first()
             
             if last_maintenance:
                 logger.warning(f'  📋 Последнее ТО: дата={last_maintenance.date}, operating_hours={last_maintenance.operating_hours}')
@@ -271,18 +231,14 @@ class PassengerCarSerializer(FriendlyModelSerializer):
                 logger.warning(f'  ℹ️ Ещё не было ТО этого типа')
             
             interval_value = float(norm_obj.norm)
-            previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
-            next_maintenance_at = previous_hours + interval_value
-            hours_until_maintenance = next_maintenance_at - current_hours
+            last_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
             
-            logger.warning(f'  → previous_hours={previous_hours}, interval={interval_value}, next_at={next_maintenance_at}, hours_until={hours_until_maintenance}')
+            logger.warning(f'  → last_hours={last_hours}, interval={interval_value}')
             
             maintenance_items.append({
                 'maintenance_type': norm_obj.maintenance_type,
-                'interval': hours_until_maintenance,
                 'norm_interval_value': interval_value,
-                'previous_maintenance_hours': previous_hours,
-                'next_maintenance_at': next_maintenance_at,
+                'last_maintenance_hours': last_hours,
                 'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
             })
         
@@ -291,7 +247,6 @@ class PassengerCarSerializer(FriendlyModelSerializer):
         
         return {
             'items': maintenance_items,
-            'current_hours': current_hours,
             'error': None
         }
 
@@ -315,6 +270,8 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
     car_brand = serializers.SerializerMethodField()
     car_model = serializers.SerializerMethodField()
     vehicleType = serializers.SerializerMethodField()
+    records = serializers.SerializerMethodField()
+    total_operating_hours = serializers.SerializerMethodField()
     
     class Meta:
         model = PassengerCarWaybill
@@ -334,7 +291,18 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
             'car_brand',
             'car_model',
             'vehicleType',
+            'records',
+            'total_operating_hours',
         ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Если это редактирование существующего путевого листа и он не editable - заблокировать date
+        # (Skip if many=True, since self.instance will be a queryset)
+        if self.instance and hasattr(self.instance, 'is_editable'):
+            if not self.instance.is_editable():
+                self.fields['date'].read_only = True
     
     def get_driver_full_name(self, obj):
         if obj.driver:
@@ -364,9 +332,32 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
     def get_vehicleType(self, obj):
         return 'passenger_car'
     
+    def get_records(self, obj):
+        """Получить записи путевого листа с operating_hours"""
+        request = self.context.get('request')
+        include_records = request.query_params.get('include_records', 'false').lower() == 'true' if request else False
+        
+        if include_records:
+            records = obj.records.all().order_by('-id')
+            return PassengerCarWaybillRecordSerializer(records, many=True, context=self.context).data
+        return None
+    
+    def get_total_operating_hours(self, obj):
+        """Получить сумму моточасов со всех записей путевого листа"""
+        from django.db.models import Sum
+        total = (
+            PassengerCarWaybillRecord.objects
+            .filter(passenger_car_waybill=obj)
+            .select_related('operating_hours_record')
+            .aggregate(
+                total_hours=Sum('operating_hours_record__operating_hours')
+            )['total_hours']
+        ) or 0
+        return float(total)
+    
     def to_representation(self, instance):
         """
-        Опционально инклюдить инфо о машине если проскан доп параметр
+        Опционально инклюдить инфо о машине и записи если проскан доп параметр
         """
         data = super().to_representation(instance)
         
@@ -380,6 +371,10 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
             data.pop('car_brand', None)
             data.pop('car_model', None)
             data.pop('vehicleType', None)
+        
+        # Удаляем records если они None (параметр не был передан)
+        if data.get('records') is None:
+            data.pop('records', None)
         
         return data
 
@@ -416,26 +411,49 @@ class PassengerCarWaybillSerializer(FriendlyModelSerializer):
 
 
 class PassengerCarWaybillRecordSerializer(FriendlyModelSerializer):
+    operating_hours = serializers.SerializerMethodField()
+    
     class Meta:
         model = PassengerCarWaybillRecord
         fields = '__all__'
         read_only_fields = [
             'fuel_before_departure',
             'odometer_before',
-            'odometer_after',
             'distance_total_km',
             'fuel_used_city',
             'fuel_used_area',
             'fuel_on_return',
             'fuel_used_normal',
+            'operating_hours',
         ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Если это редактирование существующей записи, проверяем, editable ли она
+        if self.instance:
+            # Проверяем через родительский путевой лист
+            if hasattr(self.instance, 'passenger_car_waybill'):
+                waybill = self.instance.passenger_car_waybill
+                if not waybill.is_editable():
+                    # Запретить редактирование полей расчётов
+                    self.fields['fuel_refueled'].read_only = True
+                    self.fields['fuel_used'].read_only = True
+                    self.fields['odometer_after'].read_only = True
+                    self.fields['distance_city_km'].read_only = True
+                    self.fields['distance_area_km'].read_only = True
+    
+    def get_operating_hours(self, obj):
+        """Получить часы из связанной OperatingHoursCars записи"""
+        if obj.operating_hours_record:
+            return float(obj.operating_hours_record.operating_hours)
+        return 0.0
 
 
 # ---------- ПОЖАРНЫЕ ----------
 
 class FireTruckSerializer(FriendlyModelSerializer):
     odometer_fuel_records = serializers.SerializerMethodField()
-    operating_hours = serializers.SerializerMethodField()
     technical_maintenance_norm = serializers.SerializerMethodField()
     hours_until_maintenance = serializers.SerializerMethodField()
     maintenance_info = serializers.SerializerMethodField()
@@ -451,26 +469,6 @@ class FireTruckSerializer(FriendlyModelSerializer):
             records = obj.odometer_fuel_records.all()
             return OdometerFuelFireTruckSerializer(records, many=True).data
         return None
-
-    def get_operating_hours(self, obj):
-        """Получить текущие операционные часы машины"""
-        logger.warning(f'\n[FireTruckSerializer.get_operating_hours] машина={obj.id}')
-        
-        all_records = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id')
-        logger.warning(f'  Записей с fire_truck={obj.id}, passenger_car=NULL: {all_records.count()}')
-        
-        if all_records.count() > 0:
-            logger.warning(f'  Первая (последняя по дате): id={all_records.first().id}, date={all_records.first().date}, hours={all_records.first().operating_hours}')
-        
-        operating_hours = all_records.first()
-        
-        if operating_hours:
-            result = float(operating_hours.operating_hours)
-            logger.warning(f'  ✅ Возвращаем: {result}')
-            return result
-        
-        logger.warning(f'  ⚠️ Не найдено, возвращаем 0.0')
-        return 0.0
 
     def get_technical_maintenance_norm(self, obj):
         """Получить норму технического обслуживания (часы)"""
@@ -543,10 +541,6 @@ class FireTruckSerializer(FriendlyModelSerializer):
         request = self.context.get('request')
         if not request or request.query_params.get('include_all_maintenance_info') != 'true':
             return None
-            
-        # Берем ПОСЛЕДНЮЮ запись из OperatingHoursCars для этой машины (по ID - последняя добавленная)
-        operating_hours_obj = OperatingHoursCars.objects.filter(fire_truck=obj, passenger_car__isnull=True).order_by('-id').first()
-        current_hours = float(operating_hours_obj.operating_hours) if operating_hours_obj else 0.0
         
         # Получить все нормы (уникальные по maintenance_type)
         all_norms = NormsTechnicalMaintenance.objects.filter(
@@ -568,25 +562,20 @@ class FireTruckSerializer(FriendlyModelSerializer):
             last_maintenance = TechnicalMaintenance.objects.filter(
                 fire_truck=obj,
                 maintenance_type=norm_obj.maintenance_type
-            ).order_by('-date').first()
+            ).order_by('-date', '-id').first()
             
             interval_value = float(norm_obj.norm)
-            previous_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
-            next_maintenance_at = previous_hours + interval_value
-            hours_until_maintenance = next_maintenance_at - current_hours
+            last_hours = float(last_maintenance.operating_hours) if last_maintenance else 0.0
             
             maintenance_items.append({
                 'maintenance_type': norm_obj.maintenance_type,
-                'interval': hours_until_maintenance,
                 'norm_interval_value': interval_value,
-                'previous_maintenance_hours': previous_hours,
-                'next_maintenance_at': next_maintenance_at,
+                'last_maintenance_hours': last_hours,
                 'last_maintenance_date': last_maintenance.date.isoformat() if last_maintenance else None,
             })
         
         return {
             'items': maintenance_items,
-            'current_hours': current_hours,
             'error': None
         }
 
@@ -610,6 +599,8 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
     car_brand = serializers.SerializerMethodField()
     car_model = serializers.SerializerMethodField()
     vehicleType = serializers.SerializerMethodField()
+    records = serializers.SerializerMethodField()
+    total_operating_hours = serializers.SerializerMethodField()
     
     class Meta:
         model = FireTruckWaybill
@@ -629,7 +620,18 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
             'car_brand',
             'car_model',
             'vehicleType',
+            'records',
+            'total_operating_hours',
         ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Если это редактирование существующего путевого листа и он не editable - заблокировать date
+        # (Skip if many=True, since self.instance will be a queryset)
+        if self.instance and hasattr(self.instance, 'is_editable'):
+            if not self.instance.is_editable():
+                self.fields['date'].read_only = True
     
     def get_driver_full_name(self, obj):
         if obj.driver:
@@ -659,9 +661,32 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
     def get_vehicleType(self, obj):
         return 'fire_truck'
     
+    def get_records(self, obj):
+        """Получить записи путевого листа с operating_hours"""
+        request = self.context.get('request')
+        include_records = request.query_params.get('include_records', 'false').lower() == 'true' if request else False
+        
+        if include_records:
+            records = obj.records.all().order_by('-id')
+            return FireTruckWaybillRecordSerializer(records, many=True, context=self.context).data
+        return None
+    
+    def get_total_operating_hours(self, obj):
+        """Получить сумму моточасов со всех записей путевого листа"""
+        from django.db.models import Sum
+        total = (
+            FireTruckWaybillRecord.objects
+            .filter(fire_truck_waybill=obj)
+            .select_related('operating_hours_record')
+            .aggregate(
+                total_hours=Sum('operating_hours_record__operating_hours')
+            )['total_hours']
+        ) or 0
+        return float(total)
+    
     def to_representation(self, instance):
         """
-        Опционально инклюдить инфо о машине если проскан доп параметр
+        Опционально инклюдить инфо о машине и записи если проскан доп параметр
         """
         data = super().to_representation(instance)
         
@@ -675,6 +700,10 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
             data.pop('car_brand', None)
             data.pop('car_model', None)
             data.pop('vehicleType', None)
+        
+        # Удаляем records если они None (параметр не был передан)
+        if data.get('records') is None:
+            data.pop('records', None)
         
         return data
 
@@ -711,6 +740,8 @@ class FireTruckWaybillSerializer(FriendlyModelSerializer):
 
 
 class FireTruckWaybillRecordSerializer(FriendlyModelSerializer):
+    operating_hours = serializers.SerializerMethodField()
+    
     class Meta:
         model = FireTruckWaybillRecord
         fields = '__all__'
@@ -723,7 +754,30 @@ class FireTruckWaybillRecordSerializer(FriendlyModelSerializer):
             'fuel_used_with_pump',
             'fuel_used_without_pump',
             'fuel_used_normal',
+            'operating_hours',
         ]
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Если это редактирование существующей записи, проверяем, editable ли она
+        if self.instance:
+            # Проверяем через родительский путевой лист
+            if hasattr(self.instance, 'fire_truck_waybill'):
+                waybill = self.instance.fire_truck_waybill
+                if not waybill.is_editable():
+                    # Запретить редактирование полей расчётов
+                    self.fields['fuel_refueled'].read_only = True
+                    self.fields['fuel_used'].read_only = True
+                    self.fields['odometer_after'].read_only = True
+                    self.fields['time_with_pump'].read_only = True
+                    self.fields['time_without_pump'].read_only = True
+    
+    def get_operating_hours(self, obj):
+        """Получить часы из связанной OperatingHoursCars записи"""
+        if obj.operating_hours_record:
+            return float(obj.operating_hours_record.operating_hours)
+        return 0.0
     
     def create(self, validated_data):
         import logging
@@ -774,4 +828,4 @@ class TechnicalMaintenanceSerializer(FriendlyModelSerializer):
     class Meta:
         model = TechnicalMaintenance
         fields = '__all__'
-        read_only_fields = ['number', 'operating_hours']
+        read_only_fields = ['number']
