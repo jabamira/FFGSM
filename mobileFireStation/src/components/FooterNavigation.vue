@@ -49,7 +49,7 @@ const isWaybillsActive = () => {
         >
           <!-- Trip icon image or default icon -->
           <div v-if="hasActiveTrip" style="width: 24px; height: 24px;">
-            <img src="../../../../resources/free-icon-car-trip.png" alt="Trip" style="width: 100%; height: 100%; object-fit: contain;" />
+            <img src="@/assets/free-icon-car-trip.png" alt="Trip" style="width: 100%; height: 100%; object-fit: contain;" />
           </div>
           <ion-icon v-else name="document-outline" style="font-size: 24px;"></ion-icon>
           <span class="text-xs">{{ getWaybillsLabel() }}</span>

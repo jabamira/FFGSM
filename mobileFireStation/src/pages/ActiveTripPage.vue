@@ -243,7 +243,7 @@
         <!-- Icon -->
         <div class="flex justify-center">
           <div class="flex items-center justify-center w-16 h-16 rounded-full" :style="{ backgroundColor: palette.primary + '20' }">
-            <img src="../../../../resources/free-icon-car-trip.png" alt="Trip" style="width: 40px; height: 40px; object-fit: contain;" />
+            <img src="@/assets/free-icon-car-trip.png" alt="Trip" style="width: 40px; height: 40px; object-fit: contain;" />
           </div>
         </div>
 

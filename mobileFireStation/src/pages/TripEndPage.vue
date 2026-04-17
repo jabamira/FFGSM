@@ -302,7 +302,7 @@
         <!-- Icon -->
         <div class="flex justify-center">
           <div class="flex items-center justify-center w-20 h-20 rounded-full" :style="{ backgroundColor: palette.primary + '20' }">
-            <img src="../../../../resources/free-icon-car-trip.png" alt="Success" style="width: 50px; height: 50px; object-fit: contain;" />
+            <img  :src="carIcon" alt="Success" style="width: 50px; height: 50px; object-fit: contain;" />
           </div>
         </div>
 
@@ -339,6 +339,7 @@ import FooterNavigation from '../components/FooterNavigation.vue'
 import { isOnline } from '../utils/cacheUtils'
 import { addSyncOperation, SYNC_QUEUE } from '../utils/syncQueue'
 import { passengerCarRecordApi, fireTruckRecordApi } from '../api'
+import carIcon from '@/assets/free-icon-car-trip.png'
 import {
   IonPage,
   IonHeader,
