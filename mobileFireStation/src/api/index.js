@@ -93,6 +93,17 @@ export const waybillApi = {
     }
     return apiClient.post(`/passenger-car-waybills/${id}/complete/`)
   },
+
+  // Завершить поездку с данными
+  completeTrip: async (waybillId, data) => {
+    // Определяем тип на основе типа машины в данных
+    const type = data.vehicleType === 'fire_truck' ? 'fire_truck' : 'passenger_car'
+    
+    if (type === 'fire_truck') {
+      return apiClient.post(`/fire-truck-waybills/${waybillId}/end/`, data)
+    }
+    return apiClient.post(`/passenger-car-waybills/${waybillId}/end/`, data)
+  },
 }
 
 export const fuelApi = {
@@ -128,12 +139,50 @@ export const reportApi = {
     apiClient.get('/reports/fuel/', { params }),
 }
 
+// Запись путевого листа (пассажирские автомобили)
+export const passengerCarRecordApi = {
+  create: (data) =>
+    apiClient.post('/passenger-car-records/', data),
+
+  get: (id) =>
+    apiClient.get(`/passenger-car-records/${id}/`),
+
+  update: (id, data) =>
+    apiClient.put(`/passenger-car-records/${id}/`, data),
+
+  delete: (id) =>
+    apiClient.delete(`/passenger-car-records/${id}/`),
+
+  list: (params) =>
+    apiClient.get('/passenger-car-records/', { params }),
+}
+
+// Запись путевого листа (пожарные машины)
+export const fireTruckRecordApi = {
+  create: (data) =>
+    apiClient.post('/fire-truck-records/', data),
+
+  get: (id) =>
+    apiClient.get(`/fire-truck-records/${id}/`),
+
+  update: (id, data) =>
+    apiClient.put(`/fire-truck-records/${id}/`, data),
+
+  delete: (id) =>
+    apiClient.delete(`/fire-truck-records/${id}/`),
+
+  list: (params) =>
+    apiClient.get('/fire-truck-records/', { params }),
+}
+
 export const api = {
   auth: authApi,
   waybill: waybillApi,
   fuel: fuelApi,
   vehicle: vehicleApi,
   report: reportApi,
+  passengerCarRecord: passengerCarRecordApi,
+  fireTruckRecord: fireTruckRecordApi,
   client: apiClient,
 }
 

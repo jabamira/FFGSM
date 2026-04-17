@@ -5,6 +5,8 @@
 export const SYNC_QUEUE = {
   WAYBILL_UPDATE: 'sync_waybill_update',
   WAYBILL_RECORD_CREATE: 'sync_waybill_record_create',
+  TRIP_START: 'sync_trip_start',
+  TRIP_END: 'sync_trip_end',
 }
 
 /**

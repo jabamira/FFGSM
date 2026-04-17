@@ -1,19 +1,28 @@
 <template>
   <ion-app>
     <ion-router-outlet />
-    <ConsoleDisplay />
+    <!-- <ConsoleDisplay /> -->
   </ion-app>
 </template>
 
 <script setup>
 import { IonApp, IonRouterOutlet } from '@ionic/vue'
 import { onMounted } from 'vue'
+import { useTripStore } from './stores/trip'
 import ConsoleDisplay from './components/ConsoleDisplay.vue'
 import { initStatusBar } from './utils/statusBar'
 
-// Инициализируем статус-бар при загрузке приложения
+const tripStore = useTripStore()
+
+// Инициализируем приложение при загрузке
 onMounted(() => {
   initStatusBar()
+  
+  // Загружаем сохраненную поездку из localStorage при старте приложения
+  const savedTrip = tripStore.loadTripFromStorage()
+  if (savedTrip) {
+    console.log('[App] Active trip loaded from storage on startup')
+  }
 })
 </script>
 

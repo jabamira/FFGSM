@@ -20,7 +20,7 @@
       </div>
 
       <!-- Pending Sync Alert -->
-      <div v-if="isOnlineMode && pendingSyncCount > 0" class="mb-4 p-3 rounded-lg bg-blue-100 border-l-4 border-blue-500">
+      <div v-if="!isOnlineMode && pendingSyncCount > 0" class="mb-4 p-3 rounded-lg bg-blue-100 border-l-4 border-blue-500">
         <p class="text-sm text-blue-700 font-semibold">⏳ Синхронизация данных</p>
         <p class="text-xs text-blue-600">{{ pendingSyncCount }} операции синхронизируются с сервером</p>
       </div>
@@ -87,7 +87,6 @@
         <div
           v-for="waybill in filteredWaybills"
           :key="waybill.id"
-          @click="selectWaybill(waybill.id)"
           class="cursor-pointer transform transition hover:scale-105"
         >
           <div class="p-4 rounded-xl shadow-md" :style="{ backgroundColor: '#ffffff', borderLeft: `4px solid ${palette.primary}` }">
@@ -112,7 +111,7 @@
               :disabled="isStarting === waybill.id"
               :is-loading="isStarting === waybill.id"
               loading-text="Загрузка..."
-              @click="startTrip(waybill.id)"
+              @click.stop="startTrip(waybill.id)"
               expand="block"
             />
           </div>
@@ -196,6 +195,7 @@ import { palette, Button } from '../components/ui/importUi'
 import { getCacheData, setCacheData, isOnline, onlineStatusListener, CACHE_KEYS } from '../utils/cacheUtils'
 import { getPendingSyncCount } from '../utils/syncQueue'
 import { useAuthStore } from '../stores/auth'
+import { useTripStore } from '../stores/trip'
 import { getNovosibirskDate } from '../utils'
 import FooterNavigation from '../components/FooterNavigation.vue'
 import {
@@ -214,6 +214,7 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const tripStore = useTripStore()
 const searchText = ref('')
 const vehicleFilter = ref('all')
 const waybills = ref([])
@@ -306,13 +307,40 @@ const loadWaybills = async () => {
 }
 
 const selectWaybill = (id) => {
-  router.push(`/waybill/${id}`)
+  // Переход на просмотр путевого листа
+  router.push(`/waybill/${id}/view`)
 }
 
 const startTrip = async (id) => {
+  // Проверяем, нет ли уже активной поездки
+  if (tripStore.hasActiveTrip) {
+    error.value = 'У вас уже есть активная поездка. Завершите её перед началом новой.'
+    return
+  }
+
   isStarting.value = id
   try {
-    router.push(`/waybill/${id}`)
+    // Находим путевой лист для передачи его данных
+    const waybill = waybills.value.find(w => w.id === id)
+    
+    if (waybill) {
+      // Переход на страницу начала поездки с передачей данных
+      router.push({
+        path: `/waybill/${id}/start`,
+        state: {
+          waybillData: {
+            id: waybill.id,
+            number: waybill.number,
+            date: waybill.date,
+            car_name: waybill.car_name,
+            car_number: waybill.car_number,
+            car_brand: waybill.car_brand,
+            car_model: waybill.car_model,
+            vehicleType: waybill.vehicleType
+          }
+        }
+      })
+    }
   } catch (err) {
     error.value = err.message || 'Ошибка'
   } finally {

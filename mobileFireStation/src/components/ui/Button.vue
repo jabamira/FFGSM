@@ -5,7 +5,7 @@
     :type="type"
     class="ion-button-native"
     :style="getButtonStyle()"
-    @click="$emit('click')"
+    @click="(event) => $emit('click', event)"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
   >
@@ -20,6 +20,7 @@
     :disabled="disabled || isLoading"
     :type="type"
     class="text-base"
+    @click="(event) => $emit('click', event)"
   >
     <ion-spinner v-if="isLoading" name="crescent" slot="start"></ion-spinner>
     <span v-if="isLoading">{{ loadingText }}</span>
@@ -68,6 +69,8 @@ const props = defineProps({
     default: true,
   },
 })
+
+defineEmits(['click'])
 
 const colorMap = computed(() => ({
   primary: 'primary',
