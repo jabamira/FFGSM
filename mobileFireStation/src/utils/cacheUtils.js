@@ -1,6 +1,8 @@
 /**
- * Утилиты для кэширования данных в localStorage для офлайн режима
+ * Утилиты для кэширования данных в Capacitor Preferences для офлайн режима
  */
+
+import StorageManager from './storageManager'
 
 export const CACHE_KEYS = {
   WAYBILLS: 'cache_waybills',
@@ -13,13 +15,13 @@ export const CACHE_DURATION = 1000 * 60 * 60 * 24 // 1 день
 /**
  * Сохраняет данные в кэш
  */
-export const setCacheData = (key, data) => {
+export const setCacheData = async (key, data) => {
   try {
     const cacheData = {
       data,
       timestamp: Date.now(),
     }
-    localStorage.setItem(key, JSON.stringify(cacheData))
+    await StorageManager.setItem(key, JSON.stringify(cacheData))
   } catch (err) {
     console.error('[CacheUtils] Error setting cache:', err)
   }
@@ -28,16 +30,16 @@ export const setCacheData = (key, data) => {
 /**
  * Получает данные из кэша если они ещё актуальны
  */
-export const getCacheData = (key) => {
+export const getCacheData = async (key) => {
   try {
-    const cached = localStorage.getItem(key)
+    const cached = await StorageManager.getItem(key)
     if (!cached) return null
 
     const { data, timestamp } = JSON.parse(cached)
     
     // Проверяем, не истёк ли кэш
     if (Date.now() - timestamp > CACHE_DURATION) {
-      localStorage.removeItem(key)
+      await StorageManager.removeItem(key)
       return null
     }
 
@@ -51,9 +53,9 @@ export const getCacheData = (key) => {
 /**
  * Очищает кэш
  */
-export const clearCache = (key) => {
+export const clearCache = async (key) => {
   try {
-    localStorage.removeItem(key)
+    await StorageManager.removeItem(key)
   } catch (err) {
     console.error('[CacheUtils] Error clearing cache:', err)
   }
@@ -62,13 +64,14 @@ export const clearCache = (key) => {
 /**
  * Очищает все кэши
  */
-export const clearAllCache = () => {
+export const clearAllCache = async () => {
   try {
-    Object.keys(localStorage).forEach(key => {
+    const keys = await StorageManager.keys()
+    for (const key of keys) {
       if (key.startsWith('cache_')) {
-        localStorage.removeItem(key)
+        await StorageManager.removeItem(key)
       }
-    })
+    }
   } catch (err) {
     console.error('[CacheUtils] Error clearing all cache:', err)
   }

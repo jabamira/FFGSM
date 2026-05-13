@@ -1,4 +1,5 @@
 import axios from 'axios'
+import StorageManager from '../utils/storageManager'
 
 class ApiClient {
   constructor(baseURL = 'http://192.168.1.199:8000/api') {
@@ -10,8 +11,8 @@ class ApiClient {
       },
     })
 
-    // Интерцептор для добавления токена
-    this.client.interceptors.request.use((config) => {
+    // Интерцептор для добавления токена (асинхронный)
+    this.client.interceptors.request.use(async (config) => {
       console.log('[API Request] Sending:', {
         method: config.method?.toUpperCase(),
         url: config.url,
@@ -20,7 +21,7 @@ class ApiClient {
         data: config.data ? (typeof config.data === 'string' ? config.data : JSON.stringify(config.data)) : null,
         timeout: config.timeout,
       })
-      const token = localStorage.getItem('auth_token')
+      const token = await StorageManager.getItem('auth_token')
       if (token) {
         config.headers.Authorization = `Bearer ${token}`
       }
@@ -40,7 +41,7 @@ class ApiClient {
         })
         return response
       },
-      (error) => {
+      async (error) => {
         console.error('[API Error Response]', {
           message: error.message,
           code: error.code,
@@ -53,8 +54,8 @@ class ApiClient {
         })
         // Если токен истек или доступ запрещен
         if (error.response?.status === 401 || error.response?.status === 403) {
-          localStorage.removeItem('auth_token')
-          localStorage.removeItem('auth_user')
+          await StorageManager.removeItem('auth_token')
+          await StorageManager.removeItem('auth_user')
           window.location.href = '/login'
         }
         return Promise.reject(error)

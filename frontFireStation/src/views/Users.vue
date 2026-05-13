@@ -19,9 +19,10 @@
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedUserIds"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          row-id-key="id"
         >
           <template v-if="auth.permissions.view_roles" #cell-role_name="{ row }">
             <span 
@@ -300,14 +301,8 @@ const usersToDelete = computed(() => {
   return filteredUsersByRole.value.filter(u => selectedUserIds.value.includes(u.id));
 });
 
-const getSelectedIndexes = () => {
-  return filteredUsersByRole.value
-    .map((user, index) => selectedUserIds.value.includes(user.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRowsSelected = (selectedIndexes) => {
-  selectedUserIds.value = selectedIndexes.map(idx => filteredUsersByRole.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedUserIds.value = selectedIds;
 };
 
 const openAddModal = () => {

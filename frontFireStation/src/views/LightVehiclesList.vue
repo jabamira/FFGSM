@@ -22,9 +22,10 @@
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedPassengerCarIds"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          row-id-key="id"
         >
           <template #cell-fuel_type="{ row }">
             {{ formatFuelType(row.fuel_type) }}
@@ -301,14 +302,8 @@ const passengerCarsToDelete = computed(() => {
   return finalFilteredPassengerCars.value.filter(c => selectedPassengerCarIds.value.includes(c.id));
 });
 
-const getSelectedIndexes = () => {
-  return finalFilteredPassengerCars.value
-    .map((car, index) => selectedPassengerCarIds.value.includes(car.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRowsSelected = (selectedIndexes) => {
-  selectedPassengerCarIds.value = selectedIndexes.map(idx => finalFilteredPassengerCars.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedPassengerCarIds.value = selectedIds;
 };
 
 const openAddModal = () => {

@@ -2,6 +2,8 @@
  * Система синхронизации данных для оффлайн режима
  */
 
+import StorageManager from './storageManager'
+
 export const SYNC_QUEUE = {
   WAYBILL_UPDATE: 'sync_waybill_update',
   WAYBILL_RECORD_CREATE: 'sync_waybill_record_create',
@@ -12,9 +14,10 @@ export const SYNC_QUEUE = {
 /**
  * Добавляет операцию в очередь синхронизации
  */
-export const addSyncOperation = (type, data) => {
+export const addSyncOperation = async (type, data) => {
   try {
-    const queue = JSON.parse(localStorage.getItem('sync_queue') || '[]')
+    const queueData = await StorageManager.getItem('sync_queue')
+    const queue = queueData ? JSON.parse(queueData) : []
     queue.push({
       id: Date.now(),
       type,
@@ -22,7 +25,7 @@ export const addSyncOperation = (type, data) => {
       timestamp: Date.now(),
       status: 'pending', // pending, syncing, completed, failed
     })
-    localStorage.setItem('sync_queue', JSON.stringify(queue))
+    await StorageManager.setItem('sync_queue', JSON.stringify(queue))
     return true
   } catch (err) {
     console.error('[SyncQueue] Error adding operation:', err)
@@ -33,9 +36,10 @@ export const addSyncOperation = (type, data) => {
 /**
  * Получает все операции из очереди
  */
-export const getSyncQueue = () => {
+export const getSyncQueue = async () => {
   try {
-    return JSON.parse(localStorage.getItem('sync_queue') || '[]')
+    const queueData = await StorageManager.getItem('sync_queue')
+    return queueData ? JSON.parse(queueData) : []
   } catch (err) {
     console.error('[SyncQueue] Error getting queue:', err)
     return []
@@ -45,11 +49,11 @@ export const getSyncQueue = () => {
 /**
  * Удаляет операцию из очереди
  */
-export const removeSyncOperation = (operationId) => {
+export const removeSyncOperation = async (operationId) => {
   try {
-    const queue = getSyncQueue()
+    const queue = await getSyncQueue()
     const filtered = queue.filter(op => op.id !== operationId)
-    localStorage.setItem('sync_queue', JSON.stringify(filtered))
+    await StorageManager.setItem('sync_queue', JSON.stringify(filtered))
     return true
   } catch (err) {
     console.error('[SyncQueue] Error removing operation:', err)
@@ -60,15 +64,15 @@ export const removeSyncOperation = (operationId) => {
 /**
  * Обновляет статус операции
  */
-export const updateSyncOperationStatus = (operationId, status) => {
+export const updateSyncOperationStatus = async (operationId, status) => {
   try {
-    const queue = getSyncQueue()
+    const queue = await getSyncQueue()
     const operation = queue.find(op => op.id === operationId)
     if (operation) {
       operation.status = status
       operation.lastAttempt = Date.now()
     }
-    localStorage.setItem('sync_queue', JSON.stringify(queue))
+    await StorageManager.setItem('sync_queue', JSON.stringify(queue))
     return true
   } catch (err) {
     console.error('[SyncQueue] Error updating status:', err)
@@ -79,9 +83,9 @@ export const updateSyncOperationStatus = (operationId, status) => {
 /**
  * Очищает очередь синхронизации
  */
-export const clearSyncQueue = () => {
+export const clearSyncQueue = async () => {
   try {
-    localStorage.removeItem('sync_queue')
+    await StorageManager.removeItem('sync_queue')
     return true
   } catch (err) {
     console.error('[SyncQueue] Error clearing queue:', err)
@@ -92,8 +96,8 @@ export const clearSyncQueue = () => {
 /**
  * Получает количество ожидающих синхронизации
  */
-export const getPendingSyncCount = () => {
-  const queue = getSyncQueue()
+export const getPendingSyncCount = async () => {
+  const queue = await getSyncQueue()
   return queue.filter(op => op.status === 'pending' || op.status === 'failed').length
 }
 

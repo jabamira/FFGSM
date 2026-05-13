@@ -44,7 +44,7 @@
             <input
               v-if="selectable"
               type="checkbox"
-              :checked="selectedRows.includes(idx)"
+              :checked="selectedRows.includes(getRowId(row))"
               @mousedown.stop.prevent="onCheckboxMouseDown(idx)"
               @mouseover="onCheckboxMouseOver(idx)"
               @click.stop.prevent
@@ -153,6 +153,10 @@ export default {
       type: Number,
       default: 10,
     },
+    rowIdKey: {
+      type: String,
+      default: 'id',
+    },
   },
   emits: ['row-selected', 'row-click', 'sort', 'edit-row', 'delete-row', 'view-row'],
   setup(props, { emit }) {
@@ -199,6 +203,14 @@ export default {
       paginatedData.value.length > 0
     );
 
+    const getRowId = (row) => {
+      return row[props.rowIdKey];
+    };
+
+    const getRowIndex = (rowId) => {
+      return paginatedData.value.findIndex(row => getRowId(row) === rowId);
+    };
+
     const sortBy = (key) => {
       if (sortKey.value === key) {
         sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc';
@@ -210,11 +222,12 @@ export default {
     };
 
     const toggleRow = (idx) => {
-      const index = selectedRows.value.indexOf(idx);
+      const rowId = getRowId(paginatedData.value[idx]);
+      const index = selectedRows.value.indexOf(rowId);
       if (index > -1) {
         selectedRows.value.splice(index, 1);
       } else {
-        selectedRows.value.push(idx);
+        selectedRows.value.push(rowId);
       }
       emit('row-selected', selectedRows.value);
     };
@@ -223,7 +236,7 @@ export default {
       if (allSelected.value) {
         selectedRows.value = [];
       } else {
-        selectedRows.value = paginatedData.value.map((_, idx) => idx);
+        selectedRows.value = paginatedData.value.map(row => getRowId(row));
       }
       emit('row-selected', selectedRows.value);
     };
@@ -250,8 +263,9 @@ export default {
     };
 
     const onCheckboxMouseDown = (idx) => {
-      // Определяем режим только один раз при mousedown
-      const isSelected = selectedRows.value.includes(idx);
+      // Получаем ID строки
+      const rowId = getRowId(paginatedData.value[idx]);
+      const isSelected = selectedRows.value.includes(rowId);
       dragMode.value = isSelected ? 'unselect' : 'select';
       
       // Сохраняем состояние ДО начала drag
@@ -262,11 +276,11 @@ export default {
       
       // Применяем режим к стартовой строке
       if (dragMode.value === 'select') {
-        if (!selectedRows.value.includes(idx)) {
-          selectedRows.value.push(idx);
+        if (!selectedRows.value.includes(rowId)) {
+          selectedRows.value.push(rowId);
         }
       } else {
-        const index = selectedRows.value.indexOf(idx);
+        const index = selectedRows.value.indexOf(rowId);
         if (index > -1) {
           selectedRows.value.splice(index, 1);
         }
@@ -285,14 +299,16 @@ export default {
       if (dragMode.value === 'select') {
         // Выбираем все строки от start до end
         for (let i = start; i <= end; i++) {
-          if (!selectedRows.value.includes(i)) {
-            selectedRows.value.push(i);
+          const rowId = getRowId(paginatedData.value[i]);
+          if (!selectedRows.value.includes(rowId)) {
+            selectedRows.value.push(rowId);
           }
         }
       } else {
         // Удаляем все строки от start до end
         for (let i = start; i <= end; i++) {
-          const index = selectedRows.value.indexOf(i);
+          const rowId = getRowId(paginatedData.value[i]);
+          const index = selectedRows.value.indexOf(rowId);
           if (index > -1) {
             selectedRows.value.splice(index, 1);
           }
@@ -340,6 +356,7 @@ export default {
       formatValue,
       onCheckboxMouseDown,
       onCheckboxMouseOver,
+      getRowId,
     };
   },
 };

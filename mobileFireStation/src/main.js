@@ -58,12 +58,11 @@ app.use(IonicVue)
 
 // Загружаем сохранённую авторизацию при запуске (после инициализации Pinia)
 const authStore = useAuthStore()
-const savedToken = localStorage.getItem('auth_token')
-const savedUser = localStorage.getItem('auth_user')
-if (savedToken && savedUser) {
-  authStore.setToken(savedToken)
-  authStore.setUser(JSON.parse(savedUser))
-}
+
+// Асинхронная загрузка авторизации
+authStore.loadToken().then(() => {
+  authStore.loadUser()
+})
 
 // Теперь регистрируем router после инициализации авторизации
 app.use(router)

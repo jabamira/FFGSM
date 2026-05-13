@@ -1,9 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import StorageManager from '../utils/storageManager'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref(null)
-  const token = ref(localStorage.getItem('auth_token'))
+  const token = ref(null)
   const isLoading = ref(false)
   const error = ref(null)
 
@@ -13,16 +14,37 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = newUser
   }
 
-  const setToken = (newToken) => {
+  const setToken = async (newToken) => {
     token.value = newToken
-    localStorage.setItem('auth_token', newToken)
+    await StorageManager.setItem('auth_token', newToken)
   }
 
-  const logout = () => {
+  const logout = async () => {
     user.value = null
     token.value = null
-    localStorage.removeItem('auth_token')
-    localStorage.removeItem('auth_user')
+    await StorageManager.removeItem('auth_token')
+    await StorageManager.removeItem('auth_user')
+  }
+
+  const loadToken = async () => {
+    const savedToken = await StorageManager.getItem('auth_token')
+    if (savedToken) {
+      token.value = savedToken
+    }
+    return savedToken
+  }
+
+  const saveUser = async (userData) => {
+    user.value = userData
+    await StorageManager.setItem('auth_user', JSON.stringify(userData))
+  }
+
+  const loadUser = async () => {
+    const savedUser = await StorageManager.getItem('auth_user')
+    if (savedUser) {
+      user.value = JSON.parse(savedUser)
+    }
+    return savedUser
   }
 
   const setError = (newError) => {
@@ -44,5 +66,8 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     setError,
     setLoading,
+    loadToken,
+    saveUser,
+    loadUser,
   }
 })

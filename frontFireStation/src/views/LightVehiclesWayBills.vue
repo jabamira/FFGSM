@@ -64,9 +64,10 @@
           :data="filteredWaybills"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedWaybillIds"
           @row-selected="onRowsSelected"
           @row-click="(waybill) => navigateToWaybill(waybill)"
+          row-id-key="id"
         >
           <template #cell-car="{ row }">
             {{ getCar(row.car)?.number || '-' }} ({{ getCar(row.car)?.brand }} {{ getCar(row.car)?.model }})
@@ -284,13 +285,11 @@ const openAddWaybillModal = () => {
 };
 
 const getSelectedIndexes = () => {
-  return filteredWaybills.value
-    .map((waybill, index) => selectedWaybillIds.value.includes(waybill.id) ? index : -1)
-    .filter(idx => idx !== -1);
+  return selectedWaybillIds.value;
 };
 
-const onRowsSelected = (selectedIndexes) => {
-  selectedWaybillIds.value = selectedIndexes.map(idx => filteredWaybills.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedWaybillIds.value = selectedIds;
 };
 
 const openDeleteWaybillModal = () => {

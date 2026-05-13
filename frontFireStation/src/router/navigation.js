@@ -27,6 +27,8 @@ export function useNavigation() {
     router.push(`/fire-truck-waybill/${id}`);
   const NavigatePassengerCarWaybill = (id) =>
     router.push(`/passenger-car-waybill/${id}`);
+  const NavigateUIComponents = () => router.push("/ui-elements");
+  const NavigateRoles = () => router.push("/roles");
 
   return {
     NavigateAuth,
@@ -46,5 +48,7 @@ export function useNavigation() {
     NavigatePassengerCars,
     NavigateFireTruckWaybill,
     NavigatePassengerCarWaybill,
+    NavigateUIComponents,
+    NavigateRoles,
   };
 }

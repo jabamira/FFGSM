@@ -100,9 +100,10 @@
             :columns="fuelNormsColumns"
             :selectable="true"
             :show-select-all="false"
-            :selected-rows="getSelectedFuelNormIndexes()"
+            :selected-rows="selectedFuelNormIds"
             @row-selected="onFuelNormsSelected"
             @row-click="editFuelNorm"
+            row-id-key="id"
           >
             <template #cell-car="{ value }">
               {{ getCar(value)?.number }}
@@ -147,9 +148,10 @@
             :columns="operatingHoursColumns"
             :selectable="true"
             :show-select-all="false"
-            :selected-rows="getSelectedOperatingHourIndexes()"
+            :selected-rows="selectedOperatingHourIds"
             @row-selected="onOperatingHoursSelected"
             @row-click="editOperatingHoursNorm"
+            row-id-key="id"
           >
             <template #cell-car="{ value }">
               {{ getCar(value)?.number }}
@@ -194,9 +196,10 @@
             :columns="technicalNormsColumns"
             :selectable="true"
             :show-select-all="false"
-            :selected-rows="getSelectedTechnicalNormIndexes()"
+            :selected-rows="selectedTechnicalNormIds"
             @row-selected="onTechnicalNormsSelected"
             @row-click="editTechnicalNorm"
+            row-id-key="id"
           >
             <template #cell-passenger_car="{ value }">
               {{ getCar(value)?.number }}
@@ -530,35 +533,16 @@ const getMaintenanceTypeLabel = (type) => {
 };
 
 // Get selected indexes for DataTable
-const getSelectedFuelNormIndexes = () => {
-  return filteredFuelNorms.value.map((norm, idx) => 
-    selectedFuelNormIds.value.includes(norm.id) ? idx : -1
-  ).filter(idx => idx !== -1);
+const onFuelNormsSelected = (selectedIds) => {
+  selectedFuelNormIds.value = selectedIds;
 };
 
-const getSelectedOperatingHourIndexes = () => {
-  return filteredOperatingHoursNorms.value.map((norm, idx) => 
-    selectedOperatingHourIds.value.includes(norm.id) ? idx : -1
-  ).filter(idx => idx !== -1);
+const onOperatingHoursSelected = (selectedIds) => {
+  selectedOperatingHourIds.value = selectedIds;
 };
 
-const getSelectedTechnicalNormIndexes = () => {
-  return filteredTechnicalNorms.value.map((norm, idx) => 
-    selectedTechnicalNormIds.value.includes(norm.id) ? idx : -1
-  ).filter(idx => idx !== -1);
-};
-
-// Handle row selection from DataTable
-const onFuelNormsSelected = (selectedIndexes) => {
-  selectedFuelNormIds.value = selectedIndexes.map(idx => filteredFuelNorms.value[idx].id);
-};
-
-const onOperatingHoursSelected = (selectedIndexes) => {
-  selectedOperatingHourIds.value = selectedIndexes.map(idx => filteredOperatingHoursNorms.value[idx].id);
-};
-
-const onTechnicalNormsSelected = (selectedIndexes) => {
-  selectedTechnicalNormIds.value = selectedIndexes.map(idx => filteredTechnicalNorms.value[idx].id);
+const onTechnicalNormsSelected = (selectedIds) => {
+  selectedTechnicalNormIds.value = selectedIds;
 };
 
 // Methods - Fetch Data

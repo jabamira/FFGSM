@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
+import StorageManager from '../utils/storageManager'
 
 const STORAGE_KEY = 'active_trip_data'
 
@@ -12,24 +13,24 @@ export const useTripStore = defineStore('trip', () => {
   // Проверка, есть ли активная поездка
   const hasActiveTrip = computed(() => !!activeTrip.value)
 
-  // Сохранить поездку в localStorage
-  function saveTripToStorage(trip) {
+  // Сохранить поездку в Capacitor Preferences
+  async function saveTripToStorage(trip) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trip))
-      console.log('[TripStore] Trip saved to localStorage')
+      await StorageManager.setItem(STORAGE_KEY, JSON.stringify(trip))
+      console.log('[TripStore] Trip saved to storage')
     } catch (err) {
       console.error('[TripStore] Error saving trip to storage:', err)
     }
   }
 
-  // Загрузить поездку из localStorage
-  function loadTripFromStorage() {
+  // Загрузить поездку из Capacitor Preferences
+  async function loadTripFromStorage() {
     try {
-      const tripData = localStorage.getItem(STORAGE_KEY)
+      const tripData = await StorageManager.getItem(STORAGE_KEY)
       if (tripData) {
         const trip = JSON.parse(tripData)
         activeTrip.value = trip
-        console.log('[TripStore] Trip loaded from localStorage')
+        console.log('[TripStore] Trip loaded from storage')
         return trip
       }
       return null
@@ -39,11 +40,11 @@ export const useTripStore = defineStore('trip', () => {
     }
   }
 
-  // Удалить поездку из localStorage
-  function removeTripFromStorage() {
+  // Удалить поездку из Capacitor Preferences
+  async function removeTripFromStorage() {
     try {
-      localStorage.removeItem(STORAGE_KEY)
-      console.log('[TripStore] Trip removed from localStorage')
+      await StorageManager.removeItem(STORAGE_KEY)
+      console.log('[TripStore] Trip removed from storage')
     } catch (err) {
       console.error('[TripStore] Error removing trip from storage:', err)
     }

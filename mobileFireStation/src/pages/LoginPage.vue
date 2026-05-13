@@ -152,11 +152,11 @@ const handleSubmit = async () => {
     const response = await api.auth.login(loginClean, passwordClean)
 
     if (response.data.access) {
-      // Сохраняем токен и пользователя в localStorage для офлайн режима
-      localStorage.setItem('auth_token', response.data.access)
-      localStorage.setItem('auth_user', JSON.stringify(response.data.user))
-      authStore.setUser(response.data.user)
-      authStore.setToken(response.data.access)
+      // Сохраняем токен и пользователя в Capacitor Preferences для офлайн режима
+      await StorageManager.setItem('auth_token', response.data.access)
+      await StorageManager.setItem('auth_user', JSON.stringify(response.data.user))
+      await authStore.saveUser(response.data.user)
+      await authStore.setToken(response.data.access)
       router.push('/waybills')
     } else {
       error.value = 'Неверный логин или пароль'

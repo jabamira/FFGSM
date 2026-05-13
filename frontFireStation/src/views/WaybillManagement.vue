@@ -117,10 +117,11 @@
             :data="records"
             :selectable="true"
             :show-select-all="false"
-            :selected-rows="getSelectedRecordIndexes()"
+            :selected-rows="selectedRecordIds"
             @row-selected="onRecordsSelected"
             @row-click="(row) => openEditRecord(row)"
             :hideActions="false"
+            row-id-key="id"
           >
             <template #cell-target="{ value }">
               <span :style="{ color: palette.dark }">{{ value || '-' }}</span>
@@ -1224,14 +1225,8 @@ const handleEditRecord = async (recordData) => {
   }
 };
 
-const getSelectedRecordIndexes = () => {
-  return records.value
-    .map((record, index) => selectedRecordIds.value.includes(record.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRecordsSelected = (selectedIndexes) => {
-  selectedRecordIds.value = selectedIndexes.map(idx => records.value[idx].id);
+const onRecordsSelected = (selectedIds) => {
+  selectedRecordIds.value = selectedIds;
 };
 
 const openDeleteRecordsModal = () => {

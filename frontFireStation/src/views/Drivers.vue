@@ -10,9 +10,10 @@
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedDriverIds"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          row-id-key="id"
         >
         </DataTable>
       </div>
@@ -281,14 +282,8 @@ const driversToDelete = computed(() => {
   return filteredDrivers.value.filter(d => selectedDriverIds.value.includes(d.id));
 });
 
-const getSelectedIndexes = () => {
-  return filteredDrivers.value
-    .map((driver, index) => selectedDriverIds.value.includes(driver.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRowsSelected = (selectedIndexes) => {
-  selectedDriverIds.value = selectedIndexes.map(idx => filteredDrivers.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedDriverIds.value = selectedIds;
 };
 
 const openAddModal = () => {

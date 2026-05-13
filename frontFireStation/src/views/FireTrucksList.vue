@@ -22,9 +22,10 @@
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedFireTruckIds"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          row-id-key="id"
         >
           <template #cell-fuel_type="{ row }">
             {{ formatFuelType(row.fuel_type) }}
@@ -311,14 +312,8 @@ const fireTrucksToDelete = computed(() => {
   return finalFilteredFireTrucks.value.filter(t => selectedFireTruckIds.value.includes(t.id));
 });
 
-const getSelectedIndexes = () => {
-  return finalFilteredFireTrucks.value
-    .map((truck, index) => selectedFireTruckIds.value.includes(truck.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRowsSelected = (selectedIndexes) => {
-  selectedFireTruckIds.value = selectedIndexes.map(idx => finalFilteredFireTrucks.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedFireTruckIds.value = selectedIds;
 };
 
 const openAddModal = () => {

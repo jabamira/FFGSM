@@ -384,6 +384,100 @@ export const palette = {
         </div>
       </section>
 
+      <!-- DateInput Component -->
+      <section class="bg-white rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6" :style="{ color: palette.dark }">DateInput (Выбор даты)</h2>
+
+        <div class="grid md:grid-cols-2 gap-8 mb-8">
+          <DateInput
+            v-model="dateDemo.single"
+            label="Выберите дату"
+          />
+          <DateInput
+            v-model="dateDemo.required"
+            label="Дата (обязательное)"
+            required
+          />
+          <DateInput
+            v-model="dateDemo.disabled"
+            label="Отключено"
+            disabled
+          />
+          <DateInput
+            v-model="dateDemo.withError"
+            label="С ошибкой"
+            error="Дата в прошлом"
+          />
+        </div>
+
+        <div class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+          <pre>&lt;DateInput
+  v-model="selectedDate"
+  label="Дата поездки"
+  required
+  @update:modelValue="handleDateChange"
+/&gt;</pre>
+        </div>
+      </section>
+
+      <!-- DateRangeInput Component -->
+      <section class="bg-white rounded-lg shadow-lg p-8 mb-8">
+        <h2 class="text-2xl font-bold mb-6" :style="{ color: palette.dark }">DateRangeInput (Выбор диапазона дат)</h2>
+
+        <div class="space-y-6 mb-8">
+          <div>
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.secondary }">Выбор периода</h3>
+            <DateRangeInput
+              v-model="dateRangeDemo.period"
+              label="Период отчёта"
+              start-label="От даты"
+              end-label="До даты"
+            />
+          </div>
+
+          <div>
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.secondary }">С меткой начала и конца</h3>
+            <DateRangeInput
+              v-model="dateRangeDemo.required"
+              label="Даты обслуживания"
+              start-label="Начало работ"
+              end-label="Конец работ"
+            />
+          </div>
+
+          <div>
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.secondary }">Без кнопки очистки</h3>
+            <DateRangeInput
+              v-model="dateRangeDemo.disabled"
+              label="Архивный период"
+              start-label="Период"
+              end-label="Окончание"
+              :show-clear="false"
+            />
+          </div>
+
+          <div>
+            <h3 class="text-lg font-semibold mb-4" :style="{ color: palette.secondary }">Со значениями</h3>
+            <DateRangeInput
+              v-model="dateRangeDemo.error"
+              label="Период проверки"
+              start-label="Дата начала"
+              end-label="Дата окончания"
+            />
+          </div>
+        </div>
+
+        <div class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto">
+          <pre>&lt;DateRangeInput
+  v-model="dateRange"
+  label="Период отчёта"
+  start-label="От даты"
+  end-label="До даты"
+  @update:modelValue="handleDateRangeChange"
+/&gt;</pre>
+        </div>
+      </section>
+
       <!-- Back Button -->
       <div class="flex gap-3 justify-center mb-8">
         <Button
@@ -399,7 +493,7 @@ export const palette = {
 <script>
 import { ref } from 'vue';
 import HeaderComponent from '../components/HeaderComponent.vue';
-import { Button, TextInput, SelectInput, Alert, Badge, Modal, DataTable, palette } from '../components/ui/importUi';
+import { Button, TextInput, SelectInput, Alert, Badge, Modal, DataTable, DateInput, DateRangeInput, palette } from '../components/ui/importUi';
 
 export default {
   name: 'UIComponentsPage',
@@ -412,6 +506,8 @@ export default {
     Badge,
     Modal,
     DataTable,
+    DateInput,
+    DateRangeInput,
   },
   setup() {
     const inputDemo = ref({
@@ -467,6 +563,20 @@ export default {
     const showDemoModal = ref(false);
     const modalInput = ref('');
 
+    const dateDemo = ref({
+      single: '',
+      required: '',
+      disabled: '2024-05-08',
+      withError: '',
+    });
+
+    const dateRangeDemo = ref({
+      period: { from: '', to: '' },
+      required: { from: '', to: '' },
+      disabled: { from: '2024-01-01', to: '2024-05-08' },
+      error: { from: '2024-05-10', to: '2024-05-05' },
+    });
+
     return {
       inputDemo,
       selectDemo,
@@ -477,6 +587,8 @@ export default {
       tableActions,
       showDemoModal,
       modalInput,
+      dateDemo,
+      dateRangeDemo,
       palette,
     };
   },

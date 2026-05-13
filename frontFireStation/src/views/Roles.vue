@@ -12,9 +12,10 @@
           :columns="columns"
           :selectable="true"
           :show-select-all="false"
-          :selected-rows="getSelectedIndexes()"
+          :selected-rows="selectedRoleIds"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          row-id-key="id"
         >
           <template v-if="auth.permissions.view_users" #cell-users="{ row }">
             <div class="flex items-center gap-2">
@@ -240,14 +241,8 @@ const onRoleUpdated = (updatedRole) => {
   }
 };
 
-const getSelectedIndexes = () => {
-  return filteredRoles.value
-    .map((role, index) => selectedRoleIds.value.includes(role.id) ? index : -1)
-    .filter(index => index !== -1);
-};
-
-const onRowsSelected = (selectedIndexes) => {
-  selectedRoleIds.value = selectedIndexes.map(idx => filteredRoles.value[idx].id);
+const onRowsSelected = (selectedIds) => {
+  selectedRoleIds.value = selectedIds;
 };
 
 const openAddModal = () => {
