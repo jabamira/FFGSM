@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from io import BytesIO
 from django.conf import settings
-from openpyxl import Workbook, load_workbook
+from openpyxl import load_workbook
 from decimal import Decimal
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from urllib.parse import quote
@@ -85,6 +85,20 @@ from .permissions import (
     CanUpdateTechnicalMaintenance, CanViewTechnicalMaintenance,
     CanViewOperatingHours,
 )
+
+YELLOW_FILL = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+GREEN_FILL = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+RED_FILL = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+
+CENTER_ALIGN = Alignment(horizontal='center', vertical='center')
+CENTER_FONT = Font(name='Times New Roman', size=11)
+BOLD_FONT = Font(name='Times New Roman', size=11, bold=True)
+THIN_BORDER = Border(
+            left=Side(style='thin', color='000000'),
+            right=Side(style='thin', color='000000'),
+            top=Side(style='thin', color='000000'),
+            bottom=Side(style='thin', color='000000'),
+        )
 
 
 class SoftDeleteModelViewSet(viewsets.ModelViewSet):
@@ -197,11 +211,21 @@ class UserViewSet(SoftDeleteModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='drivers-report')
     def drivers_report(self, request):
+        driver_id = request.query_params.get('driver')
         from_str = request.query_params.get('from')
         to_str = request.query_params.get('to')
 
-        if not from_str or not to_str:
-            return Response({"detail": "Параметры from и to обязательны"}, status=400)
+        if not driver_id or not from_str or not to_str:
+            return Response({"detail": "Параметры driver, from и to обязательны"}, status=400)
+
+        try:
+            driver_id = int(driver_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Неверный формат параметра driver"}, status=400)
+
+        driver = User.objects.filter(id=driver_id, role_id=3).first()
+        if not driver:
+            return Response({"detail": "Водитель не найден или не имеет роль водитель"}, status=404)
 
         from_date = parse_date(from_str)
         to_date = parse_date(to_str)
@@ -209,11 +233,13 @@ class UserViewSet(SoftDeleteModelViewSet):
             return Response({"detail": "Неверный формат дат"}, status=400)
 
         passenger_records = PassengerCarWaybillRecord.objects.filter(
+            passenger_car_waybill__driver_id=driver_id,
             passenger_car_waybill__date__gte=from_date,
             passenger_car_waybill__date__lte=to_date,
         ).select_related('passenger_car_waybill__driver', 'passenger_car_waybill__car')
 
         fire_records = FireTruckWaybillRecord.objects.filter(
+            fire_truck_waybill__driver_id=driver_id,
             fire_truck_waybill__date__gte=from_date,
             fire_truck_waybill__date__lte=to_date,
         ).select_related('fire_truck_waybill__driver', 'fire_truck_waybill__car')
@@ -251,11 +277,21 @@ class UserViewSet(SoftDeleteModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='drivers-report-excel')
     def drivers_report_excel(self, request):
+        driver_id = request.query_params.get('driver')
         from_str = request.query_params.get('from')
         to_str = request.query_params.get('to')
 
-        if not from_str or not to_str:
-            return Response({"detail": "Параметры from и to обязательны"}, status=400)
+        if not driver_id or not from_str or not to_str:
+            return Response({"detail": "Параметры driver, from и to обязательны"}, status=400)
+
+        try:
+            driver_id = int(driver_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "Неверный формат параметра driver"}, status=400)
+
+        driver = User.objects.filter(id=driver_id, role_id=3).first()
+        if not driver:
+            return Response({"detail": "Водитель не найден или не имеет роль водитель"}, status=404)
 
         from_date = parse_date(from_str)
         to_date = parse_date(to_str)
@@ -263,60 +299,76 @@ class UserViewSet(SoftDeleteModelViewSet):
             return Response({"detail": "Неверный формат дат"}, status=400)
 
         passenger_records = PassengerCarWaybillRecord.objects.filter(
+            passenger_car_waybill__driver_id=driver_id,
             passenger_car_waybill__date__gte=from_date,
             passenger_car_waybill__date__lte=to_date,
-        ).select_related('passenger_car_waybill__driver', 'passenger_car_waybill__car')
+        ).select_related('passenger_car_waybill__driver', 'passenger_car_waybill__car').order_by('passenger_car_waybill__date', 'id')
 
         fire_records = FireTruckWaybillRecord.objects.filter(
+            fire_truck_waybill__driver_id=driver_id,
             fire_truck_waybill__date__gte=from_date,
             fire_truck_waybill__date__lte=to_date,
-        ).select_related('fire_truck_waybill__driver', 'fire_truck_waybill__car')
+        ).select_related('fire_truck_waybill__driver', 'fire_truck_waybill__car').order_by('fire_truck_waybill__date', 'id')
 
-        wb = Workbook()
+        template_path = settings.BASE_DIR / 'report_templates' / 'driver.xlsx'
+        wb = load_workbook(template_path)
         ws = wb.active
-        ws.title = "Отчет по водителям"
 
-        ws['A1'] = "Период"
-        ws['B1'] = f"{from_date.strftime('%d.%m.%Y')} - {to_date.strftime('%d.%m.%Y')}"
+        ws['D2'] = f"{driver.surname} {driver.name} {driver.last_name}"
+        ws['I2'] = from_date.strftime('%d.%m.%Y')
+        ws['M2'] = to_date.strftime('%d.%m.%Y')
 
-        headers = ['Дата', 'Водитель', 'Тип автомобиля', 'Автомобиль', 'Маршрут/цель', 'Пробег', 'Факт расход', 'По норме']
-        for i, h in enumerate(headers, start=1):
-            ws.cell(row=3, column=i, value=h)
-
-        row_idx = 4
+        data_start_row = 7
+        row_idx = data_start_row
 
         for rec in passenger_records:
-            driver = rec.passenger_car_waybill.driver
-            fio = f"{driver.surname} {driver.name} {driver.last_name}"
-            ws.cell(row=row_idx, column=1, value=rec.passenger_car_waybill.date.strftime('%d.%m.%Y'))
-            ws.cell(row=row_idx, column=2, value=fio)
-            ws.cell(row=row_idx, column=3, value='Легковой')
-            ws.cell(row=row_idx, column=4, value=rec.passenger_car_waybill.car.number)
-            ws.cell(row=row_idx, column=5, value=rec.target)
-            ws.cell(row=row_idx, column=6, value=rec.distance_total_km)
-            ws.cell(row=row_idx, column=7, value=float(rec.fuel_used))
-            ws.cell(row=row_idx, column=8, value=float(rec.fuel_used_normal))
+            wb_obj = rec.passenger_car_waybill
+            ws.cell(row=row_idx, column=1, value=wb_obj.date.strftime('%d.%m.%Y'))
+            ws.cell(row=row_idx, column=2, value=wb_obj.car.number)
+            ws.cell(row=row_idx, column=3, value=float(rec.fuel_before_departure)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=4, value='Легковой автомобиль')
+            ws.cell(row=row_idx, column=5, value=rec.departure_time.strftime('%H:%M') if rec.departure_time else None)
+            ws.cell(row=row_idx, column=6, value=rec.arrival_time.strftime('%H:%M') if rec.arrival_time else None)
+            ws.cell(row=row_idx, column=7, value=rec.odometer_before).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=8, value=float(rec.fuel_used)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=9, value=float(rec.fuel_used_normal)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=10, value=float(rec.fuel_refueled)).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=11, value=float(rec.fuel_on_return)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=12, value=rec.odometer_after).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=13, value=float(rec.fuel_used_normal - rec.fuel_used) if rec.fuel_used_normal > rec.fuel_used else None).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=14, value=float(rec.fuel_used - rec.fuel_used_normal) if rec.fuel_used_normal < rec.fuel_used else None).fill = RED_FILL
             row_idx += 1
 
         for rec in fire_records:
-            driver = rec.fire_truck_waybill.driver
-            fio = f"{driver.surname} {driver.name} {driver.last_name}"
-            route = f"{rec.target} {rec.driving_route or ''}".strip()
-            ws.cell(row=row_idx, column=1, value=rec.fire_truck_waybill.date.strftime('%d.%m.%Y'))
-            ws.cell(row=row_idx, column=2, value=fio)
-            ws.cell(row=row_idx, column=3, value='Пожарный')
-            ws.cell(row=row_idx, column=4, value=rec.fire_truck_waybill.car.number)
-            ws.cell(row=row_idx, column=5, value=route)
-            ws.cell(row=row_idx, column=6, value=rec.distance_km)
-            ws.cell(row=row_idx, column=7, value=float(rec.fuel_used))
-            ws.cell(row=row_idx, column=8, value=float(rec.fuel_used_normal))
+            wb_obj = rec.fire_truck_waybill
+            ws.cell(row=row_idx, column=1, value=wb_obj.date.strftime('%d.%m.%Y'))
+            ws.cell(row=row_idx, column=2, value=wb_obj.car.number)
+            ws.cell(row=row_idx, column=3, value=float(rec.fuel_before_departure)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=4, value='Пожарный автомобиль')
+            ws.cell(row=row_idx, column=5, value=rec.departure_time.strftime('%H:%M') if rec.departure_time else None)
+            ws.cell(row=row_idx, column=6, value=rec.arrival_time.strftime('%H:%M') if rec.arrival_time else None)
+            ws.cell(row=row_idx, column=7, value=rec.odometer_before).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=8, value=float(rec.fuel_used)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=9, value=float(rec.fuel_used_normal)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=10, value=float(rec.fuel_refueled)).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=11, value=float(rec.fuel_on_return)).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=12, value=rec.odometer_after).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=13, value=float(rec.fuel_used_normal - rec.fuel_used) if rec.fuel_used_normal > rec.fuel_used else None).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=14, value=float(rec.fuel_used - rec.fuel_used_normal) if rec.fuel_used_normal < rec.fuel_used else None).fill = RED_FILL
             row_idx += 1
+
+        for r in range(data_start_row, row_idx):
+            for c in range(1, 15):
+                cell = ws.cell(row=r, column=c)
+                cell.border = THIN_BORDER
+                cell.font = CENTER_FONT
+                cell.alignment = CENTER_ALIGN
 
         output = BytesIO()
         wb.save(output)
         output.seek(0)
 
-        filename = f"Отчет по водителям {from_date.strftime('%d.%m.%Y')}-{to_date.strftime('%d.%m.%Y')}.xlsx"
+        filename = f"Отчет по водителю {driver.surname}_{driver.name}_{driver.last_name} {from_date.strftime('%d.%m.%Y')}-{to_date.strftime('%d.%m.%Y')}.xlsx"
         quoted_filename = quote(filename)
 
         response = HttpResponse(
@@ -508,7 +560,7 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             try:
                 next_record.recalc_cascade()
             except Exception as e:
-                logger.error(f'❌ ОШИБКА при cascade после удаления путевого листа: {str(e)}')
+                logger.error(f'ОШИБКА при cascade после удаления путевого листа: {str(e)}')
                 # Не прерываем удаление, просто логируем ошибку
 
     @action(detail=False, methods=['get'], url_path='export-excel')
@@ -555,41 +607,28 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
         total_distance_city = 0
         total_distance_area = 0
         total_distance = 0
-        total_fuel_used_city = Decimal('0.000')
-        total_fuel_used_area = Decimal('0.000')
-        total_fuel_used_fact = Decimal('0.000')
-        total_fuel_used_normal = Decimal('0.000')
-        total_fuel_refueled = Decimal('0.000')
-        total_savings = Decimal('0.000')
-        total_overrun = Decimal('0.000')
-
-        thin_border = Border(
-            left=Side(style='thin', color='000000'),
-            right=Side(style='thin', color='000000'),
-            top=Side(style='thin', color='000000'),
-            bottom=Side(style='thin', color='000000'),
-        )
-
-        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-        green_fill = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-        red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+        total_fuel_used_city = 0
+        total_fuel_used_area = 0
+        total_fuel_used_fact = 0
+        total_fuel_used_normal = 0
+        total_fuel_refueled = 0
+        total_savings = 0
+        total_overrun = 0
 
         for rec in records:
             wb_obj = rec.passenger_car_waybill
             driver = wb_obj.driver
 
-            savings = Decimal('0.000')
-            overrun = Decimal('0.000')
+            savings = 0
+            overrun = 0
 
             fio = f"{driver.surname} {driver.name[0]}. {driver.last_name[0]}."
 
             ws.cell(row=row_idx, column=1, value=wb_obj.date.strftime('%d.%m.%Y'))
             ws.cell(row=row_idx, column=2, value=fio)
 
-            cell = ws.cell(row=row_idx, column=3, value=rec.fuel_before_departure)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=4, value=rec.odometer_before)
-            cell.fill = yellow_fill
+            ws.cell(row=row_idx, column=3, value=rec.fuel_before_departure).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=4, value=rec.odometer_before).fill = YELLOW_FILL
 
             ws.cell(row=row_idx, column=5, value=rec.distance_total_km)
             ws.cell(row=row_idx, column=6, value=rec.distance_city_km)
@@ -597,28 +636,17 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             ws.cell(row=row_idx, column=8, value=rec.fuel_used_city)
             ws.cell(row=row_idx, column=9, value=rec.fuel_used_area)
 
-            cell = ws.cell(row=row_idx, column=10, value=rec.fuel_used_normal)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=11, value=rec.fuel_used)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=12, value=rec.fuel_refueled)
-            cell.fill = green_fill
-            cell = ws.cell(row=row_idx, column=13, value=rec.fuel_on_return)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=14, value=rec.odometer_after)
-            cell.fill = yellow_fill
+            ws.cell(row=row_idx, column=10, value=rec.fuel_used_normal).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=11, value=rec.fuel_used).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=12, value=rec.fuel_refueled).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=13, value=rec.fuel_on_return).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=14, value=rec.odometer_after).fill = YELLOW_FILL
 
-            if rec.fuel_used_normal > rec.fuel_used:
-                savings = rec.fuel_used_normal - rec.fuel_used
-                overrun = Decimal('0.000')
-            elif rec.fuel_used_normal < rec.fuel_used:
-                savings = Decimal('0.000')
-                overrun = rec.fuel_used - rec.fuel_used_normal
+            savings = rec.fuel_used_normal - rec.fuel_used if rec.fuel_used_normal > rec.fuel_used else 0
+            overrun = rec.fuel_used - rec.fuel_used_normal if rec.fuel_used_normal < rec.fuel_used else 0
 
-            cell = ws.cell(row=row_idx, column=15, value=float(savings))
-            cell.fill = green_fill
-            cell = ws.cell(row=row_idx, column=16, value=float(overrun))
-            cell.fill = red_fill
+            ws.cell(row=row_idx, column=15, value=float(savings)).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=16, value=float(overrun)).fill = RED_FILL
 
             total_distance_city += rec.distance_city_km
             total_distance_area += rec.distance_area_km
@@ -626,7 +654,6 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             total_fuel_used_city += rec.fuel_used_city
             total_fuel_used_area += rec.fuel_used_area
             total_fuel_used_fact += rec.fuel_used
-            total_fuel_used_ref = rec.fuel_used_normal
             total_fuel_used_normal += rec.fuel_used_normal
             total_fuel_refueled += rec.fuel_refueled
             total_savings += savings
@@ -634,29 +661,27 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
 
             row_idx += 1
 
-        cell = ws.cell(row=row_idx, column=2, value="ИТОГО")
-        cell.fill = yellow_fill
-        ws.cell(row=row_idx, column=5, value=total_distance).fill = yellow_fill
-        ws.cell(row=row_idx, column=6, value=total_distance_city).fill = yellow_fill
-        ws.cell(row=row_idx, column=7, value=total_distance_area).fill = yellow_fill
-        ws.cell(row=row_idx, column=8, value=float(total_fuel_used_city)).fill = yellow_fill
-        ws.cell(row=row_idx, column=9, value=float(total_fuel_used_area)).fill = yellow_fill
-        ws.cell(row=row_idx, column=10, value=float(total_fuel_used_normal)).fill = yellow_fill
-        ws.cell(row=row_idx, column=11, value=float(total_fuel_used_fact)).fill = yellow_fill
-        ws.cell(row=row_idx, column=12, value=float(total_fuel_refueled)).fill = green_fill
-        ws.cell(row=row_idx, column=15, value=float(total_savings)).fill = green_fill
-        ws.cell(row=row_idx, column=16, value=float(total_overrun)).fill = red_fill
+        ws.cell(row=row_idx, column=2, value="ИТОГО").fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=5, value=total_distance).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=6, value=total_distance_city).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=7, value=total_distance_area).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=8, value=float(total_fuel_used_city)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=9, value=float(total_fuel_used_area)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=10, value=float(total_fuel_used_normal)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=11, value=float(total_fuel_used_fact)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=12, value=float(total_fuel_refueled)).fill = GREEN_FILL
+        ws.cell(row=row_idx, column=15, value=float(total_savings)).fill = GREEN_FILL
+        ws.cell(row=row_idx, column=16, value=float(total_overrun)).fill = RED_FILL
 
-        data_end_row = row_idx
-        for r in range(data_start_row, data_end_row + 1):
-            for c in range(1, 16 + 1):
+        for r in range(data_start_row, row_idx + 1):
+            for c in range(1, 17):
                 cell = ws.cell(row=r, column=c)
-                cell.border = thin_border
-                cell.font = Font(name='Times New Roman', size=11)
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = THIN_BORDER
+                cell.font = CENTER_FONT
+                cell.alignment = CENTER_ALIGN
 
-        for c in range(1, 16 + 1):
-            ws.cell(row=data_end_row, column=c).font = Font(name='Times New Roman', size=11, bold=True)
+        for c in range(1, 17):
+            ws.cell(row=row_idx, column=c).font = BOLD_FONT
 
         output = BytesIO()
         wb.save(output)
@@ -963,7 +988,7 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
             try:
                 next_record.recalc_cascade()
             except Exception as e:
-                logger.error(f'❌ ОШИБКА при cascade после удаления путевого листа: {str(e)}')
+                logger.error(f'ОШИБКА при cascade после удаления путевого листа: {str(e)}')
                 # Не прерываем удаление, просто логируем ошибку
 
     @action(detail=False, methods=['get'], url_path='export-excel')
@@ -1010,47 +1035,30 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
         total_distance_km = 0
         total_time_with_pump = 0
         total_time_without_pump = 0
-        total_fuel_by_distance = Decimal('0.000')
-        total_fuel_with_pump = Decimal('0.000')
-        total_fuel_without_pump = Decimal('0.000')
-        total_fuel_normal = Decimal('0.000')
-        total_fuel_fact = Decimal('0.000')
-        total_fuel_refueled = Decimal('0.000')
-        total_savings = Decimal('0.000')
-        total_overrun = Decimal('0.000')
-
-        thin_border = Border(
-            left=Side(style='thin', color='000000'),
-            right=Side(style='thin', color='000000'),
-            top=Side(style='thin', color='000000'),
-            bottom=Side(style='thin', color='000000'),
-        )
-
-        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-        green_fill = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-        red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-
-        center_font = Font(name='Times New Roman', size=11)
-        bold_font = Font(name='Times New Roman', size=11, bold=True)
-        center_align = Alignment(horizontal='center', vertical='center')
+        total_fuel_by_distance = 0
+        total_fuel_with_pump = 0
+        total_fuel_without_pump = 0
+        total_fuel_normal = 0
+        total_fuel_fact = 0
+        total_fuel_refueled = 0
+        total_savings = 0
+        total_overrun = 0
 
         for rec in records:
             wb_obj = rec.fire_truck_waybill
             route = getattr(rec, 'driving_route', '') or ''
             name_place = (rec.target or '') + (f" {route}" if route else '')
 
-            savings = Decimal('0.000')
-            overrun = Decimal('0.000')
+            savings = 0
+            overrun = 0
 
             ws.cell(row=row_idx, column=1, value=wb_obj.date.strftime('%d.%m.%Y'))
             ws.cell(row=row_idx, column=2, value=name_place)
 
-            cell = ws.cell(row=row_idx, column=3, value=rec.fuel_before_departure)
-            cell.fill = yellow_fill
+            ws.cell(row=row_idx, column=3, value=rec.fuel_before_departure).fill = YELLOW_FILL
             ws.cell(row=row_idx, column=4, value=rec.departure_time.strftime('%H:%M'))
             ws.cell(row=row_idx, column=5, value=rec.arrival_time.strftime('%H:%M'))
-            cell = ws.cell(row=row_idx, column=6, value=rec.odometer_before)
-            cell.fill = yellow_fill
+            ws.cell(row=row_idx, column=6, value=rec.odometer_before).fill = YELLOW_FILL
             ws.cell(row=row_idx, column=7, value=rec.distance_km)
             ws.cell(row=row_idx, column=8, value=rec.fuel_used_by_distance)
             ws.cell(row=row_idx, column=9, value=rec.time_with_pump)
@@ -1058,26 +1066,17 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
             ws.cell(row=row_idx, column=11, value=rec.fuel_used_with_pump)
             ws.cell(row=row_idx, column=12, value=rec.fuel_used_without_pump)
 
-            cell = ws.cell(row=row_idx, column=13, value=rec.fuel_used)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=14, value=rec.fuel_used_normal)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=15, value=rec.fuel_refueled)
-            cell.fill = green_fill
-            cell = ws.cell(row=row_idx, column=16, value=rec.fuel_on_return)
-            cell.fill = yellow_fill
-            cell = ws.cell(row=row_idx, column=17, value=rec.odometer_after)
-            cell.fill = yellow_fill
+            ws.cell(row=row_idx, column=13, value=rec.fuel_used).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=14, value=rec.fuel_used_normal).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=15, value=rec.fuel_refueled).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=16, value=rec.fuel_on_return).fill = YELLOW_FILL
+            ws.cell(row=row_idx, column=17, value=rec.odometer_after).fill = YELLOW_FILL
 
-            if rec.fuel_used_normal > rec.fuel_used:
-                savings = rec.fuel_used_normal - rec.fuel_used
-            elif rec.fuel_used_normal < rec.fuel_used:
-                overrun = rec.fuel_used - rec.fuel_used_normal
+            savings = rec.fuel_used_normal - rec.fuel_used if rec.fuel_used_normal > rec.fuel_used else 0
+            overrun = rec.fuel_used - rec.fuel_used_normal if rec.fuel_used_normal < rec.fuel_used else 0
 
-            cell = ws.cell(row=row_idx, column=18, value=float(savings))
-            cell.fill = green_fill
-            cell = ws.cell(row=row_idx, column=19, value=float(overrun))
-            cell.fill = red_fill
+            ws.cell(row=row_idx, column=18, value=float(savings)).fill = GREEN_FILL
+            ws.cell(row=row_idx, column=19, value=float(overrun)).fill = RED_FILL
 
             total_distance_km += rec.distance_km
             total_time_with_pump += rec.time_with_pump
@@ -1093,31 +1092,28 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
 
             row_idx += 1
 
-        cell = ws.cell(row=row_idx, column=2, value="ИТОГО")
-        cell.fill = yellow_fill
+        ws.cell(row=row_idx, column=2, value="ИТОГО").fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=7, value=total_distance_km).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=9, value=total_time_with_pump).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=10, value=total_time_without_pump).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=8, value=float(total_fuel_by_distance)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=11, value=float(total_fuel_with_pump)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=12, value=float(total_fuel_without_pump)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=13, value=float(total_fuel_fact)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=14, value=float(total_fuel_normal)).fill = YELLOW_FILL
+        ws.cell(row=row_idx, column=15, value=float(total_fuel_refueled)).fill = GREEN_FILL
+        ws.cell(row=row_idx, column=18, value=float(total_savings)).fill = GREEN_FILL
+        ws.cell(row=row_idx, column=19, value=float(total_overrun)).fill = RED_FILL
 
-        ws.cell(row=row_idx, column=7, value=total_distance_km).fill = yellow_fill
-        ws.cell(row=row_idx, column=9, value=total_time_with_pump).fill = yellow_fill
-        ws.cell(row=row_idx, column=10, value=total_time_without_pump).fill = yellow_fill
-        ws.cell(row=row_idx, column=8, value=float(total_fuel_by_distance)).fill = yellow_fill
-        ws.cell(row=row_idx, column=11, value=float(total_fuel_with_pump)).fill = yellow_fill
-        ws.cell(row=row_idx, column=12, value=float(total_fuel_without_pump)).fill = yellow_fill
-        ws.cell(row=row_idx, column=13, value=float(total_fuel_fact)).fill = yellow_fill
-        ws.cell(row=row_idx, column=14, value=float(total_fuel_normal)).fill = yellow_fill
-        ws.cell(row=row_idx, column=15, value=float(total_fuel_refueled)).fill = green_fill
-        ws.cell(row=row_idx, column=18, value=float(total_savings)).fill = green_fill
-        ws.cell(row=row_idx, column=19, value=float(total_overrun)).fill = red_fill
-
-        data_end_row = row_idx
-        for r in range(data_start_row, data_end_row + 1):
+        for r in range(data_start_row, row_idx + 1):
             for c in range(1, 20):
                 cell = ws.cell(row=r, column=c)
-                cell.border = thin_border
-                cell.font = center_font
-                cell.alignment = center_align
+                cell.border = THIN_BORDER
+                cell.font = CENTER_FONT
+                cell.alignment = CENTER_ALIGN
 
         for c in range(1, 20):
-            ws.cell(row=data_end_row, column=c).font = bold_font
+            ws.cell(row=row_idx, column=c).font = BOLD_FONT
 
         output = BytesIO()
         wb.save(output)

@@ -13,9 +13,6 @@ from .models import (
     NormsTechnicalMaintenance,
 )
 
-
-# Самый простой вариант — просто зарегистрировать модели
-
 admin.site.register(Role)
 admin.site.register(User)
 admin.site.register(Permission)

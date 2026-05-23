@@ -1,12 +1,8 @@
-# fuel/signals.py
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 
 from .models import Role, Permission
 
-
-# Здесь описываем дефолтные роли и права для них.
-# Можно менять названия и набор прав под себя.
 DEFAULT_ROLES = [
     {
         "name": "Администратор",
@@ -252,12 +248,6 @@ DEFAULT_ROLES = [
 
 @receiver(post_migrate)
 def create_default_roles_and_permissions(sender, **kwargs):
-    """
-    Создаём роли и Permission после применения миграций,
-    но только если их ещё нет.
-    Не трогаем роли/права, которые уже созданы и отредактированы админом.
-    """
-    # Ограничиваемся только нашим приложением 'fuel'
     if sender.name != 'fuel':
         return
 

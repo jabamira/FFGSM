@@ -14,9 +14,6 @@ def _get_role_permission_obj(user):
 
 
 class RolePermission(BasePermission):
-    """
-    Базовый пермишен: проверяет булевый флаг perm_attr в Permission пользователя.
-    """
     perm_attr = None
 
     def has_permission(self, request, view):
