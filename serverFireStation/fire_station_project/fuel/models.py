@@ -61,9 +61,6 @@ class SoftDeleteModel(models.Model):
 
 
 def next_doc_number(model_cls, length=6):
-    """
-    Автонумерация документов вида 000001, 000002, ...
-    """
     last_obj = (
         model_cls.all_objects
         .exclude(number__isnull=True)

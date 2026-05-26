@@ -1,4 +1,3 @@
-# fuel/auth.py
 import jwt
 import hashlib
 from datetime import datetime, timedelta, timezone
@@ -11,7 +10,7 @@ from .models import User
 
 JWT_SECRET = settings.SECRET_KEY
 JWT_ALGORITHM = 'HS256'
-ACCESS_TOKEN_LIFETIME_MINUTES = 7 * 24 * 60  # 7 days (604800 seconds)
+ACCESS_TOKEN_LIFETIME_MINUTES = 7 * 24 * 60
 
 
 def _password_fingerprint(user: User) -> str:
