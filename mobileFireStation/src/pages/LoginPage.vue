@@ -110,6 +110,7 @@ import {
 import { palette, Button } from '@/components/ui/importUi'
 import { api } from '@/api'
 import { getErrorMessage } from '@/utils'
+import StorageManager from '@/utils/storageManager'
 import { useAuthStore } from '@/stores/auth'
 
 const authStore = useAuthStore()
@@ -150,20 +151,34 @@ const handleSubmit = async () => {
 
   try {
     const response = await api.auth.login(loginClean, passwordClean)
+    
+    // Логируем ответ для отладки
+    console.log('[LoginPage] Login response:', response.data)
 
-    if (response.data.access) {
+    // Поддерживаем различные форматы ответа: { access, user } или { token, user }
+    const token = response.data.access || response.data.token
+    const user = response.data.user
+
+    if (token && user) {
       // Сохраняем токен и пользователя в Capacitor Preferences для офлайн режима
-      await StorageManager.setItem('auth_token', response.data.access)
-      await StorageManager.setItem('auth_user', JSON.stringify(response.data.user))
-      await authStore.saveUser(response.data.user)
-      await authStore.setToken(response.data.access)
+      const tokenSaved = await StorageManager.setItem('auth_token', token)
+      const userSaved = await StorageManager.setItem('auth_user', JSON.stringify(user))
+      
+      console.log('[LoginPage] Storage save results - token:', tokenSaved, 'user:', userSaved)
+
+      await authStore.saveUser(user)
+      await authStore.setToken(token)
+      
+      // Успешный вход
+      console.log('[LoginPage] Login successful, redirecting to waybills')
       router.push('/waybills')
     } else {
-      error.value = 'Неверный логин или пароль'
+      error.value = 'Неверный формат ответа сервера'
+      console.error('[LoginPage] Invalid response format:', response.data)
     }
   } catch (err) {
     error.value = getErrorMessage(err)
-    console.error('[LoginPage] Error:', err)
+    console.error('[LoginPage] Login error:', err)
   } finally {
     isLoading.value = false
   }

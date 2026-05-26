@@ -58,7 +58,7 @@
           <h2 class="font-bold text-lg mb-4" :style="{ color: palette.error }">Опасная зона</h2>
           
           <Button
-            :label="isLoading ? '⚡ Выходим...' : 'Выход из аккаунта'"
+            :label="isLoading ? 'Выходим...' : 'Выход из аккаунта'"
             variant="danger"
             :disabled="isLoading"
             :is-loading="isLoading"
@@ -153,4 +153,6 @@ const logout = async () => {
     isLoading.value = false
   }
 }
+
+
 </script>

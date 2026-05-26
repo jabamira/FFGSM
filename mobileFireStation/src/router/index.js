@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router'
 import LoginPage from '../pages/LoginPage.vue'
 import { useTripStore } from '../stores/trip'
+import { useAuthStore } from '../stores/auth'
 
 const routes = [
   {
@@ -50,8 +51,8 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard для проверки активной поездки при загрузке приложения
-router.beforeEach((to, from, next) => {
+// Navigation guard для проверки активной поездки
+router.beforeEach(async (to, from, next) => {
   const tripStore = useTripStore()
   
   // Если переходим на путевые листы или другую страницу
@@ -59,11 +60,17 @@ router.beforeEach((to, from, next) => {
   if (to.path !== '/login' && !to.path.startsWith('/trip')) {
     // Загружаем данные поездки из localStorage если ещё не загружены
     if (!tripStore.hasActiveTrip) {
-      const savedTrip = tripStore.loadTripFromStorage()
+      const savedTrip = await tripStore.loadTripFromStorage()
       if (savedTrip) {
-        // Если есть сохраненная поездка - перенаправляем на её страницу
-        console.log('[Router] Redirecting to active trip')
-        return next('/trip/active')
+        // Проверяем валидность поездки
+        if (savedTrip.number && savedTrip.car_number) {
+          console.log('[Router] Valid active trip found, redirecting to /trip/active')
+          return next('/trip/active')
+        } else {
+          // Невалидная поездка - очищаем
+          console.warn('[Router] Invalid trip detected, clearing it')
+          await tripStore.clearActiveTrip()
+        }
       }
     }
   }

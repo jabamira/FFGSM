@@ -492,13 +492,11 @@ export const palette = {
 
 <script>
 import { ref } from 'vue';
-import HeaderComponent from '../components/HeaderComponent.vue';
 import { Button, TextInput, SelectInput, Alert, Badge, Modal, DataTable, DateInput, DateRangeInput, palette } from '../components/ui/importUi';
 
 export default {
   name: 'UIComponentsPage',
   components: {
-    HeaderComponent,
     Button,
     TextInput,
     SelectInput,
