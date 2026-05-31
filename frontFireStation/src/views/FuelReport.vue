@@ -52,6 +52,7 @@
         <div class="flex flex-wrap gap-4 mt-4">
           <Button @click="loadAnalytics" variant="primary">Загрузить аналитику</Button>
           <Button @click="resetFilters" variant="secondary">Сбросить фильтры</Button>
+          <Button @click="downloadReport" variant="primary" :style="{ backgroundColor: palette.success }">Скачать отчет (Excel)</Button>
         </div>
       </div>
 
@@ -232,13 +233,31 @@
         </div>
       </div>
     </div>
+
+    <!-- Report Info Modal -->
+    <Modal
+      :is-open="reportModalIsOpen"
+      :title="reportModalTitle"
+      @close="reportModalIsOpen = false"
+    >
+      <div class="space-y-4 min-w-96">
+        <div class="rounded-lg p-4" :style="{ backgroundColor: `${palette.warning}15`, borderLeft: `4px solid ${palette.warning}` }">
+          <p class="text-sm mt-2" :style="{ color: palette.dark }">{{ reportModalMessage }}</p>
+        </div>
+      </div>
+
+      <template #footer>
+        <Button variant="primary" size="md" @click="reportModalIsOpen = false">Закрыть</Button>
+      </template>
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import { useAuthStore } from '../stores/auth';
-import { palette, SelectInput, Button, DateRangeInput } from '../components/ui/importUi';
+import { useRouter } from 'vue-router';
+import { palette, SelectInput, Button, DateRangeInput, Modal } from '../components/ui/importUi';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import { Line, Bar, Doughnut } from 'vue-chartjs';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement } from 'chart.js';
@@ -247,11 +266,15 @@ import axios from 'axios';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement);
 
 const auth = useAuthStore();
+const router = useRouter();
 const analytics = ref(null);
 const waybillsData = ref([]);
 const firetruck_data = ref([]);
 const passenger_car_data = ref([]);
 const drivers_data = ref([]);
+const reportModalIsOpen = ref(false);
+const reportModalMessage = ref('');
+const reportModalTitle = ref('Внимание');
 
 const filters = ref({
   dateRange: { start: '', end: '' },
@@ -597,6 +620,29 @@ const chartOperatingHoursOverTime = computed(() => {
 
 // Load initial data
 onMounted(async () => {
+  // Дополнительная проверка - водитель не должен быть здесь
+  if (auth.isDriver()) {
+    console.error('[FuelReport] Driver somehow accessed FuelReport, redirecting...');
+    auth.logout();
+    router.replace('/auth');
+    return;
+  }
+
+  // Проверить, есть ли доступ к отчетам
+  if (!auth.canAccessReports()) {
+    console.warn('[FuelReport] User does not have access to any reports, redirecting...');
+    
+    // Если нет доступа к отчетам, проверить есть ли доступ к Users
+    if (auth.permissions.view_users) {
+      router.replace('/users');
+    } else {
+      // Если и на Users нет прав, то что-то не так с ролью
+      console.error('[FuelReport] User has no access to reports or users - role configuration issue');
+      router.replace('/');
+    }
+    return;
+  }
+
   try {
     // Load vehicles
     const firetrucksRes = await axios.get('/fire-trucks/');
@@ -605,8 +651,8 @@ onMounted(async () => {
     const carsRes = await axios.get('/passenger-cars/');
     passenger_car_data.value = Array.isArray(carsRes.data) ? carsRes.data : carsRes.data.results || [];
 
-    // Load drivers
-    const driversRes = await axios.get('/users/');
+    // Load drivers (use /users/drivers/ endpoint which mechanics have permission for)
+    const driversRes = await axios.get('/users/drivers/');
     drivers_data.value = Array.isArray(driversRes.data) ? driversRes.data : driversRes.data.results || [];
     console.log('[FuelReport] Loaded drivers:', drivers_data.value.length > 0 ? drivers_data.value.map(d => ({ id: d.id, name: `${d.name} ${d.last_name}` })) : 'EMPTY');
     
@@ -783,132 +829,58 @@ const loadAnalytics = async () => {
   }
 };
 
-const buildAnalytics = () => {
-  if (waybillsData.value.length === 0) {
-    analytics.value = {
-      totalFuelUsed: 0,
-      totalFuelByNorm: 0,
-      totalDistance: 0,
-      tripCount: 0,
-      totalTripCount: 0,
-      operatingHours: 0,
-      dailyFuel: [],
-      summaryByVehicle: [],
-      summaryByDriver: []
-    };
-    return;
-  }
-
-  const dailyMap = {};
-  const vehicleMap = {};
-  const driverMap = {};
-  let totalFuelUsed = 0;
-  let totalFuelByNorm = 0;
-  let totalDistance = 0;
-  let totalTripCount = 0;
-
-  waybillsData.value.forEach(waybill => {
-    // Aggregate by day
-    const dateKey = waybill.date;
-    if (!dailyMap[dateKey]) dailyMap[dateKey] = { fuelUsed: 0, fuelByNorm: 0 };
-    dailyMap[dateKey].fuelUsed += parseFloat(waybill.total_spent || 0);
-    dailyMap[dateKey].fuelByNorm += parseFloat(waybill.required_by_norm || 0);
-
-    // Aggregate by vehicle
-    const vehicleKey = waybill.car;
-    const vehicle = firetruck_data.value.find(v => v.id === vehicleKey) || 
-                    passenger_car_data.value.find(v => v.id === vehicleKey);
-    
-    if (!vehicleMap[vehicleKey]) {
-      vehicleMap[vehicleKey] = {
-        vehicleId: vehicleKey,
-        vehicleName: vehicle ? `${vehicle.number} - ${vehicle.brand} ${vehicle.model}` : `Машина ${vehicleKey}`,
-        tripCount: 0,
-        distance: 0,
-        fuelUsed: 0,
-        fuelByNorm: 0
-      };
+const downloadReport = async () => {
+  try {
+    // Check if driver is selected
+    if (!filters.value.driver) {
+      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
+      reportModalMessage.value = 'Отчеты доступны только для конкретного водителя. Пожалуйста, выберите водителя из списка.';
+      reportModalIsOpen.value = true;
+      return;
     }
 
-    // Count records as trips
-    const recordCount = waybill.records?.length || 0;
-    vehicleMap[vehicleKey].tripCount += recordCount;
-    totalTripCount += recordCount;
-
-    vehicleMap[vehicleKey].fuelUsed += parseFloat(waybill.total_spent || 0);
-    vehicleMap[vehicleKey].fuelByNorm += parseFloat(waybill.required_by_norm || 0);
-
-    // Calculate distance from records - different for fire truck vs passenger car
-    if (waybill.records && waybill.records.length > 0) {
-      let waybillDistance = 0;
-      
-      // Check if this is a fire truck or passenger car by checking record fields
-      const firstRecord = waybill.records[0];
-      const isFireTruck = firstRecord.hasOwnProperty('distance_km');
-      
-      if (isFireTruck) {
-        // Fire truck: sum distance_km from all records
-        waybillDistance = waybill.records.reduce((sum, record) => {
-          return sum + (record.distance_km || 0);
-        }, 0);
-      } else {
-        // Passenger car: sum (distance_city_km + distance_area_km) from all records
-        waybillDistance = waybill.records.reduce((sum, record) => {
-          return sum + ((record.distance_city_km || 0) + (record.distance_area_km || 0));
-        }, 0);
-      }
-      
-      vehicleMap[vehicleKey].distance += waybillDistance;
-      totalDistance += waybillDistance;
+    // Check if dates are selected (required by server)
+    if (!filters.value.dateRange.start || !filters.value.dateRange.end) {
+      reportModalTitle.value = 'Ошибка: даты не указаны';
+      reportModalMessage.value = 'Для скачивания отчета необходимо указать период (от и до).';
+      reportModalIsOpen.value = true;
+      return;
     }
 
-    totalFuelUsed += parseFloat(waybill.total_spent || 0);
-    totalFuelByNorm += parseFloat(waybill.required_by_norm || 0);
+    // Build query parameters
+    const params = new URLSearchParams();
+    params.append('driver', filters.value.driver);
+    params.append('from', filters.value.dateRange.start);
+    params.append('to', filters.value.dateRange.end);
 
-    // Aggregate by driver
-    const driverId = waybill.driver;
-    // Use driver_full_name from API response, or fallback to searching in drivers_data
-    const driver = drivers_data.value.find(d => d.id === driverId);
-    const driverFullName = waybill.driver_full_name || (driver ? `${driver.name} ${driver.last_name}`.trim() : `Водитель ${driverId}`);
-    
-    if (!driverMap[driverId]) {
-      driverMap[driverId] = {
-        driverId: driverId,
-        driverName: driverFullName,
-        tripCount: 0,
-        distance: 0,
-        fuelUsed: 0,
-        fuelByNorm: 0
-      };
-    }
-    driverMap[driverId].tripCount += recordCount;
-    driverMap[driverId].fuelUsed += parseFloat(waybill.total_spent || 0);
-    driverMap[driverId].fuelByNorm += parseFloat(waybill.required_by_norm || 0);
-    driverMap[driverId].distance += vehicleMap[vehicleKey].distance;
-    
-    console.log(`[DEBUG] Driver ${driverId} (${driverFullName}):`, {
-      tripCount: recordCount,
-      fuelUsed: driverMap[driverId].fuelUsed,
-      fuelByNorm: driverMap[driverId].fuelByNorm,
-      difference: driverMap[driverId].fuelUsed - driverMap[driverId].fuelByNorm
+    // Download the report
+    const response = await axios.get(`/users/drivers-report-excel/?${params.toString()}`, {
+      responseType: 'blob'
     });
-  });
 
-  const dailyFuel = Object.entries(dailyMap)
-    .map(([date, data]) => ({ date, fuel: data.fuelUsed, norm: data.fuelByNorm }))
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  const summaryByVehicle = Object.values(vehicleMap).sort((a, b) => b.fuelUsed - a.fuelUsed);
-  const summaryByDriver = Object.values(driverMap).sort((a, b) => b.fuelUsed - a.fuelUsed);
-
-  analytics.value = {
-    totalFuelUsed,
-    totalFuelByNorm,
-    totalDistance,
-    tripCount: totalTripCount,
-    dailyFuel,
-    summaryByVehicle,
-    summaryByDriver
-  };
+    // Create a download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Get driver name for filename
+    const driver = drivers_data.value.find(d => d.id == filters.value.driver);
+    const driverName = driver ? `${driver.surname}_${driver.name}` : `driver_${filters.value.driver}`;
+    const dateStr = new Date().toISOString().split('T')[0];
+    
+    link.setAttribute('download', `report_${driverName}_${dateStr}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    link.parentNode.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('[FuelReport] Report downloaded successfully');
+  } catch (error) {
+    console.error('[FuelReport] Error downloading report:', error);
+    reportModalTitle.value = 'Ошибка при скачивании';
+    reportModalMessage.value = error.response?.data?.detail || 'Не удалось скачать отчет. Пожалуйста, попробуйте еще раз.';
+    reportModalIsOpen.value = true;
+  }
 };
+
 </script>

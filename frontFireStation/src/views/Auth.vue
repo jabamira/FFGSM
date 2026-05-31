@@ -55,14 +55,22 @@
       </div>
     </main>
 
+    <!-- Error Modal for Driver Access Denied -->
+    <ErrorModal 
+      :is-open="showDriverError"
+      title="Доступ запрещен"
+      message="Эта роль предназначена только для мобильного приложения. Пожалуйста, используйте мобильное приложение для входа."
+      @close="showDriverError = false"
+    />
   
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 
 import { TextInput, Button, palette } from '../components/ui/importUi';
+import ErrorModal from '../components/ErrorModal.vue';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 
@@ -73,6 +81,15 @@ const login = ref('');
 const password = ref('');
 const showPassword = ref(false);
 const error = ref('');
+const showDriverError = ref(false);
+
+// Проверить что пользователь не авторизован
+onMounted(() => {
+  if (auth.isAuthenticated) {
+    console.log('[Auth View] User is already authenticated, redirecting to default page');
+    router.replace(auth.getDefaultRedirectPath() || '/fuel-report');
+  }
+});
 
 function toggleShowPassword() {
   showPassword.value = !showPassword.value;
@@ -106,13 +123,36 @@ async function submit() {
     console.log('[Auth View] Attempting login...');
     const ok = await auth.login(loginClean, passwordClean);
     if (ok) {
-      console.log('[Auth View] Login successful, permissions loaded (or loading in background), redirecting...');
-      // Даже если разрешения не загружены в синхронном режиме,
-      // пользователь будет перенаправлен и разрешения загрузятся в фоне
-      router.push('/fuel-report');
+      console.log('[Auth View] Login successful, permissions are loaded');
+      
+      // login() гарантирует что разрешения загружены, так что можем сразу проверять роль
+      console.log('[Auth View] Checking user role...');
+      
+      // Теперь когда разрешения загружены, проверить, является ли пользователь водителем
+      if (auth.isDriver()) {
+        console.warn('[Auth View] Driver tried to access web application');
+        showDriverError.value = true;
+        // Разлогировать водителя
+        auth.logout();
+        return;
+      }
+      
+      // Определить куда перенаправить на основе разрешений
+      const redirectPath = auth.getDefaultRedirectPath();
+      console.log('[Auth View] Redirecting to:', redirectPath);
+      // Использовать replace() вместо push() для более надежной переадресации
+      router.replace(redirectPath);
     } else {
-      error.value = 'Неверный логин или пароль';
-      console.error('[Auth View] Login failed');
+      // Проверим что произошло - ошибка логина или ошибка загрузки разрешений
+      if (auth.access) {
+        // access установлен но login вернул false - это ошибка при загрузке разрешений
+        error.value = 'Ошибка при загрузке данных. Попробуйте еще раз.';
+        console.error('[Auth View] Login credentials accepted but failed to load permissions');
+      } else {
+        // access не установлен - ошибка логина/пароля
+        error.value = 'Неверный логин или пароль';
+        console.error('[Auth View] Login failed - invalid credentials');
+      }
     }
   } catch (e) {
     error.value = 'Ошибка при подключении';

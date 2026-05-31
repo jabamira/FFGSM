@@ -54,6 +54,13 @@ export const useAuthStore = defineStore("auth", {
     },
 
     setPermissions(permissions) {
+      // Если permissions === null, значит мы логируемся - очищаем и отмечаем что разрешения НЕ загружены
+      if (permissions === null) {
+        this.permissions = {};
+        this.permissionsLoaded = false;
+        return;
+      }
+
       this.permissions = permissions || {};
       this.permissionsLoaded = true; // отметить что разрешения загружены
 
@@ -89,20 +96,22 @@ export const useAuthStore = defineStore("auth", {
         // Убедиться, что флаг checkedOnce установлен перед возвратом
         this.checkedOnce = true;
 
-        // ВАЖНО: Попробуем загрузить разрешения, но не блокируем вход если это не удастся.
-        // Разрешения загрузятся в фоне, и приложение будет работать и без них (с дефолтными)
-        this.fetchPermissionsWithRetry(3, 5000).then((loaded) => {
-          if (loaded) {
-            console.log("[AUTH STORE] Permissions loaded successfully");
-          } else {
-            console.warn(
-              "[AUTH STORE] Failed to load permissions, will retry on navigation",
-            );
-          }
-        });
+        // КРИТИЧНО: Дождаться загрузки разрешений перед возвратом
+        // Это гарантирует, что разрешения готовы когда компонент проверит isDriver()
+        const permissionsLoaded = await this.fetchPermissionsWithRetry(3, 5000);
+        if (!permissionsLoaded) {
+          console.error(
+            "[AUTH STORE] Failed to load permissions after login, cannot proceed",
+          );
+          // Откатываем state обратно потому что не смогли загрузить разрешения
+          this.setAccess(null);
+          this.setUser(null);
+          this.setPermissions(null);
+          return false;
+        }
 
+        console.log("[AUTH STORE] Permissions loaded successfully");
         this.startHealthPolling();
-
         console.log("[AUTH STORE] Login successful, redirecting to app");
         return true;
       } catch (err) {
@@ -190,15 +199,18 @@ export const useAuthStore = defineStore("auth", {
     logout() {
       this.setAccess(null);
       this.setUser(null);
-      this.setPermissions(null);
-      this.permissionsLoaded = false;
+      this.setPermissions(null); // теперь это устанавливает permissionsLoaded = false
+      this.permissionsLoaded = false; // явно обнулить флаг
       this.clearCrudPermissions();
       this.stopHealthPolling();
       // Очищаем всё из localStorage при выходе
       localStorage.removeItem("access");
       localStorage.removeItem("user");
       localStorage.removeItem("permissions");
-      console.log("[AUTH] Logged out, cleared all data");
+      console.log(
+        "[AUTH] Logged out, cleared all data, permissionsLoaded:",
+        this.permissionsLoaded,
+      );
     },
 
     /**
@@ -453,6 +465,69 @@ export const useAuthStore = defineStore("auth", {
           return Promise.reject(error);
         },
       );
+    },
+
+    /**
+     * Проверить, есть ли доступ к отчетам
+     */
+    canAccessReports() {
+      return !!(
+        this.permissions.view_drivers_reports ||
+        this.permissions.view_passenger_cars_reports ||
+        this.permissions.view_fire_truck_reports
+      );
+    },
+
+    /**
+     * Найти первую доступную страницу для пользователя
+     * Используется для переадресации после авторизации
+     */
+    getDefaultRedirectPath() {
+      // Проверим, есть ли доступ к отчетам
+      if (this.canAccessReports()) {
+        return "/fuel-report";
+      }
+
+      // Иначе проверим доступ к пользователям
+      if (this.permissions.view_users) {
+        return "/users";
+      }
+
+      // Если никуда не может, вернем на главную (будет переадресовано на /auth)
+      return "/";
+    },
+    /**
+     * Проверить, является ли пользователь водителем (только мобильное приложение)
+     * Водитель это:
+     * 1. Пользователь с ролью "Водитель"
+     * 2. Или пользователь без доступа к отчетам, пользователям и ролям (только если разрешения загружены)
+     */
+    isDriver() {
+      // Проверка 1: явно указана роль "Водитель"
+      if (this.user?.role) {
+        // role может быть строкой или объектом
+        const roleName =
+          typeof this.user.role === "string"
+            ? this.user.role
+            : this.user.role?.name || this.user.role?.toString?.() || "";
+
+        if (roleName.toLowerCase?.() === "водитель") {
+          return true;
+        }
+      }
+
+      // Проверка 2: нет доступа ни к отчетам, ни к пользователям, ни к ролям
+      // ЭТА ПРОВЕРКА РАБОТАЕТ ТОЛЬКО ЕСЛИ РАЗРЕШЕНИЯ УЖЕ ЗАГРУЖЕНЫ!
+      if (
+        this.permissionsLoaded &&
+        !this.canAccessReports() &&
+        !this.permissions.view_users &&
+        !this.permissions.view_roles
+      ) {
+        return true;
+      }
+
+      return false;
     },
   },
 });

@@ -100,28 +100,49 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
+  console.log(
+    "[ROUTER GUARD] Navigating to:",
+    to.path,
+    "isAuthenticated:",
+    auth.isAuthenticated,
+    "permissionsLoaded:",
+    auth.permissionsLoaded,
+  );
+
   if (to.path !== "/server-error") {
     await auth.checkConnection();
     // only redirect if the store believes the server is actually down.
     if (auth.serverError) {
+      console.warn(
+        "[ROUTER GUARD] Server error detected, redirecting to server-error",
+      );
       return "/server-error";
     }
   }
 
   // if server previously failed, go straight to error page (unless we are already there)
   if (auth.serverError && to.path !== "/server-error") {
+    console.warn(
+      "[ROUTER GUARD] Server error flag set, redirecting to server-error",
+    );
     return "/server-error";
   }
 
   if (to.meta.requiresAuth) {
+    console.log(
+      "[ROUTER GUARD] Route requires auth, checking authentication...",
+    );
     if (!auth.isAuthenticated) {
+      console.warn("[ROUTER GUARD] Not authenticated, redirecting to /auth");
       return "/auth";
     }
 
     // if we haven't ever checked before, block until result
     if (!auth.checkedOnce) {
+      console.log("[ROUTER GUARD] First check, verifying with server...");
       const ok = await auth.checkConnection();
       if (!ok) {
+        console.warn("[ROUTER GUARD] Connection check failed, redirecting");
         return auth.serverError ? "/server-error" : "/auth";
       }
     } else {
@@ -157,7 +178,31 @@ router.beforeEach(async (to) => {
   }
 
   if (to.path === "/auth" && auth.isAuthenticated) {
-    return "/fuel-report";
+    // Если пользователь уже залогинен, перенаправляем на default страницу
+    // Но перед этим убедимся что разрешения загружены
+    console.log(
+      "[ROUTER GUARD] /auth route but isAuthenticated=true, redirecting to default page",
+    );
+    if (!auth.permissionsLoaded) {
+      console.warn(
+        "[ROUTER GUARD] User authenticated but permissions not loaded on /auth route",
+      );
+      // Попробуем загрузить разрешения
+      await auth.fetchPermissionsWithRetry(3, 5000);
+    }
+    const redirectPath = auth.getDefaultRedirectPath() || "/fuel-report";
+    console.log(
+      "[ROUTER GUARD] Redirecting authenticated user to:",
+      redirectPath,
+    );
+    return redirectPath;
+  }
+
+  // Если мы идем на /auth и пользователь не авторизован, просто разрешаем переход
+  if (to.path === "/auth" && !auth.isAuthenticated) {
+    console.log(
+      "[ROUTER GUARD] /auth route and not authenticated, allowing access",
+    );
   }
 });
 

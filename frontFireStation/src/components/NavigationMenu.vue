@@ -112,26 +112,42 @@
       </div>
       <div class="ml-auto">
         <Button 
-          @click="logout" 
+          @click="openLogoutModal" 
           label="Выход"
           variant="secondary"
         />
       </div>
     </div>
 
-   
+    <!-- Modal подтверждения логаута -->
+    <Modal
+      :is-open="showLogoutModal"
+      title="Подтвердить выход"
+      @close="closeLogoutModal"
+    >
+      <div class="space-y-4">
+        <p :style="{ color: palette.dark }">Вы уверены что хотите выйти из системы?</p>
+      </div>
+      <template #footer>
+        <Button variant="secondary" size="md" @click="closeLogoutModal">Отмена</Button>
+        <Button variant="danger" size="md" @click="confirmLogout">Выйти</Button>
+      </template>
+    </Modal>
   </nav>
 </template>
 
 <script setup>
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import { palette, Button } from './ui/importUi';
-import { onMounted } from 'vue';
+import { palette, Button, Modal } from './ui/importUi';
+import { onMounted, ref } from 'vue';
 
 const router = useRouter();
 const route = useRoute();
 const auth = useAuthStore();
+
+// Logout modal
+const showLogoutModal = ref(false);
 
 console.debug("[NavigationMenu] Auth store:", auth); // Debug the auth object
 
@@ -171,11 +187,36 @@ const canViewPassengerCars = () => {
   );
 };
 
-const logout = () => {
-  auth.setAccess(null);
-  auth.setUser(null);
-  router.push('/auth');
-};
+// Открыть modal подтверждения логаута
+function openLogoutModal() {
+  console.log('[NavigationMenu] Opening logout modal...');
+  showLogoutModal.value = true;
+}
+
+// Закрыть modal подтверждения логаута
+function closeLogoutModal() {
+  console.log('[NavigationMenu] Closing logout modal...');
+  showLogoutModal.value = false;
+}
+
+// Подтвердить логаут
+async function confirmLogout() {
+  showLogoutModal.value = false;
+  console.log('[NavigationMenu] Confirming logout...');
+  
+  // Небольшая задержка чтобы modal успела закрыться
+  await new Promise(resolve => setTimeout(resolve, 100));
+  
+  console.log('[NavigationMenu] Performing logout...');
+  await auth.logout();
+  console.log('[NavigationMenu] Logout completed, auth state:', {
+    isAuthenticated: auth.isAuthenticated,
+    permissionsLoaded: auth.permissionsLoaded
+  });
+  
+  console.log('[NavigationMenu] Navigating to /auth...');
+  router.replace("/auth");
+}
 
 // Fetch permissions on component mount
 onMounted(async () => {
