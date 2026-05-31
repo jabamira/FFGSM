@@ -223,7 +223,7 @@ class UserViewSet(SoftDeleteModelViewSet):
         except (TypeError, ValueError):
             return Response({"detail": "Неверный формат параметра driver"}, status=400)
 
-        driver = User.objects.filter(id=driver_id, role_id=3).first()
+        driver = User.objects.filter(id=driver_id, role_id=3, deleted_at__isnull=True).first()
         if not driver:
             return Response({"detail": "Водитель не найден или не имеет роль водитель"}, status=404)
 
@@ -234,12 +234,14 @@ class UserViewSet(SoftDeleteModelViewSet):
 
         passenger_records = PassengerCarWaybillRecord.objects.filter(
             passenger_car_waybill__driver_id=driver_id,
+            passenger_car_waybill__deleted_at__isnull=True,
             passenger_car_waybill__date__gte=from_date,
             passenger_car_waybill__date__lte=to_date,
         ).select_related('passenger_car_waybill__driver', 'passenger_car_waybill__car')
 
         fire_records = FireTruckWaybillRecord.objects.filter(
             fire_truck_waybill__driver_id=driver_id,
+            fire_truck_waybill__deleted_at__isnull=True,
             fire_truck_waybill__date__gte=from_date,
             fire_truck_waybill__date__lte=to_date,
         ).select_related('fire_truck_waybill__driver', 'fire_truck_waybill__car')
@@ -289,7 +291,7 @@ class UserViewSet(SoftDeleteModelViewSet):
         except (TypeError, ValueError):
             return Response({"detail": "Неверный формат параметра driver"}, status=400)
 
-        driver = User.objects.filter(id=driver_id, role_id=3).first()
+        driver = User.objects.filter(id=driver_id, role_id=3, deleted_at__isnull=True).first()
         if not driver:
             return Response({"detail": "Водитель не найден или не имеет роль водитель"}, status=404)
 
@@ -300,12 +302,14 @@ class UserViewSet(SoftDeleteModelViewSet):
 
         passenger_records = PassengerCarWaybillRecord.objects.filter(
             passenger_car_waybill__driver_id=driver_id,
+            passenger_car_waybill__deleted_at__isnull=True,
             passenger_car_waybill__date__gte=from_date,
             passenger_car_waybill__date__lte=to_date,
         ).select_related('passenger_car_waybill__driver', 'passenger_car_waybill__car').order_by('passenger_car_waybill__date', 'id')
 
         fire_records = FireTruckWaybillRecord.objects.filter(
             fire_truck_waybill__driver_id=driver_id,
+            fire_truck_waybill__deleted_at__isnull=True,
             fire_truck_waybill__date__gte=from_date,
             fire_truck_waybill__date__lte=to_date,
         ).select_related('fire_truck_waybill__driver', 'fire_truck_waybill__car').order_by('fire_truck_waybill__date', 'id')
@@ -581,6 +585,7 @@ class PassengerCarWaybillViewSet(SoftDeleteModelViewSet):
             PassengerCarWaybillRecord.objects
             .filter(
                 passenger_car_waybill__car_id=car_id,
+                passenger_car_waybill__deleted_at__isnull=True,
                 passenger_car_waybill__date__gte=from_date,
                 passenger_car_waybill__date__lte=to_date,
             )
@@ -1009,6 +1014,7 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
             FireTruckWaybillRecord.objects
             .filter(
                 fire_truck_waybill__car_id=car_id,
+                fire_truck_waybill__deleted_at__isnull=True,
                 fire_truck_waybill__date__gte=from_date,
                 fire_truck_waybill__date__lte=to_date,
             )
@@ -1599,7 +1605,7 @@ class TechnicalMaintenanceViewSet(SoftDeleteModelViewSet):
                 operating_hours=Decimal(str(operating_hours_val))
             )
             
-            print(f'[TechnicalMaintenance] ✅ Создана запись TechnicalMaintenance:')
+            print(f'[TechnicalMaintenance] Создана запись TechnicalMaintenance:')
             print(f'  - id: {maintenance.id}')
             print(f'  - date: {maintenance.date}')
             print(f'  - maintenance_type: {maintenance.maintenance_type}')
