@@ -88,7 +88,7 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
             if actual_vehicle_type in ['all', 'passenger-car']:
                 logger.warning('[Statistics] Processing PASSENGER CARS')
                 
-                pc_query = PassengerCarWaybill.objects.filter(deleted_at__isnull=True)
+                pc_query = PassengerCarWaybill.objects.filter(deleted_at__isnull=True, driver__deleted_at__isnull=True, car__deleted_at__isnull=True)
                 if from_date and to_date:
                     pc_query = pc_query.filter(date__gte=from_date, date__lte=to_date)
                 if vehicle_type_prefix == 'pc' and vehicle_id:
@@ -211,7 +211,7 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
             if actual_vehicle_type in ['all', 'fire-truck']:
                 logger.warning('[Statistics] Processing FIRE TRUCKS')
                 
-                ft_query = FireTruckWaybill.objects.filter(deleted_at__isnull=True)
+                ft_query = FireTruckWaybill.objects.filter(deleted_at__isnull=True, driver__deleted_at__isnull=True, car__deleted_at__isnull=True)
                 if from_date and to_date:
                     ft_query = ft_query.filter(date__gte=from_date, date__lte=to_date)
                 if vehicle_type_prefix == 'ft' and vehicle_id:
@@ -349,7 +349,9 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
                     # Пассажирские путевые листы водителя
                     pc_waybills = PassengerCarWaybill.objects.filter(
                         driver_id=int(driver_id),
-                        deleted_at__isnull=True
+                        deleted_at__isnull=True,
+                        driver__deleted_at__isnull=True,
+                        car__deleted_at__isnull=True,
                     )
                     if from_date and to_date:
                         pc_waybills = pc_waybills.filter(date__gte=from_date, date__lte=to_date)
@@ -363,7 +365,9 @@ class FuelStatisticsViewSet(viewsets.ViewSet):
                     # Пожарные путевые листы водителя
                     ft_waybills = FireTruckWaybill.objects.filter(
                         driver_id=int(driver_id),
-                        deleted_at__isnull=True
+                        deleted_at__isnull=True,
+                        driver__deleted_at__isnull=True,
+                        car__deleted_at__isnull=True,
                     )
                     if from_date and to_date:
                         ft_waybills = ft_waybills.filter(date__gte=from_date, date__lte=to_date)
