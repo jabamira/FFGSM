@@ -1,11 +1,13 @@
 <template>
   <ion-page class="page-layout">
     <ion-header :translucent="true" class="no-border">
-      <ion-toolbar :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', '--border-bottom': 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: '24px' }">
-        <ion-title :style="{ color: palette.dark, textAlign: 'center', width: '100%' }">Путевыые листы</ion-title>
-        <p v-if="filteredWaybills.length > 0" :style="{ color: palette.medium, fontSize: '12px', margin: '6px 0 0 0', textAlign: 'center' }">
-          Всего: {{ filteredWaybills.length }}
-        </p>
+      <ion-toolbar :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', '--border-bottom': 'none' }">
+        <div style="width: 100%; display: flex; flex-direction: column; align-items: center; gap: 0; padding-top: 12px;">
+          <div :style="{ fontSize: '20px', fontWeight: '600', color: palette.dark, width: '100%', textAlign: 'center' }">Путевыые листы</div>
+          <div v-if="filteredWaybills.length > 0" :style="{ fontSize: '12px', color: palette.medium, marginTop: '4px', textAlign: 'center' }">
+            Всего: {{ filteredWaybills.length }}
+          </div>
+        </div>
       </ion-toolbar>
     </ion-header>
 

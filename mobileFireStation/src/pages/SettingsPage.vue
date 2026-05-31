@@ -58,6 +58,21 @@
           <h2 class="font-bold text-lg mb-4" :style="{ color: palette.error }">Опасная зона</h2>
           
           <Button
+            v-if="hasActiveTrip"
+            :label="isResettingTrip ? 'Сбрасываем...' : 'Сбросить данные поездки'"
+            variant="warning"
+            :disabled="isResettingTrip || isLoading"
+            :is-loading="isResettingTrip"
+            loading-text="Сбрасываем..."
+            @click="resetTripData"
+            expand="block"
+            class="mb-3"
+          />
+          <p v-if="hasActiveTrip" class="text-xs mt-2 mb-3 text-center" :style="{ color: palette.medium }">
+            Удалит застрявшие данные текущей поездки из памяти
+          </p>
+
+          <Button
             :label="isLoading ? 'Выходим...' : 'Выход из аккаунта'"
             variant="danger"
             :disabled="isLoading"
@@ -104,10 +119,11 @@
 </style>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { palette, Button } from '../components/ui/importUi'
 import { useAuthStore } from '../stores/auth'
+import { useTripStore } from '../stores/trip'
 import { getPendingSyncCount, clearSyncQueue } from '../utils/syncQueue'
 import { clearAllCache } from '../utils/cacheUtils'
 import FooterNavigation from '../components/FooterNavigation.vue'
@@ -122,8 +138,31 @@ import {
 
 const router = useRouter()
 const authStore = useAuthStore()
+const tripStore = useTripStore()
 const isLoading = ref(false)
+const isResettingTrip = ref(false)
 const pendingSyncCount = ref(getPendingSyncCount())
+
+const hasActiveTrip = computed(() => tripStore.hasActiveTrip)
+
+const resetTripData = async () => {
+  isResettingTrip.value = true
+  try {
+    console.log('[SettingsPage] Starting trip data reset...')
+    
+    // Очищаем активную поездку
+    await tripStore.clearActiveTrip()
+    console.log('[SettingsPage] Trip data reset complete')
+    
+    // Показываем успешное сообщение
+    alert('Данные поездки успешно сброшены')
+  } catch (err) {
+    console.error('[SettingsPage] Error resetting trip data:', err)
+    alert('Ошибка при сбросе данных поездки: ' + err.message)
+  } finally {
+    isResettingTrip.value = false
+  }
+}
 
 const logout = async () => {
   isLoading.value = true

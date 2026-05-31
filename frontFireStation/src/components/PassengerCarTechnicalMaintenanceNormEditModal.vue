@@ -151,10 +151,10 @@ const editingId = ref(null);
 
 // Maintenance types
 const MAINTENANCE_TYPES = [
-  { value: 'engine_oil', label: 'Замена моторного масла и фильтра' },
-  { value: 'air_filter', label: 'Замена воздушного фильтра' },
-  { value: 'cabine_filter', label: 'Замена салонного фильтра' },
-  { value: 'antifreeze', label: 'Замена антифриза' },
+  { value: 'engine_oil', label: 'Моторное масло' },
+  { value: 'air_filter', label: 'Воздушный фильтр' },
+  { value: 'cabine_filter', label: 'Салонный фильтр' },
+  { value: 'antifreeze', label: 'Антифриз' },
 ];
 
 const maintenanceTypeOptions = computed(() => MAINTENANCE_TYPES);

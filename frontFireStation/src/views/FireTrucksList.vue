@@ -576,13 +576,26 @@ const handleCrudDelete = () => {
   openDeleteModal();
 };
 
+// Перевод типов ТО на короткие названия
+const maintenanceTypeLabels = {
+  'engine_oil': 'Моторное масло',
+  'air_filter': 'Воздушный фильтр',
+  'cabine_filter': 'Салонный фильтр',
+  'antifreeze': 'Антифриз'
+};
+
+const getMaintenanceTypeLabel = (type) => {
+  return maintenanceTypeLabels[type] || type;
+};
+
 const formatMaintenanceHours = (row) => {
   // Проверка наличия информации о ТО
   if (!row.maintenance_info || row.maintenance_info?.error) {
     return 'нет норм';
   }
   
-  const maintenanceType = row.maintenance_info?.maintenance_type || 'ТО';
+  const rawMaintenanceType = row.maintenance_info?.maintenance_type || 'ТО';
+  const maintenanceType = getMaintenanceTypeLabel(rawMaintenanceType);
   const hours = row.maintenance_info?.interval;  // Используем interval из maintenance_info
   
   if (hours === null || hours === undefined) {

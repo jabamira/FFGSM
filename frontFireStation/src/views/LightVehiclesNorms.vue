@@ -518,10 +518,10 @@ const technicalNormsColumns = [
 
 // Methods - Helpers
 const MAINTENANCE_TYPES = {
-  'engine_oil': 'Замена моторного масла и фильтра',
-  'air_filter': 'Замена воздушного фильтра',
-  'cabine_filter': 'Замена салонного фильтра',
-  'antifreeze': 'Замена антифриза'
+  'engine_oil': 'Моторное масло',
+  'air_filter': 'Воздушный фильтр',
+  'cabine_filter': 'Салонный фильтр',
+  'antifreeze': 'Антифриз'
 };
 
 const getCar = (carId) => {

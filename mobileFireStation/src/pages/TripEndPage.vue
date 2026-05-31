@@ -44,14 +44,14 @@
               Цель выезда <span :style="{ color: '#ef4444' }">*</span>
             </label>
             <ion-item class="rounded-lg border" :style="{ borderColor: palette.light }">
-              <ion-select v-model="form.trip_purpose" placeholder="Выберите цель">
-                <ion-select-option value="Хозяйственный выезд">Хозяйственный выезд</ion-select-option>
-                <ion-select-option value="Выезд на пожар">Выезд на пожар</ion-select-option>
-                <ion-select-option value="Учебная тревога">Учебная тревога</ion-select-option>
-                <ion-select-option value="Техническое обслуживание">Техническое обслуживание</ion-select-option>
-                <ion-select-option value="Прочее">Прочее</ion-select-option>
-              </ion-select>
+              <ion-input
+                v-model="form.trip_purpose"
+                type="text"
+                placeholder="Введите цель выезда"
+                maxlength="255"
+              />
             </ion-item>
+            <p class="text-xs mt-1" :style="{ color: palette.medium }">{{ form.trip_purpose?.length || 0 }}/255</p>
           </div>
 
           <!-- Trip Route (Fire Truck Only) -->
@@ -436,9 +436,9 @@ function formatWorkSessionTime(ms) {
   const minutes = Math.floor((totalSeconds % 3600) / 60)
   
   if (hours > 0) {
-    return `${hours}ч ${minutes}м`
+    return `${hours}ч ${minutes} мин`
   }
-  return `${minutes}м`
+  return `${minutes} мин`
 }
 
 async function submitTripEnd() {
@@ -657,6 +657,16 @@ onMounted(() => {
     router.push('/waybills')
   }
 
+  // Загружаем цель выезда и маршрут из tripData если они там есть
+  if (tripData.value.tripPurpose) {
+    form.value.trip_purpose = tripData.value.tripPurpose
+    console.log('[TripEnd] Loaded trip_purpose from tripData:', form.value.trip_purpose)
+  }
+  if (tripData.value.tripRoute) {
+    form.value.trip_route = tripData.value.tripRoute
+    console.log('[TripEnd] Loaded trip_route from tripData:', form.value.trip_route)
+  }
+
   // Инициализируем время выезда из startedAt
   if (tripData.value.startedAt) {
     const startDate = new Date(tripData.value.startedAt)
@@ -695,6 +705,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Скрыть AM/PM из input[type="time"] */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none;
+}
+
+input[type="time"] {
+  /* Убрать AM/PM */
+}
+
+/* Для ion-input с type="time" */
+::v-deep ion-input input[type="time"]::-webkit-datetime-edit-ampm-field {
+  display: none !important;
+}
+
+::v-deep ion-input input[type="time"] {
+  width: 100%;
+}
+
 .page-layout {
   display: flex;
   flex-direction: column;

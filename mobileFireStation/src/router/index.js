@@ -30,11 +30,6 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
-    path: '/waybill/:id/view',
-    component: () => import('../pages/WaybillDetailPage.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
     path: '/trip/active',
     component: () => import('../pages/ActiveTripPage.vue'),
     meta: { requiresAuth: true }
@@ -51,9 +46,32 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard для проверки активной поездки
+// Navigation guard для проверки авторизации и активной поездки
 router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
   const tripStore = useTripStore()
+  
+  // Если нет авторизации, загружаем её из хранилища
+  if (!authStore.isAuthenticated && !authStore.token) {
+    await authStore.loadToken()
+    await authStore.loadUser()
+  }
+  
+  // Проверяем требуемую авторизацию
+  const requiresAuth = to.meta.requiresAuth !== false
+  const isAuthenticated = !!authStore.token
+  
+  // Если страница требует авторизации, но авторизации нет - идём на логин
+  if (requiresAuth && !isAuthenticated) {
+    console.log('[Router] Auth required but not authenticated, redirecting to /login')
+    return next('/login')
+  }
+  
+  // Если на логине и авторизованы - идём на путевые листы
+  if (to.path === '/login' && isAuthenticated) {
+    console.log('[Router] Already authenticated, redirecting to /waybills')
+    return next('/waybills')
+  }
   
   // Если переходим на путевые листы или другую страницу
   // и у нас есть активная поездка - перенаправляем на активную поездку

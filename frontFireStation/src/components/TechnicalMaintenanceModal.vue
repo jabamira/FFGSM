@@ -24,7 +24,7 @@
             }"
             class="w-full text-left hover:shadow transition-shadow"
           >
-            {{ getMaintenanceTypeLabel(item.maintenance_type) }}: {{ ((item.last_maintenance_hours + item.norm_interval_value) - carCurrentHours).toFixed(2) }} ч
+            {{ getMaintenanceTypeShortLabel(item.maintenance_type) }}: {{ ((item.last_maintenance_hours + item.norm_interval_value) - carCurrentHours).toFixed(2) }} ч
           </button>
         </div>
       </div>
@@ -189,14 +189,26 @@ const carCurrentHours = computed(() => {
 
 // Маппинг для переводов видов ТО
 const maintenanceTypeLabels = {
-  'engine_oil': 'Замена моторного масла и фильтра',
-  'air_filter': 'Замена воздушного фильтра',
-  'cabine_filter': 'Замена салонного фильтра',
-  'antifreeze': 'Замена антифриза'
+  'engine_oil': 'Моторное масло',
+  'air_filter': 'Воздушный фильтр',
+  'cabine_filter': 'Салонный фильтр',
+  'antifreeze': 'Антифриз'
+};
+
+// Маппинг для коротких названий (для кнопок)
+const maintenanceTypeShortLabels = {
+  'engine_oil': 'Моторное масло',
+  'air_filter': 'Воздушный фильтр',
+  'cabine_filter': 'Салонный фильтр',
+  'antifreeze': 'Антифриз'
 };
 
 const getMaintenanceTypeLabel = (typeCode) => {
   return maintenanceTypeLabels[typeCode] || typeCode;
+};
+
+const getMaintenanceTypeShortLabel = (typeCode) => {
+  return maintenanceTypeShortLabels[typeCode] || typeCode;
 };
 
 // Получить все варианты ТО для этой машины

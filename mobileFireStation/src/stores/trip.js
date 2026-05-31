@@ -9,6 +9,7 @@ export const useTripStore = defineStore('trip', () => {
   const activeTrip = ref(null)
   const isLoading = ref(false)
   const error = ref('')
+  const tripLoaded = ref(false) // Флаг чтобы отследить загружена ли поездка
 
   // Проверка, есть ли активная поездка
   const hasActiveTrip = computed(() => !!activeTrip.value)
@@ -25,12 +26,20 @@ export const useTripStore = defineStore('trip', () => {
 
   // Загрузить поездку из Capacitor Preferences
   async function loadTripFromStorage() {
+    // Если уже загружали - не загружаем снова
+    if (tripLoaded.value) {
+      console.log('[TripStore] Trip already loaded, skipping duplicate load')
+      return activeTrip.value
+    }
+
     try {
       const tripData = await StorageManager.getItem(STORAGE_KEY)
+      tripLoaded.value = true // Отмечаем что уже пытались загрузить
+      
       if (tripData) {
         const trip = JSON.parse(tripData)
         activeTrip.value = trip
-        console.log('[TripStore] Trip loaded from storage')
+        console.log('[TripStore] Trip loaded from storage:', { number: trip.number, car_number: trip.car_number })
         return trip
       }
       return null
@@ -89,6 +98,7 @@ export const useTripStore = defineStore('trip', () => {
   async function endTrip() {
     activeTrip.value = null
     error.value = ''
+    tripLoaded.value = false // Сбрасываем флаг
     await removeTripFromStorage()
   }
 
@@ -97,6 +107,7 @@ export const useTripStore = defineStore('trip', () => {
     console.warn('[TripStore] Clearing invalid/stuck active trip')
     activeTrip.value = null
     error.value = ''
+    tripLoaded.value = false // Сбрасываем флаг чтобы можно было загрузить новую поездку
     await removeTripFromStorage()
   }
 
