@@ -625,9 +625,23 @@ async function submitFuelingData() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Проверяем, есть ли активная поездка
   if (!tripStore.hasActiveTrip) {
+    router.push('/waybills')
+    return
+  }
+
+  // Проверяем валидность активной поездки
+  if (!trip.value.number || !trip.value.car_number) {
+    error.value = 'Обнаружена поврежденная поездка с неполными данными. Очищаю...'
+    console.error('[ActiveTrip] Invalid trip detected, clearing:', trip.value)
+    
+    // Ждем 2 секунды чтобы пользователь увидел сообщение
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
+    // Очищаем поврежденную поездку и возвращаемся к списку
+    await tripStore.clearActiveTrip()
     router.push('/waybills')
     return
   }

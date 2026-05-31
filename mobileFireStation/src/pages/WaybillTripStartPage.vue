@@ -196,8 +196,21 @@ const form = ref({
 
 const errors = ref({
   tripPurpose: '',
-  tripRoute: ''
+  tripRoute: '',
+  waybill: ''
 })
+
+function isWaybillValid(wb) {
+  // Проверяем что путевой лист имеет все необходимые данные
+  return !!(
+    wb &&
+    wb.id &&
+    wb.number &&
+    wb.car_number &&
+    (wb.car_name || (wb.car_brand && wb.car_model)) &&
+    wb.date
+  )
+}
 
 function getCurrentTime() {
   const now = new Date()
@@ -237,7 +250,14 @@ function handleStartTrip() {
   validateTripPurpose()
   validateTripRoute()
   
-  if (!errors.value.tripPurpose && !errors.value.tripRoute) {
+  // Валидируем путевой лист
+  errors.value.waybill = ''
+  if (!isWaybillValid(waybill.value)) {
+    errors.value.waybill = 'Ошибка: неполные данные путевого листа. Попробуйте перезагрузить или выберите другой путевой лист.'
+    return
+  }
+  
+  if (!errors.value.tripPurpose && !errors.value.tripRoute && !errors.value.waybill) {
     showConfirmModal.value = true
   }
 }
@@ -249,7 +269,21 @@ async function confirmStartTrip() {
   try {
     // Проверяем, нет ли уже активной поездки
     if (tripStore.hasActiveTrip) {
-      error.value = 'У вас уже есть активная поездка. Завершите её перед началом новой.'
+      // Проверяем валидность старой поездки
+      if (!tripStore.activeTrip?.number || !tripStore.activeTrip?.car_number) {
+        // Очищаем невалидную поездку
+        console.warn('[WaybillTripStart] Clearing invalid active trip:', tripStore.activeTrip)
+        await tripStore.clearActiveTrip()
+      } else {
+        error.value = 'У вас уже есть активная поездка. Завершите её перед началом новой.'
+        isConfirming.value = false
+        return
+      }
+    }
+    
+    // Финальная проверка перед началом поездки
+    if (!isWaybillValid(waybill.value)) {
+      error.value = 'Ошибка: неполные данные путевого листа. Пожалуйста, попробуйте ещё раз.'
       isConfirming.value = false
       return
     }
@@ -274,7 +308,13 @@ async function confirmStartTrip() {
     console.log('Начало поездки:', tripStartData)
 
     // Сохраняем активную поездку в store
-    tripStore.startTrip(tripStartData)
+    const startResult = tripStore.startTrip(tripStartData)
+    
+    if (!startResult) {
+      error.value = tripStore.error || 'Ошибка при сохранении данных поездки'
+      isConfirming.value = false
+      return
+    }
 
     // Добавляем операцию в очередь синхронизации для офлайн режима
     const syncAdded = addSyncOperation(SYNC_QUEUE.TRIP_START, tripStartData)
@@ -329,8 +369,13 @@ async function loadWaybill() {
       const foundWaybill = data.find(w => w.id === parseInt(waybillId))
       
       if (foundWaybill) {
-        waybill.value = foundWaybill
-        console.log('Waybill loaded from server:', waybill.value)
+        if (isWaybillValid(foundWaybill)) {
+          waybill.value = foundWaybill
+          console.log('Waybill loaded from server:', waybill.value)
+        } else {
+          error.value = 'Путевой лист содержит неполные данные. Пожалуйста, проверьте данные машины и попробуйте ещё раз.'
+          console.error('Invalid waybill data:', foundWaybill)
+        }
       } else {
         error.value = 'Путевой лист не найден'
       }

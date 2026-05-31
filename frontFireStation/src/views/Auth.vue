@@ -61,8 +61,7 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import HeaderComponent from '../components/HeaderComponent.vue';
-import FooterComponent from '../components/FooterComponent.vue';
+
 import { TextInput, Button, palette } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';

@@ -52,6 +52,13 @@ export const useTripStore = defineStore('trip', () => {
 
   // Начать новую поездку
   function startTrip(tripData) {
+    // Валидируем что данные полные перед сохранением
+    if (!tripData.number || !tripData.car_number || !tripData.waybillId || !tripData.date) {
+      console.error('[TripStore] Invalid trip data, cannot start trip:', tripData)
+      error.value = 'Ошибка: неполные данные путевого листа, поездка не может быть начата'
+      return false
+    }
+    
     activeTrip.value = {
       waybillId: tripData.waybillId,
       number: tripData.number,
@@ -75,20 +82,22 @@ export const useTripStore = defineStore('trip', () => {
     error.value = ''
     // Сохраняем в localStorage
     saveTripToStorage(activeTrip.value)
+    return true
   }
 
   // Завершить поездку
-  function endTrip() {
+  async function endTrip() {
     activeTrip.value = null
     error.value = ''
-    removeTripFromStorage()
+    await removeTripFromStorage()
   }
 
-  // Очистить активную поездку
-  function clearActiveTrip() {
+  // Очистить активную поездку (невалидная или зависшая)
+  async function clearActiveTrip() {
+    console.warn('[TripStore] Clearing invalid/stuck active trip')
     activeTrip.value = null
     error.value = ''
-    removeTripFromStorage()
+    await removeTripFromStorage()
   }
 
   // Обновить данные о заправке

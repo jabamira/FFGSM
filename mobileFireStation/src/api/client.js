@@ -23,7 +23,10 @@ class ApiClient {
       })
       const token = await StorageManager.getItem('auth_token')
       if (token) {
+        console.log('[API Request] Token attached:', token.substring(0, 20) + '...')
         config.headers.Authorization = `Bearer ${token}`
+      } else {
+        console.warn('[API Request] No token found in storage')
       }
       return config
     }, (error) => {
@@ -52,12 +55,32 @@ class ApiClient {
             method: error.config?.method,
           },
         })
-        // Если токен истек или доступ запрещен
+        
+        // Если токен истек или доступ запрещен (401 или 403)
         if (error.response?.status === 401 || error.response?.status === 403) {
+          console.warn('[API] Unauthorized (401/403) - clearing auth and redirecting to login')
+          
+          // Очищаем storage
           await StorageManager.removeItem('auth_token')
           await StorageManager.removeItem('auth_user')
-          window.location.href = '/login'
+          
+          // Очищаем Pinia store если он инициализирован
+          try {
+            const { useAuthStore } = await import('../stores/auth')
+            const authStore = useAuthStore()
+            authStore.logout()
+            console.log('[API] Auth store cleared')
+          } catch (err) {
+            console.warn('[API] Could not clear auth store:', err)
+          }
+          
+          // Только если не на странице логина
+          if (window.location.pathname !== '/login') {
+            console.log('[API] Redirecting to login page')
+            window.location.href = '/login'
+          }
         }
+        
         return Promise.reject(error)
       }
     )

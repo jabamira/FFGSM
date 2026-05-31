@@ -617,36 +617,45 @@ onMounted(async () => {
   }
 });
 
-// When vehicle type changes, clear the selected vehicle and auto-load
+// Debounced analytics loader
+let loadAnalyticsTimeout;
+const debouncedLoadAnalytics = () => {
+  clearTimeout(loadAnalyticsTimeout);
+  loadAnalyticsTimeout = setTimeout(() => {
+    loadAnalytics();
+  }, 300);
+};
+
+// When vehicle type changes, clear the selected vehicle and reload
 watch(
   () => filters.value.vehicleType,
-  async (newType) => {
+  (newType) => {
     filters.value.vehicle = '';
-    await loadAnalytics();
+    debouncedLoadAnalytics();
   }
 );
 
 // Auto-load when vehicle changes
 watch(
   () => filters.value.vehicle,
-  async () => {
-    await loadAnalytics();
+  () => {
+    debouncedLoadAnalytics();
   }
 );
 
 // Auto-load when driver changes
 watch(
   () => filters.value.driver,
-  async () => {
-    await loadAnalytics();
+  () => {
+    debouncedLoadAnalytics();
   }
 );
 
 // Auto-load when date range changes
 watch(
   () => filters.value.dateRange,
-  async () => {
-    await loadAnalytics();
+  () => {
+    debouncedLoadAnalytics();
   },
   { deep: true }
 );

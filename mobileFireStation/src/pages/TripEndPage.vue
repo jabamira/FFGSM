@@ -15,11 +15,7 @@
 
     <!-- Content -->
     <ion-content :fullscreen="true" class="ion-padding" :style="{ '--background': 'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)' }">
-      <div class="pb-4">
-        <!-- Error Alert -->
-        <div v-if="error" class="mb-4 p-4 rounded-lg bg-red-100 border-l-4 border-red-500">
-          <p class="text-sm text-red-700">{{ error }}</p>
-        </div>
+      <div class="pb-24">
 
         <!-- Trip Info Card -->
         <div class="mb-6 p-4 rounded-xl shadow-md" :style="{ backgroundColor: '#ffffff', borderLeft: `4px solid ${palette.primary}` }">
@@ -61,10 +57,10 @@
           <!-- Trip Route (Fire Truck Only) -->
           <div class="p-4 rounded-xl shadow-md" :style="{ backgroundColor: '#ffffff' }">
             <label class="text-sm font-medium block mb-2" :style="{ color: palette.dark }">
-              Маршрут движения
+              Маршрут движения <span style="color: #ef4444;">*</span>
             </label>
-            <p class="text-xs mb-2" :style="{ color: palette.medium }">До 255 символов (опционально)</p>
-            <ion-item class="rounded-lg border" :style="{ borderColor: palette.light }">
+            <p class="text-xs mb-2" :style="{ color: palette.medium }">До 255 символов</p>
+            <ion-item class="rounded-lg border" :style="{ borderColor: errors.trip_route ? '#ef4444' : palette.light }">
               <ion-input
                 v-model="form.trip_route"
                 type="text"
@@ -72,6 +68,7 @@
                 maxlength="255"
               />
             </ion-item>
+            <p v-if="errors.trip_route" class="text-xs mt-1" style="color: #ef4444;">{{ errors.trip_route }}</p>
             <p class="text-xs mt-1" :style="{ color: palette.medium }">{{ form.trip_route?.length || 0 }}/255</p>
           </div>
 
@@ -292,6 +289,17 @@
       </div>
     </ion-content>
 
+    <!-- Error Alert at Bottom -->
+    <div v-if="error" class="fixed bottom-0 left-0 right-0 p-4 bg-red-500 text-white" style="z-index: 1000;">
+      <div class="flex justify-between items-start">
+        <div class="flex-1">
+          <p class="font-semibold mb-1">Ошибка</p>
+          <p class="text-sm">{{ error }}</p>
+        </div>
+        <button @click="error = ''" class="ml-2 text-xl">&times;</button>
+      </div>
+    </div>
+
     <!-- Success Modal -->
     <div v-if="showSuccessModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Overlay -->
@@ -355,6 +363,7 @@ import {
 const router = useRouter()
 const tripStore = useTripStore()
 const error = ref('')
+const errors = ref({})
 const isSubmitting = ref(false)
 const showCustomTripPurpose = ref(false)
 const showSuccessModal = ref(false)
@@ -442,12 +451,20 @@ async function submitTripEnd() {
       throw new Error('Расход топлива не может быть отрицательным')
     }
 
-    if (tripData.value.vehicleType === 'fire_truck' && !form.value.trip_purpose) {
-      throw new Error('Укажите цель выезда для пожарной машины')
+    if (tripData.value.vehicleType === 'fire_truck') {
+      if (!form.value.trip_purpose) {
+        errors.value.trip_purpose = 'Укажите цель выезда'
+        throw new Error('Укажите цель выезда')
+      }
+      if (!form.value.trip_route || form.value.trip_route.trim() === '') {
+        errors.value.trip_route = 'Маршрут движения обязателен'
+        throw new Error('Укажите маршрут движения')
+      }
     }
 
     if (tripData.value.vehicleType === 'passenger_car') {
       if (!form.value.trip_purpose) {
+        errors.value.trip_purpose = 'Укажите цель выезда'
         throw new Error('Укажите цель выезда')
       }
       if (form.value.city_kilometers < 0 || form.value.regional_kilometers < 0) {
@@ -455,8 +472,12 @@ async function submitTripEnd() {
       }
     }
 
+    // Очищаем ошибки валидации
+    errors.value = {}
+
     // Строим данные для отправки в зависимости от типа машины
     let recordData = {}
+    let submitSuccess = false
 
     if (tripData.value.vehicleType === 'passenger_car') {
       // Данные для PassengerCarWaybillRecord
@@ -493,21 +514,18 @@ async function submitTripEnd() {
           console.error('[TripEnd] Error creating passenger car record:', err)
           console.error('[TripEnd] Error response:', err.response?.data)
           console.error('[TripEnd] Error message:', err.message)
-          // Выводим полный ответ сервера
-          let errorMsg = err.message || 'Ошибка при отправке данных'
+          
+          // Выводим понятное сообщение об ошибке
+          let errorMsg = 'Ошибка при сохранении данных поездки'
           if (err.response?.data) {
-            if (typeof err.response.data === 'string') {
-              errorMsg = err.response.data
+            if (Array.isArray(err.response.data)) {
+              errorMsg = err.response.data.join(', ')
             } else if (err.response.data.detail) {
               errorMsg = err.response.data.detail
             } else if (err.response.data.non_field_errors) {
               errorMsg = err.response.data.non_field_errors.join(', ')
-            } else {
-              // Выводим все ошибки как строку
-              const errors = Object.entries(err.response.data)
-                .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
-                .join('; ')
-              errorMsg = errors || errorMsg
+            } else if (typeof err.response.data === 'string') {
+              errorMsg = err.response.data
             }
           }
           error.value = errorMsg
@@ -562,21 +580,24 @@ async function submitTripEnd() {
           console.error('[TripEnd] Error creating fire truck record:', err)
           console.error('[TripEnd] Error response:', err.response?.data)
           console.error('[TripEnd] Error message:', err.message)
-          // Выводим полный ответ сервера
-          let errorMsg = err.message || 'Ошибка при отправке данных'
+          
+          // Выводим понятное сообщение об ошибке
+          let errorMsg = 'Ошибка при сохранении данных поездки'
           if (err.response?.data) {
-            if (typeof err.response.data === 'string') {
-              errorMsg = err.response.data
+            if (Array.isArray(err.response.data)) {
+              // Если это массив ошибок (например, 'Не найдены последние показания')
+              const errorMessages = err.response.data
+              if (errorMessages[0] && errorMessages[0].includes('Не найдены последние показания')) {
+                errorMsg = 'Для этой машины нет начальных данных (одометр и топливо). Создайте запись в журнале одометра перед началом поездки.'
+              } else {
+                errorMsg = errorMessages.join(', ')
+              }
             } else if (err.response.data.detail) {
               errorMsg = err.response.data.detail
             } else if (err.response.data.non_field_errors) {
               errorMsg = err.response.data.non_field_errors.join(', ')
-            } else {
-              // Выводим все ошибки как строку
-              const errors = Object.entries(err.response.data)
-                .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
-                .join('; ')
-              errorMsg = errors || errorMsg
+            } else if (typeof err.response.data === 'string') {
+              errorMsg = err.response.data
             }
           }
           error.value = errorMsg
@@ -596,8 +617,8 @@ async function submitTripEnd() {
       console.log('[TripEnd] Showing success modal and clearing active trip')
       showSuccessModal.value = true
       // Закрываем модаль через 3 секунды и переходим
-      setTimeout(() => {
-        tripStore.clearActiveTrip()
+      setTimeout(async () => {
+        await tripStore.clearActiveTrip()
         router.push('/waybills')
       }, 2000)
     } else {

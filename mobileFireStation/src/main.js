@@ -59,12 +59,7 @@ app.use(IonicVue)
 // Загружаем сохранённую авторизацию при запуске (после инициализации Pinia)
 const authStore = useAuthStore()
 
-// Асинхронная загрузка авторизации
-authStore.loadToken().then(() => {
-  authStore.loadUser()
-})
-
-// Теперь регистрируем router после инициализации авторизации
+// Регистрируем router
 app.use(router)
 
 // Защита маршрутов - проверяем авторизацию перед каждым переходом
@@ -108,6 +103,35 @@ router.beforeEach((to, from, next) => {
   }
 })
 
-router.isReady().then(() => {
-  app.mount('#app')
+// Асинхронная инициализация приложения - ГЛАВНОЕ:
+// 1. Загружаем auth данные из Capacitor Preferences
+// 2. Дождаемся router.isReady()
+// 3. Монтируем приложение
+async function initializeApp() {
+  try {
+    console.log('[Main] ===== App Initialization Start =====')
+    console.log('[Main] Loading auth data from storage...')
+    
+    await authStore.loadToken()
+    console.log('[Main] Token loaded:', !!authStore.token ? `${authStore.token.substring(0, 20)}...` : 'NONE')
+    
+    await authStore.loadUser()
+    console.log('[Main] User loaded:', authStore.user?.login || 'NONE')
+    
+    console.log('[Main] Auth initialization complete')
+    console.log('[Main] isAuthenticated:', authStore.isAuthenticated)
+    console.log('[Main] ===== App Initialization Complete =====')
+  } catch (err) {
+    console.error('[Main] Error loading auth data:', err)
+  }
+}
+
+// Инициализируем auth и монтируем приложение
+initializeApp().then(() => {
+  console.log('[Main] Auth ready, waiting for router...')
+  router.isReady().then(() => {
+    console.log('[Main] Router ready, mounting app...')
+    app.mount('#app')
+    console.log('[Main] App mounted successfully')
+  })
 })
