@@ -126,6 +126,12 @@ export function validateFormFields(data, definitions) {
       return;
     }
 
+    // Check startsWith constraint - must start with specified character
+    if (fieldDef.startsWith && !strValue.startsWith(fieldDef.startsWith)) {
+      errors[fieldName] = `Должно начинаться с ${fieldDef.startsWith}`;
+      return;
+    }
+
     // Check validRussianCar constraint - valid Russian license plate format
     if (fieldDef.validRussianCar && !isValidRussianCarPlate(strValue)) {
       errors[fieldName] =
@@ -269,6 +275,11 @@ export function validateSingleField(fieldName, value, fieldDef) {
   // Check onlyDigits constraint - only numbers allowed
   if (fieldDef.onlyDigits && !/^\d+$/.test(strValue.replace(/\s/g, ""))) {
     return "Допускаются только цифры";
+  }
+
+  // Check startsWith constraint - must start with specified character
+  if (fieldDef.startsWith && !strValue.startsWith(fieldDef.startsWith)) {
+    return `Должно начинаться с ${fieldDef.startsWith}`;
   }
 
   // Check validRussianCar constraint
