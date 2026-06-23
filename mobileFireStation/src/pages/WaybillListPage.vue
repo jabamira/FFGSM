@@ -139,6 +139,25 @@
         </div>
       </div>
 
+      <!-- Пустой список (когда вообще нет путевых листов) -->
+      <div v-else class="flex flex-col items-center justify-center h-96 px-6">
+        <ion-icon name="document-outline" style="font-size: 64px; color: #ccc; margin-bottom: 16px;"></ion-icon>
+        <p class="text-gray-500 text-center w-full">Путевые листы не найдены</p>
+        <p class="text-gray-400 text-sm mt-2">Попробуйте обновить для загрузки путевых листов</p>
+        
+        <!-- Кнопка обновить -->
+        <div class="mt-6 flex justify-center">
+          <Button
+            :label="isLoading ? 'Загрузка...' : 'Обновить'"
+            variant="primary"
+            :disabled="isLoading"
+            :is-loading="isLoading"
+            loading-text="Загрузка..."
+            @click="loadWaybills"
+          />
+        </div>
+      </div>
+
     </ion-content>
 
     <!-- Bottom Navigation Footer -->

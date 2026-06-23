@@ -331,7 +331,7 @@ import { useRouter } from 'vue-router'
 import { useTripStore } from '../stores/trip'
 import { palette, Button } from '../components/ui/importUi'
 import FooterNavigation from '../components/FooterNavigation.vue'
-import { isOnline } from '../utils/cacheUtils'
+import { isOnline, isNetworkError } from '../utils/cacheUtils'
 import { addSyncOperation, SYNC_QUEUE } from '../utils/syncQueue'
 import { passengerCarRecordApi, fireTruckRecordApi } from '../api'
 import carIcon from '@/assets/free-icon-car-trip.png'
@@ -502,22 +502,31 @@ async function submitTripEnd() {
           console.error('[TripEnd] Error response:', err.response?.data)
           console.error('[TripEnd] Error message:', err.message)
           
-          // Выводим понятное сообщение об ошибке
-          let errorMsg = 'Ошибка при сохранении данных поездки'
-          if (err.response?.data) {
-            if (Array.isArray(err.response.data)) {
-              errorMsg = err.response.data.join(', ')
-            } else if (err.response.data.detail) {
-              errorMsg = err.response.data.detail
-            } else if (err.response.data.non_field_errors) {
-              errorMsg = err.response.data.non_field_errors.join(', ')
-            } else if (typeof err.response.data === 'string') {
-              errorMsg = err.response.data
+          // Проверяем, является ли ошибка сетевой ошибкой
+          if (isNetworkError(err)) {
+            // Сетевая ошибка - сохраняем в синхронизацию
+            console.log('[TripEnd] Network error detected, adding to sync queue')
+            addSyncOperation(SYNC_QUEUE.TRIP_END, recordData)
+            error.value = 'Сервер не отвечает. Данные будут синхронизированы, когда соединение восстановится.'
+            submitSuccess = true // Считаем успешным для прогресса
+          } else {
+            // Обычная ошибка - выводим сообщение об ошибке
+            let errorMsg = 'Ошибка при сохранении данных поездки'
+            if (err.response?.data) {
+              if (Array.isArray(err.response.data)) {
+                errorMsg = err.response.data.join(', ')
+              } else if (err.response.data.detail) {
+                errorMsg = err.response.data.detail
+              } else if (err.response.data.non_field_errors) {
+                errorMsg = err.response.data.non_field_errors.join(', ')
+              } else if (typeof err.response.data === 'string') {
+                errorMsg = err.response.data
+              }
             }
+            error.value = errorMsg
+            console.log('[TripEnd] Final error message:', errorMsg)
+            submitSuccess = false
           }
-          error.value = errorMsg
-          console.log('[TripEnd] Final error message:', errorMsg)
-          submitSuccess = false
         }
       } else {
         // Офлайн режим - сохраняем в синхронизацию
@@ -568,28 +577,37 @@ async function submitTripEnd() {
           console.error('[TripEnd] Error response:', err.response?.data)
           console.error('[TripEnd] Error message:', err.message)
           
-          // Выводим понятное сообщение об ошибке
-          let errorMsg = 'Ошибка при сохранении данных поездки'
-          if (err.response?.data) {
-            if (Array.isArray(err.response.data)) {
-              // Если это массив ошибок (например, 'Не найдены последние показания')
-              const errorMessages = err.response.data
-              if (errorMessages[0] && errorMessages[0].includes('Не найдены последние показания')) {
-                errorMsg = 'Для этой машины нет начальных данных (одометр и топливо). Создайте запись в журнале одометра перед началом поездки.'
-              } else {
-                errorMsg = errorMessages.join(', ')
+          // Проверяем, является ли ошибка сетевой ошибкой
+          if (isNetworkError(err)) {
+            // Сетевая ошибка - сохраняем в синхронизацию
+            console.log('[TripEnd] Network error detected, adding to sync queue')
+            addSyncOperation(SYNC_QUEUE.TRIP_END, recordData)
+            error.value = 'Сервер не отвечает. Данные будут синхронизированы, когда соединение восстановится.'
+            submitSuccess = true // Считаем успешным для прогресса
+          } else {
+            // Обычная ошибка - выводим сообщение об ошибке
+            let errorMsg = 'Ошибка при сохранении данных поездки'
+            if (err.response?.data) {
+              if (Array.isArray(err.response.data)) {
+                // Если это массив ошибок (например, 'Не найдены последние показания')
+                const errorMessages = err.response.data
+                if (errorMessages[0] && errorMessages[0].includes('Не найдены последние показания')) {
+                  errorMsg = 'Для этой машины нет начальных данных (одометр и топливо). Создайте запись в журнале одометра перед началом поездки.'
+                } else {
+                  errorMsg = errorMessages.join(', ')
+                }
+              } else if (err.response.data.detail) {
+                errorMsg = err.response.data.detail
+              } else if (err.response.data.non_field_errors) {
+                errorMsg = err.response.data.non_field_errors.join(', ')
+              } else if (typeof err.response.data === 'string') {
+                errorMsg = err.response.data
               }
-            } else if (err.response.data.detail) {
-              errorMsg = err.response.data.detail
-            } else if (err.response.data.non_field_errors) {
-              errorMsg = err.response.data.non_field_errors.join(', ')
-            } else if (typeof err.response.data === 'string') {
-              errorMsg = err.response.data
             }
+            error.value = errorMsg
+            console.log('[TripEnd] Final error message:', errorMsg)
+            submitSuccess = false
           }
-          error.value = errorMsg
-          console.log('[TripEnd] Final error message:', errorMsg)
-          submitSuccess = false
         }
       } else {
         // Офлайн режим - сохраняем в синхронизацию

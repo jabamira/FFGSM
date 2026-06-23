@@ -85,6 +85,43 @@ export const isOnline = () => {
 }
 
 /**
+ * Определяет, является ли ошибка ошибкой сетевого соединения
+ * (сервер не отвечает, timeout, отсутствие соединения и т.д.)
+ */
+export const isNetworkError = (error) => {
+  // Проверяем различные типы сетевых ошибок
+  if (!error) return false
+  
+  // Ошибки axios
+  if (error.code === 'ERR_NETWORK' || error.code === 'ECONNABORTED' || 
+      error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' ||
+      error.code === 'EHOSTUNREACH' || error.code === 'ENETUNREACH') {
+    return true
+  }
+  
+  // Проверяем сообщение об ошибке
+  const message = error.message ? error.message.toLowerCase() : ''
+  if (message.includes('timeout') || message.includes('network') || 
+      message.includes('econnrefused') || message.includes('unreachable') ||
+      message.includes('offline') || message.includes('fetch') ||
+      message.includes('request failed')) {
+    return true
+  }
+  
+  // Ошибка ответа (500, 503 - server errors)
+  if (error.response && error.response.status >= 500) {
+    return true
+  }
+  
+  // Нет ответа от сервера
+  if (error.request && !error.response) {
+    return true
+  }
+  
+  return false
+}
+
+/**
  * Слушает изменения статуса интернета
  */
 export const onlineStatusListener = (callback) => {
@@ -98,6 +135,7 @@ export default {
   clearCache,
   clearAllCache,
   isOnline,
+  isNetworkError,
   onlineStatusListener,
   CACHE_KEYS,
 }
