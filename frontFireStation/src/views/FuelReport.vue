@@ -52,8 +52,9 @@
         <div class="flex flex-wrap gap-4 mt-4">
           <Button @click="loadAnalytics" variant="primary">Загрузить аналитику</Button>
           <Button @click="resetFilters" variant="secondary">Сбросить фильтры</Button>
-          <Button @click="downloadReport" variant="primary" :style="{ backgroundColor: palette.success }">Скачать отчет (Excel)</Button>
+          <Button @click="downloadReport" variant="primary" :style="{ backgroundColor: palette.success }">Скачать отчет (Excel) по водителю или машине</Button>
         </div>
+        <p class="text-sm text-gray-500 mt-3">Выберите конкретного водителя или конкретную машину (пожарную/легковую) для выгрузки Excel-отчета.</p>
       </div>
 
       <!-- Statistics Cards -->
@@ -839,58 +840,96 @@ const downloadReport = async () => {
       return;
     }
 
-    // Check if driver is selected
-    if (!filters.value.driver) {
-      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
-      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
+    if (filters.value.driver && filters.value.vehicle) {
+      reportModalTitle.value = 'Неверный выбор для отчета';
+      reportModalMessage.value = 'Скачивание отчета поддерживается либо по конкретному водителю, либо по конкретной машине, но не по обоим сразу.';
       reportModalIsOpen.value = true;
       return;
     }
 
-    // Check if vehicle type is selected
-    if (filters.value.vehicleType) {
-      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
-      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
-      reportModalIsOpen.value = true;
-      return;
-    }
-
-    // Check if specific vehicle is selected
+    // Download report for a selected vehicle
     if (filters.value.vehicle) {
-      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
-      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
-      reportModalIsOpen.value = true;
+      const [prefix, vehicleId] = filters.value.vehicle.split('-');
+      if (!vehicleId) {
+        reportModalTitle.value = 'Неверный выбор машины';
+        reportModalMessage.value = 'Выберите конкретную пожарную или легковую машину для выгрузки отчета.';
+        reportModalIsOpen.value = true;
+        return;
+      }
+
+      let endpoint = null;
+      let filePrefix = null;
+      let vehicleName = '';
+
+      if (prefix === 'ft') {
+        endpoint = '/fire-truck-waybills/export-excel/';
+        filePrefix = 'fire_truck';
+        const selected = firetruck_data.value.find(truck => truck.id == vehicleId);
+        vehicleName = selected ? selected.number : `firetruck_${vehicleId}`;
+      } else if (prefix === 'pc') {
+        endpoint = '/passenger-car-waybills/export-excel/';
+        filePrefix = 'passenger_car';
+        const selected = passenger_car_data.value.find(car => car.id == vehicleId);
+        vehicleName = selected ? selected.number : `passenger_car_${vehicleId}`;
+      }
+
+      if (!endpoint) {
+        reportModalTitle.value = 'Неверный выбор машины';
+        reportModalMessage.value = 'Выберите конкретную пожарную или легковую машину для выгрузки отчета.';
+        reportModalIsOpen.value = true;
+        return;
+      }
+
+      const params = new URLSearchParams();
+      params.append('car', vehicleId);
+      params.append('from', filters.value.dateRange.start);
+      params.append('to', filters.value.dateRange.end);
+
+      const response = await axios.get(`${endpoint}?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `report_${filePrefix}_${vehicleName}_${dateStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      console.log('[FuelReport] Vehicle report downloaded successfully');
       return;
     }
 
-    // Build query parameters
-    const params = new URLSearchParams();
-    params.append('driver', filters.value.driver);
-    params.append('from', filters.value.dateRange.start);
-    params.append('to', filters.value.dateRange.end);
+    if (filters.value.driver) {
+      const params = new URLSearchParams();
+      params.append('driver', filters.value.driver);
+      params.append('from', filters.value.dateRange.start);
+      params.append('to', filters.value.dateRange.end);
 
-    // Download the report
-    const response = await axios.get(`/users/drivers-report-excel/?${params.toString()}`, {
-      responseType: 'blob'
-    });
+      const response = await axios.get(`/users/drivers-report-excel/?${params.toString()}`, {
+        responseType: 'blob'
+      });
 
-    // Create a download link
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    
-    // Get driver name for filename
-    const driver = drivers_data.value.find(d => d.id == filters.value.driver);
-    const driverName = driver ? `${driver.surname}_${driver.name}` : `driver_${filters.value.driver}`;
-    const dateStr = new Date().toISOString().split('T')[0];
-    
-    link.setAttribute('download', `report_${driverName}_${dateStr}.xlsx`);
-    document.body.appendChild(link);
-    link.click();
-    link.parentNode.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    
-    console.log('[FuelReport] Report downloaded successfully');
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      const driver = drivers_data.value.find(d => d.id == filters.value.driver);
+      const driverName = driver ? `${driver.surname}_${driver.name}` : `driver_${filters.value.driver}`;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `report_${driverName}_${dateStr}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      console.log('[FuelReport] Report downloaded successfully');
+      return;
+    }
+
+    reportModalTitle.value = 'Не выбран отчёт';
+    reportModalMessage.value = 'Для скачивания отчета выберите конкретного водителя или конкретную машину.';
+    reportModalIsOpen.value = true;
   } catch (error) {
     console.error('[FuelReport] Error downloading report:', error);
     reportModalTitle.value = 'Ошибка при скачивании';
