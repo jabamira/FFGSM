@@ -54,7 +54,7 @@
           <Button @click="resetFilters" variant="secondary">Сбросить фильтры</Button>
           <Button @click="downloadReport" variant="primary" :style="{ backgroundColor: palette.success }">Скачать отчет (Excel)</Button>
         </div>
-        <p class="text-sm text-gray-500 mt-3">Выберите конкретного водителя или конкретную машину (пожарную/легковую) для выгрузки Excel-отчета.</p>
+        <p class="text-sm text-gray-500 mt-3">Выберите конкретного водителя или конкретную машину для выгрузки Excel-отчета.</p>
       </div>
 
       <!-- Statistics Cards -->
