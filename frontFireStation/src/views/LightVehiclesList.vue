@@ -23,8 +23,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedPassengerCarIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          @sort="handleSort"
           row-id-key="id"
         >
           <template #cell-fuel_type="{ row }">
@@ -179,6 +182,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { DataTable, TextInput, SelectInput, palette, Modal, Button } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { fuelTypeOptions, formatFuelType } from '../config/fuelTypes';
 import { validateFormFields, createValidationError } from '../utils/errorUtils';
@@ -200,6 +204,7 @@ const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const passengerCarEditModalRef = ref(null);
 const { searchQuery, filtered: filteredPassengerCars } = useSearch(passengerCars, ['number', 'brand', 'model']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('light_vehicles');
 const filterFuelType = ref('');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
@@ -248,11 +253,17 @@ const showMaintenanceModal = ref(false);
 const selectedMaintenanceCar = ref(null);
 const selectedMaintenanceInfo = ref(null);
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const fetchPassengerCars = async () => {
   if (!auth.permissions.view_passenger_cars) {
     console.warn('Нет разрешения на просмотр легковых автомобилей (view_passenger_cars).');
     return;
   }
+
+  loadSortState();
 
   try {
     const response = await axios.get('/passenger-cars/?include_odometer=true&include_all_maintenance_info=true', {
@@ -350,7 +361,7 @@ const addPassengerCar = async () => {
     });
     
     console.log('[PassengerCars] Passenger car added successfully:', response.data);
-    passengerCars.value.push(response.data);
+    passengerCars.value.unshift(response.data);
     
     // Открываем модал для ввода стартовых данных
     odometerData.value.car = response.data.id;

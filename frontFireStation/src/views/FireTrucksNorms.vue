@@ -101,8 +101,11 @@
             :selectable="true"
             :show-select-all="false"
             :selected-rows="selectedFuelNormIds"
+            :modelSortKey="fuelSortBy"
+            :modelSortOrder="fuelSortOrder"
             @row-selected="onFuelNormsSelected"
             @row-click="editFuelNorm"
+            @sort="handleFuelNormsSort"
             row-id-key="id"
           >
             <template #cell-car="{ value }">
@@ -149,8 +152,11 @@
             :selectable="true"
             :show-select-all="false"
             :selected-rows="selectedOperatingHourIds"
+            :modelSortKey="operatingHoursSortBy"
+            :modelSortOrder="operatingHoursSortOrder"
             @row-selected="onOperatingHoursSelected"
-            @row-click="editOperatingHoursNorm"
+            @row-click="editOperatingHourNorm"
+            @sort="handleOperatingHoursSort"
             row-id-key="id"
           >
             <template #cell-car="{ value }">
@@ -197,8 +203,11 @@
             :selectable="true"
             :show-select-all="false"
             :selected-rows="selectedTechnicalNormIds"
+            :modelSortKey="technicalSortBy"
+            :modelSortOrder="technicalSortOrder"
             @row-selected="onTechnicalNormsSelected"
             @row-click="editTechnicalNorm"
+            @sort="handleTechnicalNormsSort"
             row-id-key="id"
           >
             <template #cell-fire_truck="{ value }">
@@ -314,6 +323,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
+import { useSortState } from '../composables/useSortState';
 import { palette, SelectInput, Button, DataTable, Modal, DateRangeInput, TextInput } from '../components/ui/importUi';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import PermissionDeniedModal from '../components/PermissionDeniedModal.vue';
@@ -329,6 +339,11 @@ const errorModalRef = ref(null);
 const fuelNormEditModal = ref(null);
 const operatingHoursNormEditModal = ref(null);
 const technicalNormEditModal = ref(null);
+
+// Sorting state for each table
+const { sortBy: fuelSortBy, sortOrder: fuelSortOrder, loadSortState: loadFuelSortState, setSortOrder: setFuelSortOrder } = useSortState('fire_truck_fuel_norms');
+const { sortBy: operatingHoursSortBy, sortOrder: operatingHoursSortOrder, loadSortState: loadOperatingHoursSortState, setSortOrder: setOperatingHoursSortOrder } = useSortState('fire_truck_operating_hours_norms');
+const { sortBy: technicalSortBy, sortOrder: technicalSortOrder, loadSortState: loadTechnicalSortState, setSortOrder: setTechnicalSortOrder } = useSortState('fire_truck_technical_norms');
 
 // Modal states
 const showDeleteFuelNormsModal = ref(false);
@@ -545,6 +560,19 @@ const onTechnicalNormsSelected = (selectedIds) => {
   selectedTechnicalNormIds.value = selectedIds;
 };
 
+// Sort handlers
+const handleFuelNormsSort = (sortEvent) => {
+  setFuelSortOrder(sortEvent.key, sortEvent.order);
+};
+
+const handleOperatingHoursSort = (sortEvent) => {
+  setOperatingHoursSortOrder(sortEvent.key, sortEvent.order);
+};
+
+const handleTechnicalNormsSort = (sortEvent) => {
+  setTechnicalSortOrder(sortEvent.key, sortEvent.order);
+};
+
 // Methods - Fetch Data
 const fetchFireTrucks = async () => {
   if (!auth.permissions.view_fire_trucks) {
@@ -566,6 +594,7 @@ const fetchFuelNorms = async () => {
     permissionDeniedModal.value?.openModal('view_fire_truck_norms');
     return;
   }
+  loadFuelSortState();
   try {
     const response = await axios.get('fire-truck-norms/', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -582,6 +611,7 @@ const fetchOperatingHoursNorms = async () => {
     permissionDeniedModal.value?.openModal('view_operating_hours');
     return;
   }
+  loadOperatingHoursSortState();
   try {
     const response = await axios.get('fire-truck-operating-hours-norms/', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -598,6 +628,7 @@ const fetchTechnicalNorms = async () => {
     permissionDeniedModal.value?.openModal('view_technical_maintenance');
     return;
   }
+  loadTechnicalSortState();
   try {
     const response = await axios.get('technical-maintenance-norms/?fire_truck__isnull=false', {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -730,7 +761,7 @@ const openCreateTechnicalNormModal = () => {
 
 // Handlers for modal events - Fuel Norms
 const handleFuelNormAdded = (norm) => {
-  fuelNorms.value.push(norm);
+  fuelNorms.value.unshift(norm);
 };
 
 const handleFuelNormUpdated = (updatedNorm) => {
@@ -742,7 +773,7 @@ const handleFuelNormUpdated = (updatedNorm) => {
 
 // Handlers for modal events - Operating Hours Norms
 const handleOperatingHoursNormAdded = (norm) => {
-  operatingHoursNorms.value.push(norm);
+  operatingHoursNorms.value.unshift(norm);
 };
 
 const handleOperatingHoursNormUpdated = (updatedNorm) => {
@@ -754,7 +785,7 @@ const handleOperatingHoursNormUpdated = (updatedNorm) => {
 
 // Handlers for modal events - Technical Norms
 const handleTechnicalNormAdded = (norm) => {
-  technicalNorms.value.push(norm);
+  technicalNorms.value.unshift(norm);
 };
 
 const handleTechnicalNormUpdated = (updatedNorm) => {

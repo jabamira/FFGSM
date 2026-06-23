@@ -23,8 +23,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedFireTruckIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          @sort="handleSort"
           row-id-key="id"
         >
           <template #cell-fuel_type="{ row }">
@@ -187,6 +190,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { DataTable, TextInput, SelectInput, palette, Modal, Button } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { fuelTypeOptions, formatFuelType } from '../config/fuelTypes';
 import { validateFormFields, createValidationError } from '../utils/errorUtils';
@@ -208,6 +212,7 @@ const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const firetruckEditModalRef = ref(null);
 const { searchQuery, filtered: filteredFireTrucks } = useSearch(fireTrucks, ['number', 'brand', 'model', 'type']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('fire_trucks');
 const filterFuelType = ref('');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
@@ -258,11 +263,17 @@ const showMaintenanceModal = ref(false);
 const selectedMaintenanceTruck = ref(null);
 const selectedMaintenanceInfo = ref(null);
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const fetchFireTrucks = async () => {
   if (!auth.permissions.view_fire_trucks) {
     console.warn('Нет разрешения на просмотр пожарных автомобилей (view_fire_trucks).');
     return;
   }
+
+  loadSortState();
 
   try {
     const response = await axios.get('/fire-trucks/?include_odometer=true&include_all_maintenance_info=true', {
@@ -360,7 +371,7 @@ const addFireTruck = async () => {
     });
     
     console.log('[FireTrucks] Fire truck added successfully:', response.data);
-    fireTrucks.value.push(response.data);
+    fireTrucks.value.unshift(response.data);
     
     // Открываем модал для ввода стартовых данных
     odometerData.value.car = response.data.id;

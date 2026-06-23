@@ -122,20 +122,7 @@
               Цель выезда <span :style="{ color: '#ef4444' }">*</span>
             </label>
             <ion-item class="rounded-lg border" :style="{ borderColor: palette.light }">
-              <ion-select 
-                v-if="!showCustomTripPurpose"
-                v-model="form.trip_purpose" 
-                placeholder="Выберите цель выезда"
-                @ion-change="onTripPurposeChange"
-              >
-                <ion-select-option value="Служебная поездка">Служебная поездка</ion-select-option>
-                <ion-select-option value="Деловая встреча">Деловая встреча</ion-select-option>
-                <ion-select-option value="Доставка груза">Доставка груза</ion-select-option>
-                <ion-select-option value="Техническое обслуживание">Техническое обслуживание</ion-select-option>
-                <ion-select-option value="Прочее">Другое (свой вариант)</ion-select-option>
-              </ion-select>
               <ion-input
-                v-else
                 v-model="form.trip_purpose"
                 type="text"
                 placeholder="Введите цель выезда"
@@ -250,8 +237,8 @@
           <p class="text-xs mt-1" :style="{ color: palette.medium }">Минимум 0, максимум 1000, до 3 знаков после запятой</p>
         </div>
 
-        <!-- Odometer Reading -->
-        <div class="p-4 rounded-xl shadow-md" :style="{ backgroundColor: '#ffffff' }">
+        <!-- Odometer Reading (Fire Truck Only) -->
+        <div v-if="tripData.vehicleType === 'fire_truck'" class="p-4 rounded-xl shadow-md" :style="{ backgroundColor: '#ffffff' }">
           <label class="text-sm font-medium block mb-2" :style="{ color: palette.dark }">
             Одометр после возвращения (км) <span :style="{ color: '#ef4444' }">*</span>
           </label>

@@ -118,8 +118,11 @@
             :selectable="true"
             :show-select-all="false"
             :selected-rows="selectedRecordIds"
+            :modelSortKey="sortBy"
+            :modelSortOrder="sortOrder"
             @row-selected="onRecordsSelected"
             @row-click="(row) => openEditRecord(row)"
+            @sort="handleSort"
             :hideActions="false"
             row-id-key="id"
           >
@@ -353,6 +356,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useSortState } from '../composables/useSortState';
 import { palette, SelectInput, TextInput, Modal, Button } from '../components/ui/importUi';
 import NavigationMenu from '../components/NavigationMenu.vue';
 import CrudPanel from '../components/CrudPanel.vue';
@@ -378,6 +382,7 @@ const waybill = ref({});
 const records = ref([]);
 const cars = ref([]);
 const drivers = ref([]);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('waybill_records');
 const loading = ref(false);
 
 // ID from route
@@ -717,6 +722,7 @@ const fetchWaybill = async () => {
 
 const fetchRecords = async () => {
   loading.value = true;
+  loadSortState();
   try {
     const response = await axios.get(getRecordsEndpoint(), {
       headers: { Authorization: `Bearer ${auth.access}` }
@@ -1054,12 +1060,12 @@ const handleAddRecord = async (recordData) => {
     console.log(JSON.stringify(payload, null, 2));
     console.log('==========================================\n');
     
-    await axios.post(endpoint, payload, {
+    const response = await axios.post(endpoint, payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     
     console.log('[WaybillManagement] Record added successfully');
-    await fetchRecords();
+    records.value.unshift(response.data);
     recordEditModal.value?.closeModal();
   } catch (error) {
     const errorData = error.response?.data;
@@ -1153,12 +1159,15 @@ const handleEditRecord = async (recordData) => {
     console.log(JSON.stringify(payload, null, 2));
     console.log('======================================\n');
     
-    await axios.patch(endpoint, payload, {
+    const response = await axios.patch(endpoint, payload, {
       headers: { Authorization: `Bearer ${auth.access}` }
     });
     
     console.log('[WaybillManagement] Record updated successfully');
-    await fetchRecords();
+    const recordIndex = records.value.findIndex(r => r.id === recordData.id);
+    if (recordIndex !== -1) {
+      records.value[recordIndex] = response.data;
+    }
     recordEditModal.value?.closeModal();
   } catch (error) {
     const errorData = error.response?.data;
@@ -1229,6 +1238,10 @@ const onRecordsSelected = (selectedIds) => {
   selectedRecordIds.value = selectedIds;
 };
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const openDeleteRecordsModal = () => {
   if (selectedRecordIds.value.length === 0) {
     noSelectionModal.value?.openModal();
@@ -1271,8 +1284,8 @@ const confirmDeleteRecords = async () => {
     }
     
     console.log('[WaybillManagement] Records deleted successfully');
+    records.value = records.value.filter(r => !selectedRecordIds.value.includes(r.id));
     selectedRecordIds.value = [];
-    await fetchRecords();
     closeDeleteRecordsModal();
   } catch (error) {
     console.error('Error deleting records:', error);

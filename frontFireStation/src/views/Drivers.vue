@@ -11,8 +11,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedDriverIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          @sort="handleSort"
           row-id-key="id"
         >
         </DataTable>
@@ -214,6 +217,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
@@ -230,6 +234,7 @@ const permissionDeniedModal = ref(null);
 const noSelectionModal = ref(null);
 const errorModalRef = ref(null);
 const { searchQuery, filtered: filteredDrivers } = useSearch(drivers, ['name', 'surname', 'last_name', 'phone', 'driver_license']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('drivers');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const showEditModal = ref(false);
@@ -260,12 +265,18 @@ const editFormErrors = ref({});
 const addFormGeneralError = ref('');
 const editFormGeneralError = ref('');
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const fetchDrivers = async () => {
   // Проверяем разрешение view_drivers
   if (!auth.permissions.view_drivers) {
     console.warn('Нет разрешения на просмотр водителей (view_drivers).');
     return;
   }
+
+  loadSortState();
 
   try {
     // Используем специальный endpoint /users/drivers/ для получения только водителей
@@ -337,7 +348,7 @@ const addDriver = async () => {
     console.log('[Drivers] Driver added successfully:', response.data);
     
     // Добавляем нового водителя в таблицу без перезагрузки
-    drivers.value.push(response.data);
+    drivers.value.unshift(response.data);
     
     // Закрываем модальное окно
     closeAddModal();

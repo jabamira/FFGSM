@@ -117,7 +117,7 @@
 </template>
 
 <script>
-import { ref, computed, onUnmounted } from 'vue';
+import { ref, computed, onUnmounted, watch } from 'vue';
 import { palette } from './theme';
 
 export default {
@@ -157,17 +157,34 @@ export default {
       type: String,
       default: 'id',
     },
+    modelSortKey: {
+      type: String,
+      default: null,
+    },
+    modelSortOrder: {
+      type: String,
+      default: 'asc',
+    },
   },
   emits: ['row-selected', 'row-click', 'sort', 'edit-row', 'delete-row', 'view-row'],
   setup(props, { emit }) {
     const currentPage = ref(1);
-    const sortKey = ref(null);
-    const sortOrder = ref('asc');
+    const sortKey = ref(props.modelSortKey);
+    const sortOrder = ref(props.modelSortOrder);
     const selectedRows = ref([]);
     const isDragging = ref(false);
     const dragStartIdx = ref(null);
-    const dragMode = ref(null); // 'select' или 'unselect'
-    const selectedRowsBeforeDrag = ref([]); // Состояние до начала drag
+    const dragMode = ref(null);
+    const selectedRowsBeforeDrag = ref([]);
+
+    // Watch for external changes to sort props
+    watch(() => props.modelSortKey, (newVal) => {
+      sortKey.value = newVal;
+    });
+
+    watch(() => props.modelSortOrder, (newVal) => {
+      sortOrder.value = newVal;
+    });
 
     const sortedData = computed(() => {
       if (!sortKey.value) return [...props.data];

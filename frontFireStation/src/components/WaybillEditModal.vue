@@ -46,14 +46,6 @@
           :required="fieldDefinitions.waybillCreate.norm_season.required"
           :error="formErrors.norm_season"
         />
-        <SelectInput
-          v-model="form.fuel_type"
-          :options="fuelTypeOptions"
-          :label="fieldDefinitions.waybillCreate.fuel_type.label"
-          :hint="fieldDefinitions.waybillCreate.fuel_type.hint"
-          :required="fieldDefinitions.waybillCreate.fuel_type.required"
-          :error="formErrors.fuel_type"
-        />
       </div>
       <template #footer>
         <Button @click="closeAddModal" variant="secondary">Отмена</Button>
@@ -95,7 +87,6 @@ import { Modal, Button, TextInput, SelectInput, DateInput } from './ui/importUi'
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import ErrorModal from './ErrorModal.vue';
 import PermissionDeniedModal from './PermissionDeniedModal.vue';
-import { fuelTypeOptions } from '../config/fuelTypes';
 import { validateFormFields } from '../utils/errorUtils';
 import { getNovosibirskDateISO } from '../utils/dateUtils';
 
@@ -125,8 +116,7 @@ const form = ref({
   car: null,
   driver: null,
   date: getNovosibirskDateISO(),
-  norm_season: 'summer',
-  fuel_type: 'petrol95'
+  norm_season: 'summer'
 });
 
 const validationError = ref('');
@@ -138,8 +128,7 @@ const formErrors = ref({
   car: '',
   driver: '',
   date: '',
-  norm_season: '',
-  fuel_type: ''
+  norm_season: ''
 });
 
 const generalError = ref('');
@@ -181,8 +170,7 @@ const openAddModal = () => {
     car: null,
     driver: null,
     date: getNovosibirskDateISO(),
-    norm_season: getCurrentSeason(),
-    fuel_type: 'petrol95'
+    norm_season: getCurrentSeason()
   };
   showAddModal.value = true;
 };
@@ -217,8 +205,7 @@ const submitAdd = async () => {
     car: form.value.car,
     driver: form.value.driver,
     date: form.value.date,
-    norm_season: form.value.norm_season,
-    fuel_type: form.value.fuel_type
+    norm_season: form.value.norm_season
   });
 
 };

@@ -723,7 +723,7 @@ export const fieldDefinitions = {
     },
     fuel_type: {
       label: "Тип топлива",
-      required: true,
+      required: false,
       hint: "Выберите тип топлива",
     },
   },

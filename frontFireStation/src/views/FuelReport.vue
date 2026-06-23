@@ -831,18 +831,34 @@ const loadAnalytics = async () => {
 
 const downloadReport = async () => {
   try {
-    // Check if driver is selected
-    if (!filters.value.driver) {
-      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
-      reportModalMessage.value = 'Отчеты доступны только для конкретного водителя. Пожалуйста, выберите водителя из списка.';
+    // Check if dates are selected (required by server)
+    if (!filters.value.dateRange.start || !filters.value.dateRange.end) {
+      reportModalTitle.value = 'Ошибка: даты не указаны';
+      reportModalMessage.value = 'Для скачивания отчета необходимо обязательно указать период (от и до).';
       reportModalIsOpen.value = true;
       return;
     }
 
-    // Check if dates are selected (required by server)
-    if (!filters.value.dateRange.start || !filters.value.dateRange.end) {
-      reportModalTitle.value = 'Ошибка: даты не указаны';
-      reportModalMessage.value = 'Для скачивания отчета необходимо указать период (от и до).';
+    // Check if driver is selected
+    if (!filters.value.driver) {
+      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
+      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
+      reportModalIsOpen.value = true;
+      return;
+    }
+
+    // Check if vehicle type is selected
+    if (filters.value.vehicleType) {
+      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
+      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
+      reportModalIsOpen.value = true;
+      return;
+    }
+
+    // Check if specific vehicle is selected
+    if (filters.value.vehicle) {
+      reportModalTitle.value = 'Отчеты не поддерживаются для типа машины';
+      reportModalMessage.value = 'Скачать отчет можно только на конкретного водителя не указывая конкретный тип и конкретную машину.';
       reportModalIsOpen.value = true;
       return;
     }

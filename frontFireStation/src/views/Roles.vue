@@ -13,8 +13,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedRoleIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          @sort="handleSort"
           row-id-key="id"
         >
           <template v-if="auth.permissions.view_users" #cell-users="{ row }">
@@ -130,6 +133,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button, SelectInput } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
@@ -151,6 +155,7 @@ const userEditModal = ref(null);
 const roleEditModal = ref(null);
 const users = ref([]);
 const { searchQuery, filtered: filteredRoles } = useSearch(roles, ['name']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('roles');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const usersWithRoles = ref([]);
@@ -174,7 +179,13 @@ const newRole = ref({
 const addFormErrors = ref({});
 const addFormGeneralError = ref('');
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const fetchRoles = async () => {
+  loadSortState();
+
   try {
     const response = await axios.get('/roles/', { headers: { Authorization: `Bearer ${auth.access}` } });
     roles.value = response.data;
@@ -279,7 +290,7 @@ const addRole = async () => {
     // 1. Создаём роль
     const roleResp = await axios.post('/roles/', newRole.value, { headers: { Authorization: `Bearer ${auth.access}` } });
     const createdRole = roleResp.data;
-    roles.value.push(createdRole);
+    roles.value.unshift(createdRole);
 
     // 2. Создаём Permission для этой роли (все поля false)
     const permissionPayload = { role: createdRole.id };

@@ -20,8 +20,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedUserIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="onRowClick"
+          @sort="handleSort"
           row-id-key="id"
         >
           <template v-if="auth.permissions.view_roles" #cell-role_name="{ row }">
@@ -180,6 +183,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { DataTable, TextInput, palette, Modal, Button, SelectInput } from '../components/ui/importUi';
 import { useAuthStore } from '../stores/auth';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import { fieldDefinitions } from '../config/fieldDefinitions';
 import { validateFormFields, createValidationError } from '../utils/errorUtils';
 import axios from 'axios';
@@ -201,6 +205,7 @@ const noSelectionModal = ref(null);
 const userEditModal = ref(null);
 const roleEditModal = ref(null);
 const { searchQuery, filtered: filteredUsers } = useSearch(users, ['name', 'surname', 'last_name', 'login', 'phone']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('users');
 const showAddModal = ref(false);
 const showDeleteModal = ref(false);
 const showEditModal = ref(false);
@@ -269,11 +274,17 @@ const fetchRoles = async () => {
   }
 };
 
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
+};
+
 const fetchUsers = async () => {
   if (!auth.permissions.view_users) {
     console.warn('Нет разрешения на просмотр пользователей (view_users).');
     return;
   }
+
+  loadSortState();
 
   try {
     const response = await axios.get('/users/', {
@@ -363,7 +374,7 @@ const addUser = async () => {
       ...response.data,
       role_name: roles.value.find(r => r.id === response.data.role)?.name || '-'
     };
-    users.value.push(newUserData);
+    users.value.unshift(newUserData);
     closeAddModal();
   } catch (error) {
     console.error('Ошибка при добавлении пользователя:', error);

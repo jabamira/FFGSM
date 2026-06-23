@@ -13,7 +13,7 @@ export const useAuthStore = defineStore("auth", {
     checkedOnce: false,
     healthIntervalId: null,
     permissions: {},
-    permissionsLoaded: false, // флаг чтобы знать загружены ли разрешения
+    permissionsLoaded: false,
     crudPermissions: {
       canCreate: false,
       canDelete: false,
@@ -54,7 +54,6 @@ export const useAuthStore = defineStore("auth", {
     },
 
     setPermissions(permissions) {
-      // Если permissions === null, значит мы логируемся - очищаем и отмечаем что разрешения НЕ загружены
       if (permissions === null) {
         this.permissions = {};
         this.permissionsLoaded = false;
@@ -64,7 +63,6 @@ export const useAuthStore = defineStore("auth", {
       this.permissions = permissions || {};
       this.permissionsLoaded = true; // отметить что разрешения загружены
 
-      // Сохраняем разрешения в localStorage для восстановления после refresh
       if (permissions && Object.keys(permissions).length > 0) {
         try {
           localStorage.setItem("permissions", JSON.stringify(permissions));
@@ -93,11 +91,8 @@ export const useAuthStore = defineStore("auth", {
         this.setAccess(access);
         this.setUser(user);
 
-        // Убедиться, что флаг checkedOnce установлен перед возвратом
         this.checkedOnce = true;
 
-        // КРИТИЧНО: Дождаться загрузки разрешений перед возвратом
-        // Это гарантирует, что разрешения готовы когда компонент проверит isDriver()
         const permissionsLoaded = await this.fetchPermissionsWithRetry(3, 5000);
         if (!permissionsLoaded) {
           console.error(
@@ -144,8 +139,6 @@ export const useAuthStore = defineStore("auth", {
             ),
           ]);
 
-          // Если permissionsLoaded установлен, значит разрешения загружены
-          // (даже если они пустые - это нормально)
           if (this.permissionsLoaded) {
             console.log("[AUTH] Permissions loaded successfully");
             return true;
@@ -158,7 +151,6 @@ export const useAuthStore = defineStore("auth", {
           );
 
           if (attempt < maxRetries) {
-            // Экспоненциальная задержка перед retry: 500ms, 1s, 2s...
             const delay = 500 * Math.pow(2, attempt - 1);
             console.log(`[AUTH] Retrying after ${delay}ms...`);
             await new Promise((resolve) => setTimeout(resolve, delay));
@@ -180,7 +172,6 @@ export const useAuthStore = defineStore("auth", {
       }
 
       try {
-        // Используем /permissions/current/ для получения разрешений текущего пользователя
         const res = await axios.get(`/permissions/current/`, {
           headers: {
             Authorization: `Bearer ${this.access}`,
@@ -199,11 +190,10 @@ export const useAuthStore = defineStore("auth", {
     logout() {
       this.setAccess(null);
       this.setUser(null);
-      this.setPermissions(null); // теперь это устанавливает permissionsLoaded = false
-      this.permissionsLoaded = false; // явно обнулить флаг
+      this.setPermissions(null);
+      this.permissionsLoaded = false;
       this.clearCrudPermissions();
       this.stopHealthPolling();
-      // Очищаем всё из localStorage при выходе
       localStorage.removeItem("access");
       localStorage.removeItem("user");
       localStorage.removeItem("permissions");
@@ -277,7 +267,6 @@ export const useAuthStore = defineStore("auth", {
       }
 
       if (this.access && this.user) {
-        // Попробуем обновить разрешения, но не блокируем если не удастся
         this.fetchPermissions().catch((err) => {
           console.warn(
             "[AUTH] Could not refresh permissions on startup, using cached",
@@ -467,9 +456,6 @@ export const useAuthStore = defineStore("auth", {
       );
     },
 
-    /**
-     * Проверить, есть ли доступ к отчетам
-     */
     canAccessReports() {
       return !!(
         this.permissions.view_drivers_reports ||
@@ -478,34 +464,20 @@ export const useAuthStore = defineStore("auth", {
       );
     },
 
-    /**
-     * Найти первую доступную страницу для пользователя
-     * Используется для переадресации после авторизации
-     */
     getDefaultRedirectPath() {
       // Проверим, есть ли доступ к отчетам
       if (this.canAccessReports()) {
         return "/fuel-report";
       }
 
-      // Иначе проверим доступ к пользователям
       if (this.permissions.view_users) {
         return "/users";
       }
 
-      // Если никуда не может, вернем на главную (будет переадресовано на /auth)
       return "/";
     },
-    /**
-     * Проверить, является ли пользователь водителем (только мобильное приложение)
-     * Водитель это:
-     * 1. Пользователь с ролью "Водитель"
-     * 2. Или пользователь без доступа к отчетам, пользователям и ролям (только если разрешения загружены)
-     */
     isDriver() {
-      // Проверка 1: явно указана роль "Водитель"
       if (this.user?.role) {
-        // role может быть строкой или объектом
         const roleName =
           typeof this.user.role === "string"
             ? this.user.role
@@ -516,8 +488,6 @@ export const useAuthStore = defineStore("auth", {
         }
       }
 
-      // Проверка 2: нет доступа ни к отчетам, ни к пользователям, ни к ролям
-      // ЭТА ПРОВЕРКА РАБОТАЕТ ТОЛЬКО ЕСЛИ РАЗРЕШЕНИЯ УЖЕ ЗАГРУЖЕНЫ!
       if (
         this.permissionsLoaded &&
         !this.canAccessReports() &&

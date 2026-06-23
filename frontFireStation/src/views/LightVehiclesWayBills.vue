@@ -65,8 +65,11 @@
           :selectable="true"
           :show-select-all="false"
           :selected-rows="selectedWaybillIds"
+          :modelSortKey="sortBy"
+          :modelSortOrder="sortOrder"
           @row-selected="onRowsSelected"
           @row-click="(waybill) => navigateToWaybill(waybill)"
+          @sort="handleSort"
           row-id-key="id"
         >
           <template #cell-car="{ row }">
@@ -143,6 +146,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { palette, SelectInput, TextInput, DateRangeInput, Modal, Button } from '../components/ui/importUi';
 import { useSearch } from '../composables/useSearch';
+import { useSortState } from '../composables/useSortState';
 import CrudPanel from '../components/CrudPanel.vue';
 import DataTable from '../components/ui/DataTable.vue';
 import NavigationMenu from '../components/NavigationMenu.vue';
@@ -196,6 +200,7 @@ const waybillsForSearch = computed(() => {
 
 // Search with useSearch composable
 const { searchQuery, filtered: searchFiltered } = useSearch(waybillsForSearch, ['searchText']);
+const { sortBy, sortOrder, loadSortState, setSortOrder } = useSortState('light_vehicle_waybills');
 
 // Computed
 const carOptions = computed(() => {
@@ -290,6 +295,10 @@ const getSelectedIndexes = () => {
 
 const onRowsSelected = (selectedIds) => {
   selectedWaybillIds.value = selectedIds;
+};
+
+const handleSort = (sortEvent) => {
+  setSortOrder(sortEvent.key, sortEvent.order);
 };
 
 const openDeleteWaybillModal = () => {
@@ -399,6 +408,7 @@ const fetchWaybills = async () => {
     permissionDeniedModal.value?.openModal('view_passenger_cars_waybills');
     return;
   }
+  loadSortState();
   try {
     const response = await axios.get('passenger-car-waybills/', {
       headers: { Authorization: `Bearer ${auth.access}` }
