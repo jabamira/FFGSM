@@ -2,7 +2,7 @@ import axios from 'axios'
 import StorageManager from '../utils/storageManager'
 
 class ApiClient {
-  constructor(baseURL = 'http://192.168.1.199:8000/api') {
+  constructor(baseURL = 'http://10.4.82.227:8000/api') {
     this.client = axios.create({
       baseURL,
       timeout: 10000,

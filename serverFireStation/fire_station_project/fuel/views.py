@@ -1032,7 +1032,7 @@ class FireTruckWaybillViewSet(SoftDeleteModelViewSet):
         ws = wb.active
 
         ws['D2'] = car.number
-        ws['K2'] = from_date.strftime('%d.%м.%Y')
+        ws['K2'] = from_date.strftime('%d.%m.%Y')
         ws['R2'] = to_date.strftime('%d.%m.%Y')
 
         data_start_row = 7

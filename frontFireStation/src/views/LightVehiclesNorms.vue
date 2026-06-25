@@ -236,7 +236,7 @@
       <div class="bg-red-50 border border-red-200 rounded p-4">
         <ul class="space-y-2">
           <li v-for="norm in fuelNormsToDelete" :key="norm.id" :style="{ color: palette.dark }">
-            {{ getCar(norm.car)?.number }} - Город: {{ parseFloat(norm.city_norm).toFixed(3) }}, Трасса: {{ parseFloat(norm.area_norm).toFixed(3) }}
+            {{ getCar(norm.car)?.number }} - Город: {{ parseFloat(norm.city_norm).toFixed(3) }}, Область: {{ parseFloat(norm.area_norm).toFixed(3) }}
           </li>
         </ul>
       </div>
@@ -258,7 +258,7 @@
       <div class="bg-red-50 border border-red-200 rounded p-4">
         <ul class="space-y-2">
           <li v-for="norm in operatingHoursToDelete" :key="norm.id" :style="{ color: palette.dark }">
-            {{ getCar(norm.car)?.number }} - Город: {{ parseFloat(norm.city_norm).toFixed(4) }}, Трасса: {{ parseFloat(norm.area_norm).toFixed(4) }}
+            {{ getCar(norm.car)?.number }} - Город: {{ parseFloat(norm.city_norm).toFixed(4) }}, Область: {{ parseFloat(norm.area_norm).toFixed(4) }}
           </li>
         </ul>
       </div>
@@ -516,7 +516,7 @@ const technicalNormsToDelete = computed(() => {
 const fuelNormsColumns = [
   { key: 'car', label: 'Машина' },
   { key: 'city_norm', label: 'Город' },
-  { key: 'area_norm', label: 'Трасса' }
+  { key: 'area_norm', label: 'Область' }
 ];
 
 const operatingHoursColumns = [
